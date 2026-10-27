@@ -1,0 +1,242 @@
+# Jugar en RetroArch con PepoMote
+
+El modo **RetroArch** convierte el móvil en un mando para RetroArch: **el
+mando de la consola del juego que RetroArch tiene cargado** (NES, Game Boy,
+SNES, Mega Drive, N64, PlayStation… o el **RetroPad** completo de dos sticks
+si no se conoce), el **Mando Wii vertical u horizontal** con puntero,
+o una **pistola de luz** (el Mando de Wii apuntando) para Duck Hunt y compañía. Usa dos cosas que
+RetroArch trae de serie: el **mando en red** (Network Gamepad / Remote
+RetroPad, UDP 55400 + jugador) para los botones y los sticks, y la **interfaz
+de comandos de red** (UDP 55355) para el menú y las teclas rápidas (guardar y
+cargar estado, avance rápido, rebobinar…). Sin driver de mando virtual y sin
+DSU; funciona igual en Windows, Linux y macOS.
+
+## Primera partida
+
+1. Abre el receptor de PepoMote en el PC y conecta el móvil al mismo PC.
+2. **Cierra RetroArch**. En el móvil toca **RetroArch**: se abre el RetroPad.
+3. Espera el aviso de que RetroArch está listo. Abre RetroArch y juega.
+
+PepoMote escribe en `retroarch.cfg` las claves que activan el mando en red
+(`network_remote_enable`, `network_remote_enable_user_p1`…`p4`,
+`network_remote_base_port`) y la interfaz de comandos (`network_cmd_enable`,
+`network_cmd_port`) y el ratón del menú (`menu_mouse_enable`), con una copia de seguridad en `retroarch.cfg.pepomote.bak`.
+Si RetroArch está abierto, espera a que lo cierres: RetroArch reescribe su
+configuración al salir y pisaría el cambio. Solo hace falta una vez: si las
+claves ya están, PepoMote no toca nada aunque RetroArch esté abierto.
+
+La ventana del receptor dice en todo momento si RetroArch responde, qué
+versión es y a cuántos sondeos por segundo contesta, y RetroArch enseña
+«PepoMote: mando del móvil conectado» en su pantalla al enlazar. Qué está
+corriendo («jugando Super Mario World.sfc (snes9x)») solo se lo pregunta a
+versiones posteriores a la 1.22.2: en la 1.22.2 y anteriores el comando de
+red `GET_STATUS` cierra RetroArch cuando el núcleo cargado no está en su
+lista de información (núcleo fuera de `cores/`, sin archivo `.info` o sin
+caché todavía). Es un fallo de RetroArch corregido en enero de 2026, y
+PepoMote no manda ese comando a esas versiones.
+
+## Los tres mandos
+
+En el móvil, **En RetroArch soy:** elige el mando; se recuerda entre sesiones.
+
+| Mando | Cómo se sostiene | Qué manda |
+|---|---|---|
+| **Consola** (el primer segmento, con el nombre de la que toca) | apaisado | el mando de la consola del juego cargado (ver «El mando de cada consola»); si no se conoce, el **RetroPad** completo: A/B/X/Y en las posiciones de la SNES, L/R, L2/R2, L3/R3, cruceta, dos sticks, Select/Start, **Menú** (abre el menú de RetroArch) y **Rápido** (avance rápido mientras se mantiene) |
+| **Mando Wii** | vertical u horizontal, giro automático | puntero del PC para el Jugador 1, cruceta, **B/A** (1/2), **X/Y** (A/gatillo B del mando Wii), Select/Start y Menú; mismas etiquetas y botones en ambas orientaciones |
+| **Pistola** | derecho, apuntando a la pantalla | el puntero mueve el ratón del PC (es la pistola de luz de RetroArch), **B dispara** (clic izquierdo) y **A recarga** fuera de pantalla (clic derecho); 1 y 2 son B y A del RetroPad, y la cruceta, − / + y Menú como en el mando de NES |
+
+La cabecera plegable del móvil trae además las **teclas rápidas**: Guardar y
+Cargar estado, Ranura − / +, Rebobinar (se mantiene pulsado), Pausa, Captura
+y Reiniciar. Van por la interfaz de comandos de RetroArch, así que no
+dependen de qué teclas tengas asignadas.
+
+## Apuntar con el Mando Wii
+
+El Jugador 1 apunta moviendo el móvil, tanto en vertical como en horizontal.
+Al girar la pantalla, el receptor vuelve a centrar el puntero y adapta los
+ejes en ese mismo paquete. La diana recentra manualmente y la zona de
+precisión permite movimientos más finos. Abrir el teclado congela la pose
+hasta terminar de escribir. Actualiza tanto la app móvil como el receptor.
+
+El Mando Wii conserva sus botones de juego: no genera clics duplicados.
+En el menú, apunta a una opción y confirma con **A** (el botón 2 del mando
+Wii). Para disparar/clicar con el gatillo, elige **Pistola**. El menú debe
+admitir ratón; PepoMote habilita su ajuste al cerrar RetroArch.
+
+Dentro de un juego, el núcleo debe admitir ratón o pistola y tener ese
+dispositivo seleccionado en **Menú rápido → Controles → Puerto 1**. En el
+núcleo Dolphin, elige **Wiimote IR Mode → Mouse controls pointer** en sus
+opciones ([documentación de Libretro](https://docs.libretro.com/library/dolphin/)).
+El puntero de RetroArch usa el ratón; la integración Dolphin independiente
+conserva su propio puntero IR y sensores por DSU. El servidor Android ofrece
+los botones en ambas orientaciones, pero no puede mover el cursor de otra app.
+
+## El mando de cada consola
+
+RetroArch apunta en su historial (`content_history.lpl`) qué juego y qué
+núcleo acaba de cargar, y la ficha del núcleo (`info/*.info`) dice de qué
+consola es. El receptor lo lee (cada 2 s, sin preguntar nada a RetroArch) y
+se lo cuenta al móvil, que enseña **el mando de esa consola**: solo sus
+botones, con sus nombres y sus colores, y sin sticks si no los tenía. En la
+ventana del receptor sale «Último juego cargado: …» y, por jugador, la
+plantilla que enseña cada móvil.
+
+| Consola (núcleos) | Botones en el móvil | Qué manda cada uno al RetroPad |
+|---|---|---|
+| **NES** (FCEUmm, Nestopia, Mesen) | cruceta, B y A, Select/Start | B, A |
+| **Game Boy / Color** (Gambatte, SameBoy) | cruceta, B y A, Select/Start | B, A |
+| **Game Boy Advance** (mGBA, VBA) | cruceta, B y A, L/R, Select/Start | B, A, L, R |
+| **SNES** (Snes9x, bsnes) | cruceta, rombo X/Y/A/B, L/R, Select/Start | los mismos |
+| **Master System / Game Gear** (Genesis Plus GX, SMS Plus) | cruceta, 1 y 2, Pause | 1 → B, 2 → A, Pause → Start |
+| **Mega Drive / 32X** (Genesis Plus GX, PicoDrive) | cruceta, X Y Z sobre A B C, Mode/Start | A → Y, B → B, C → A, X → L, Y → X, Z → R, Mode → Select |
+| **PC Engine** (Beetle PCE) | cruceta, II y I, Select/Run | I → A, II → B, Run → Start |
+| **Arcade** (FBNeo, MAME) | cruceta, seis botones (Y X L / B A R), Moneda/Start | los del RetroPad (dispositivo «Classic» de FBNeo: en lucha, puño flojo/medio/fuerte arriba y patadas abajo), Moneda → Select |
+| **Neo Geo** (FBNeo) | cruceta, rombo A/B/C/D, Moneda/Start | A → B, B → A, C → Y, D → X |
+| **Atari 2600** (Stella) | joystick (cruceta) y Disparo, Select/Reset | Disparo → B, Reset → Start |
+| **Nintendo 64** (Mupen64Plus, ParaLLEl) | stick, cruceta, B y A, Z, L/R, botones C, Start | A → B, B → Y, Z → L2, C → stick derecho |
+| **PlayStation** (PCSX-ReARMed, Beetle PSX, SwanStation) | dos sticks, cruceta, △ ○ ✕ □, L1/L2/R1/R2, L3/R3, Select/Start | ✕ → B, ○ → A, □ → Y, △ → X |
+
+Son los mapeos por defecto de cada núcleo: si en RetroArch has remapeado los
+controles, o usas el dispositivo «Modern» de FBNeo, las etiquetas no
+cuadrarán; elige entonces **RetroPad completo**. Cualquier otro núcleo (DOS,
+Saturn, Dreamcast, PSP…) usa el RetroPad completo.
+
+En el selector del móvil el primer segmento lleva el nombre de la consola que
+toca. Tócalo cuando ya está elegido y sale la lista: **Automático** (seguir
+al PC), las doce consolas, **Mega Drive (3)** (el mando de tres botones) y
+**RetroPad completo**. Lo que elijas se recuerda **para ese juego**; sin juego
+cargado vale para todos hasta que RetroArch cargue uno. Con RetroArch en el
+menú o cerrado se conserva el último juego; si se recarga el mismo, todo sigue
+igual. Cambiar de mando con algo pulsado lo suelta todo primero.
+
+Para que funcione, RetroArch tiene que tener el historial activado (Ajustes →
+Guardado → Historial, que lo está de serie) y el núcleo su ficha `.info`
+(las trae el zip oficial y el actualizador en línea); sin ficha, el receptor
+adivina la consola por el nombre del archivo del núcleo, y para los núcleos
+multisistema (Genesis Plus GX, mGBA…) por la extensión del ROM.
+
+## Multijugador
+
+Cada móvil es un jugador: el Jugador 1 usa el puerto 55400, el 2 el 55401, y
+así hasta cuatro (PepoMote habilita los cuatro usuarios en `retroarch.cfg`).
+En RetroArch, Ajustes → Entrada → Mando en red debe quedar activado (lo hace
+PepoMote) y el mando de cada jugador aparece en su puerto sin configurar nada
+más. Solo el Jugador 1 apunta con el cursor del PC y cambia el modo; el rol Nunchuk no tiene papel en
+RetroArch.
+
+## Cómo llega cada pulsación
+
+RetroArch lee **un** datagrama del mando en red por jugador y por fotograma
+emulado. Mandar más rápido acumula cola (y retardo); más lento deja
+fotogramas sin nada, y en Windows un fotograma vacío puede poner el mando a
+cero (es un despiste de RetroArch con `errno`). PepoMote no adivina la
+velocidad: mantiene siempre **una sonda** en la interfaz de comandos y
+RetroArch la contesta en el mismo sondeo en que lee el mando, así que cada
+respuesta es un hueco para un datagrama por jugador, a 50, 60 o 300
+fotogramas por segundo. En cada hueco va el flanco de botón más antiguo (una
+pulsación breve son dos fotogramas y nunca se pierde), si no el eje que más
+se ha movido, y si no hay nada nuevo un refresco de lo que sigue pulsado. Un
+botón responde al fotograma siguiente; con los dos sticks moviéndose a la
+vez, cada eje se actualiza cada cuatro fotogramas: perfecto para 2D y
+suficiente para 3D. El giroscopio del móvil no llega a RetroArch: su mando en
+red no lo transporta.
+
+## Pistola de luz
+
+En RetroArch la pistola es el ratón: en el núcleo, Menú rápido → Controles →
+Puerto 1, elige el dispositivo de pistola (Zapper, Super Scope, Justifier,
+GunCon…). PepoMote mueve el cursor con el puntero del móvil como en el modo
+puntero (mantén la diana para recentrar; la tira de precisión ralentiza el
+cursor) y B/A son los botones 1 y 2 del ratón, que son los enlaces por
+defecto de RetroArch para disparar y recargar. En Linux, con el driver de
+entrada `udev` la pistola puede no seguir al cursor: usa `x11` o `sdl2`.
+Solo el Jugador 1 apunta (el PC tiene un cursor); un segundo móvil en
+Pistola hace de mando de NES.
+
+## Teclado
+
+Toca **Teclado** en la cabecera para escribir en la ventana de RetroArch
+(núcleos con teclado: DOSBox, ordenadores…). En Windows y macOS PepoMote
+activa la ventana de RetroArch antes de teclear; en Linux déjala en primer
+plano. Si el juego usa el teclado, activa el foco de juego en RetroArch
+(Bloq Despl por defecto) para que las letras no se interpreten como botones.
+
+## Restaurar retroarch.cfg
+
+En el receptor, **Restaurar mi retroarch.cfg** devuelve las claves de
+PepoMote a como estaban en la copia (o las quita si no existían), conserva
+todo lo demás y desactiva **Configurar RetroArch automáticamente** para que
+una reconexión no las vuelva a escribir. Puedes volver a activarlo en Ajustes
+o usar **Configurar RetroArch** a mano. Con RetroArch abierto, la
+restauración queda pendiente hasta que se cierre.
+
+## Localización de retroarch.cfg
+
+| Instalación | Archivo |
+|---|---|
+| Windows (zip oficial y Steam) | `retroarch.cfg` junto a `retroarch.exe` |
+| Windows (instalador) | `%APPDATA%\RetroArch\retroarch.cfg` |
+| Linux | `~/.config/retroarch/retroarch.cfg` (o `$XDG_CONFIG_HOME`), Flatpak `~/.var/app/org.libretro.RetroArch/config/retroarch/retroarch.cfg`, Snap `~/snap/retroarch/current/.config/retroarch/retroarch.cfg` |
+| macOS | `~/Library/Application Support/RetroArch/config/retroarch.cfg` |
+
+PepoMote escribe en todos los que existan (para que valga con una instalación
+nativa y un Flatpak a la vez), y lee el historial (`playlists/builtin/
+content_history.lpl`) y las fichas (`info/`) de la misma carpeta, o de donde
+digan `content_history_path` y `libretro_info_path` en `retroarch.cfg`. En **Ajustes → Carpeta de RetroArch** puedes
+indicar la carpeta del ejecutable, la que contiene `retroarch.cfg` o el
+propio archivo; **Detectar** busca la versión de Steam, y el receptor aprende
+la carpeta al ver RetroArch abierto (Windows).
+
+## RetroArch en Android o en otro PC
+
+El mando en red funciona en cualquier RetroArch con red, pero el receptor
+del PC solo manda a `127.0.0.1`: RetroArch tiene que correr en el mismo
+equipo. En **Android**, el servidor Android de PepoMote (dos Android) hace
+de receptor para el RetroArch de ese mismo móvil: el mismo mando en red, las
+mismas teclas rápidas y el mando de cada consola leyendo el historial de la
+carpeta `RetroArch`; sin pistola ni teclado, y con el mando en red y los
+comandos de red activados a mano en RetroArch (Android no deja que otra app
+toque `Android/data`, y la pantalla Servidor te guía y comprueba la conexión de comandos). Ver
+[ANDROID-SERVER.md](ANDROID-SERVER.md#retroarch).
+
+## Problemas típicos
+
+- **«Esperando a RetroArch»**: RetroArch no responde a los comandos de red.
+  Ciérralo, pulsa **Configurar RetroArch** en el receptor y ábrelo de nuevo;
+  comprueba en Ajustes → Red que Comandos de red esté activado (puerto 55355).
+- **«RetroArch está abierto pero no responde a los comandos de red»**: el
+  mando sigue funcionando en modo degradado (solo cambios, sin sincronizar
+  con los fotogramas). Activa los comandos de red y reinicia RetroArch.
+- **RetroArch se cierra solo al poco de enlazar**: en la 1.22.2 y anteriores
+  el comando de red `GET_STATUS` cierra RetroArch si el núcleo no está en
+  su lista de información (ver arriba). PepoMote no se lo manda a esas
+  versiones; si otro programa usa la interfaz de comandos (un frontend,
+  un script), es él quien pregunta.
+- **Un botón se queda pulsado un solo fotograma o se suelta solo** con otros
+  programas que usan el mando en red: es el despiste de `errno` de RetroArch
+  en Windows; PepoMote lo esquiva refrescando el mando cada fotograma. Si te
+  pasa con PepoMote, mira que la ventana del receptor diga «responde».
+- **El receptor dice «responde» pero el juego no se mueve**: RetroArch pausa
+  el contenido mientras su ventana no está en primer plano (Ajustes →
+  Interfaz → «Pausar el contenido cuando no está activo»). Haz clic en su
+  ventana o desactiva esa opción (`pause_nonactive`). Los comandos (Menú,
+  capturas, estados) sí funcionan con la ventana detrás.
+- **El móvil no cambia al mando de la consola**: RetroArch tiene el historial
+  desactivado, el núcleo no tiene ficha `.info` y su nombre no se reconoce, o
+  la extensión es ambigua (`.bin`, `.cue`) en un núcleo multisistema; el
+  receptor enseña «Último juego cargado» con lo que ha visto. Elige la
+  consola a mano en el selector del móvil.
+- **Las etiquetas no cuadran con el juego**: controles remapeados en
+  RetroArch o dispositivo «Modern» de FBNeo; elige **RetroPad completo**.
+- **El mando no aparece en el juego**: en RetroArch, Ajustes → Entrada →
+  Mando en red activado y el jugador 1 (o el que sea) habilitado; Ajustes →
+  Entrada → Usuarios máximos ≥ número de móviles. Los mandos en red no salen
+  en la lista de mandos detectados: se suman al puerto del jugador.
+- **Las teclas rápidas no hacen nada**: RetroArch las aplica al contenido en
+  marcha; sin juego cargado, guardar estado no hace nada. Rebobinar necesita
+  Ajustes → Fotogramas → Rebobinar activado.
+- **Con un mando de verdad enchufado**: los dos controlan el mismo puerto;
+  los sticks del móvil, si no están en el centro, mandan sobre los del mando.
+- **Se acumula retardo**: no debería (ver «Cómo llega cada pulsación»). Si
+  la ventana dice «sondeos/s» muy por debajo de la velocidad del juego,
+  RetroArch no está contestando a cada fotograma: reinícialo.

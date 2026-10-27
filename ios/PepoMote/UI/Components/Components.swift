@@ -1,0 +1,1171 @@
+import SwiftUI
+
+// MARK: - Gesto de pulsación
+
+/// Pulsación momentánea que sigue al dedo hasta que lo levanta. Según los dos
+/// ajustes de pulsación (`AppPrefs`), tres maneras:
+///
+/// - Con «Mantener al salir del botón» (de serie): una vez pulsado sigue
+///   pulsado aunque el dedo se salga de la vista, hasta levantarlo.
+/// - Sin «Mantener»: al salir del rectángulo se suelta UNA vez y ese dedo ya
+///   no vuelve a pulsar hasta levantarlo (como `tryAwaitRelease` en Compose).
+/// - Con «Pulsar deslizando» (`slide` + `registry`): el gesto no es solo de
+///   este botón; el dedo va cogiendo la zona que pisa (`PressRegistry`) y
+///   soltando la anterior. Lo decide `PressStep`.
+///
+/// `onUp` también si la vista desaparece con el dedo puesto.
+struct HoldGesture: ViewModifier {
+    let onDown: () -> Void
+    let onUp: () -> Void
+    /// «Mantener al salir del botón»; las tiras de Precisión/Acercar, siempre.
+    var sticky = true
+    /// «Pulsar deslizando» (necesita `registry`).
+    var slide = false
+    /// Registro de zonas de la pantalla, solo con `slide`.
+    var registry: PressRegistry? = nil
+
+    /// Este botón lo tiene pulsado el dedo (maneras sin deslizar).
+    @State private var down = false
+    /// Sin «Mantener»: el dedo ya se salió y no vuelve a pulsar.
+    @State private var gone = false
+    /// Tamaño propio, para saber cuándo el dedo se sale.
+    @State private var size: CGSize = .zero
+    /// Deslizando: zona que este dedo tiene cogida.
+    @State private var held: UUID?
+    /// Quién es este dedo para el registro (un gesto, un dedo).
+    @State private var finger = UUID()
+
+    private var sliding: Bool { slide && registry != nil }
+    /// Deslizando se mira toda la pantalla; si no, basta el rectángulo propio.
+    private var space: CoordinateSpace { sliding ? .named(PressRegistry.padSpace) : .local }
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                GeometryReader { g in
+                    Color.clear
+                        .onAppear { size = g.size }
+                        .onChange(of: g.size) { s in size = s }
+                }
+                .allowsHitTesting(false)
+            )
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: space)
+                    .onChanged { v in
+                        if sliding { slideTo(v.location) } else { moved(v.location) }
+                    }
+                    .onEnded { _ in
+                        releaseHeld()
+                        lifted()
+                    }
+            )
+            .onDisappear {
+                releaseHeld()
+                lifted()
+            }
+    }
+
+    /// Deslizando: el dedo suelta lo que tuviera y coge lo que pisa. Una zona
+    /// que ya lleva otro dedo no se le quita a este: si no, al levantar el
+    /// segundo se soltaría el botón que el primero sigue apretando.
+    private func slideTo(_ p: CGPoint) {
+        guard let registry else { return }
+        let over = registry.resolve(p).flatMap { registry.free($0, for: finger) ? $0 : nil }
+        switch PressStep.next(slide: true, sticky: sticky, held: registry.bit(held), over: registry.bit(over)) {
+        case .keep:
+            break
+        case .to(let bit):
+            if let old = held { registry.release(old, by: finger) }
+            held = bit == nil ? nil : over
+            if let id = held { registry.press(id, by: finger) }
+        }
+    }
+
+    private func moved(_ p: CGPoint) {
+        if gone { return }
+        if !down {
+            down = true
+            onDown()
+            return
+        }
+        guard !sticky, size != .zero else { return }
+        // Sin «Mantener»: en cuanto el dedo se sale del botón, se suelta
+        if p.x < 0 || p.y < 0 || p.x > size.width || p.y > size.height {
+            gone = true
+            down = false
+            onUp()
+        }
+    }
+
+    private func lifted() {
+        gone = false
+        if down {
+            down = false
+            onUp()
+        }
+    }
+
+    private func releaseHeld() {
+        if let registry, let id = held { registry.release(id, by: finger) }
+        held = nil
+    }
+}
+
+extension View {
+    func holdGesture(onDown: @escaping () -> Void, onUp: @escaping () -> Void) -> some View {
+        modifier(HoldGesture(onDown: onDown, onUp: onUp))
+    }
+}
+
+/// Modificador compartido de los botones momentáneos (redondos, pastillas y
+/// zonas-gatillo): apunta su marco en el registro de zonas, elige el gesto
+/// según los dos ajustes y deja en `down` si está pulsado (deslizando lo dice
+/// el registro, porque quien lo pulsa puede ser el dedo de otro botón).
+struct PressBit: ViewModifier {
+    let bit: UInt32
+    /// Redondo: la zona es el círculo, no su cuadrado.
+    let circular: Bool
+    /// Sonido «pop» en vez del bip (A y 2).
+    let pop: Bool
+    @Binding var down: Bool
+    @EnvironmentObject private var reg: PressRegistry
+    @AppStorage(AppPrefs.slidePressKey) private var slidePress = false
+    @AppStorage(AppPrefs.stickyPressKey) private var stickyPress = true
+    @State private var id = UUID()
+
+    /// Espacio de coordenadas común de la pantalla.
+    private var padSpace: CoordinateSpace { .named(PressRegistry.padSpace) }
+
+    func body(content: Content) -> some View {
+        let sliding = slidePress && reg.enabled
+        return content
+            .background(
+                GeometryReader { g in
+                    Color.clear
+                        .onAppear { place(g.frame(in: padSpace)) }
+                        .onChange(of: g.frame(in: padSpace)) { r in place(r) }
+                }
+                .allowsHitTesting(false)
+            )
+            .modifier(HoldGesture(
+                onDown: {
+                    down = true
+                    PressRegistry.fire(bit: bit, pop: pop, down: true)
+                },
+                onUp: {
+                    down = false
+                    PressRegistry.fire(bit: bit, pop: pop, down: false)
+                },
+                sticky: stickyPress,
+                slide: sliding,
+                registry: sliding ? reg : nil
+            ))
+            .onChange(of: reg.pressed.contains(id)) { on in
+                if sliding { down = on }
+            }
+            .onDisappear { reg.remove(id) }
+    }
+
+    private func place(_ rect: CGRect) {
+        // Pulsado, el botón se encoge (scaleEffect): vale su marco en reposo
+        guard !down, rect.width > 0, rect.height > 0 else { return }
+        reg.place(id, PressZone(bit: bit, rect: rect, circular: circular, pop: pop))
+    }
+}
+
+extension View {
+    /// Botón momentáneo con los dos modos de pulsación; `down` es lo que pinta.
+    func pressBit(bit: UInt32, circular: Bool, pop: Bool = false, down: Binding<Bool>) -> some View {
+        modifier(PressBit(bit: bit, circular: circular, pop: pop, down: down))
+    }
+}
+
+// MARK: - Texto que se encoge hasta caber
+
+/// Texto de una sola línea que se encoge hasta caber (nunca se corta):
+/// etiquetas de botones y del selector en móviles pequeños.
+struct FitText: View {
+    let text: String
+    var size: CGFloat = 16
+    var weight: PepoFont.Weight = .bold
+    var color: Color = Pepo.text
+
+    init(_ text: String, size: CGFloat = 16, weight: PepoFont.Weight = .bold, color: Color = Pepo.text) {
+        self.text = text
+        self.size = size
+        self.weight = weight
+        self.color = color
+    }
+
+    var body: some View {
+        Text(text)
+            .font(PepoFont.nunito(size, weight))
+            .foregroundColor(color)
+            .lineLimit(1)
+            .minimumScaleFactor(0.45)
+            .allowsTightening(true)
+    }
+}
+
+// MARK: - Botones momentáneos
+
+/// Botón circular momentáneo: mantiene el bit activo mientras está pulsado.
+/// Háptica y sonido en cada pulsación.
+struct RoundButton: View {
+    let label: String
+    let size: CGFloat
+    let bit: UInt32
+    var background: Color = Pepo.card
+    var pressedColor: Color = Pepo.glow
+    var textColor: Color = Pepo.text
+    var textSize: CGFloat = 20
+    var pop = false
+    @State private var down = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(down ? pressedColor : background)
+                .shadow(color: Color.black.opacity(down ? 0.06 : 0.16), radius: down ? 1 : 6, x: 0, y: down ? 1 : 3)
+            FitText(label, size: textSize, weight: .black, color: textColor)
+                .padding(.horizontal, 3)
+        }
+        .frame(width: size, height: size)
+        .scaleEffect(down ? 0.90 : 1)
+        .animation(.easeOut(duration: 0.08), value: down)
+        .contentShape(Circle())
+        .pressBit(bit: bit, circular: true, pop: pop, down: $down)
+    }
+}
+
+/// Botón rectangular momentáneo: los gatillos L/ZL/R/ZR del GamePad y las
+/// pastillas pequeñas TV/Pad y Soplar.
+struct ShoulderButton: View {
+    let label: String
+    let bit: UInt32
+    let width: CGFloat
+    let height: CGFloat
+    var textSize: CGFloat = 16
+    @State private var down = false
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: height / 2.5, style: .continuous)
+        return ZStack {
+            shape
+                .fill(down ? Pepo.glow : Pepo.card)
+                .shadow(color: Color.black.opacity(down ? 0.06 : 0.14), radius: down ? 1 : 4, x: 0, y: down ? 1 : 2)
+            FitText(label, size: textSize, weight: .black)
+                .padding(.horizontal, 4)
+        }
+        .frame(width: width, height: height)
+        .scaleEffect(down ? 0.94 : 1)
+        .animation(.easeOut(duration: 0.08), value: down)
+        .contentShape(shape)
+        .pressBit(bit: bit, circular: false, down: $down)
+    }
+}
+
+/// Zona-gatillo: banda ancha a todo el ancho, como el gatillo trasero del
+/// Wiimote. Por defecto es B; el Nunchuk la usa para Z (azul) y para C.
+struct TriggerZone: View {
+    var bit: UInt32 = Btn.b
+    var label: String = "B"
+    var height: CGFloat = 88
+    var background: Color = Pepo.blue
+    var pressedColor: Color = Pepo.blueHover
+    var textColor: Color = Pepo.onAccent
+    @State private var down = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(down ? pressedColor : background)
+            Text(label)
+                .font(PepoFont.headline())
+                .foregroundColor(textColor)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: height)
+        .contentShape(Rectangle())
+        .pressBit(bit: bit, circular: false, down: $down)
+    }
+}
+
+// MARK: - Stick analógico
+
+/// Stick analógico virtual. El pomo sigue al pulgar dentro del círculo
+/// (tocar el borde = tope) y al soltar vuelve al centro con un muelle.
+/// Salida −127..127, +y arriba, zona muerta pequeña (StickMap); tic háptico
+/// al salir del centro.
+struct AnalogStick: View {
+    let size: CGFloat
+    let onStick: (Int, Int) -> Void
+    @State private var active = false
+    @State private var knob: CGSize = .zero
+    @State private var centered = true
+
+    var body: some View {
+        let knobSize = size * 0.46
+        let travel = (size - knobSize) / 2
+        return ZStack {
+            Circle().fill(Pepo.card)
+            Circle().stroke(active ? Pepo.glow : Pepo.cardBorder, lineWidth: 1.5)
+            // Marcas de los cuatro ejes: orientan el pulgar sin mirar
+            ForEach(0..<4, id: \.self) { i in
+                let a = CGFloat(i) * .pi / 2
+                Circle()
+                    .fill(Pepo.cardBorder)
+                    .frame(width: 6, height: 6)
+                    .offset(x: cos(a) * size * 0.42, y: sin(a) * size * 0.42)
+            }
+            ZStack {
+                Circle()
+                    .fill(active ? Pepo.blueHover : Pepo.blue)
+                    .shadow(color: Color.black.opacity(0.18), radius: active ? 2 : 6, x: 0, y: 2)
+                Circle()
+                    .fill(Pepo.glow)
+                    .frame(width: knobSize * 0.28, height: knobSize * 0.28)
+            }
+            .frame(width: knobSize, height: knobSize)
+            .offset(knob)
+            .animation(active ? nil : Animation.spring(response: 0.25, dampingFraction: 0.65), value: knob)
+        }
+        .frame(width: size, height: size)
+        .contentShape(Circle())
+        .gesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                .onChanged { v in
+                    if !active { active = true }
+                    let dx = v.location.x - size / 2
+                    let dy = v.location.y - size / 2
+                    let len = (dx * dx + dy * dy).squareRoot()
+                    if len > travel {
+                        knob = CGSize(width: dx * travel / len, height: dy * travel / len)
+                    } else {
+                        knob = CGSize(width: dx, height: dy)
+                    }
+                    let (x, y) = StickMap.map(Float(dx), Float(dy), radius: Float(travel))
+                    let atCenter = x == 0 && y == 0
+                    if centered, !atCenter { Haptics.tick() }
+                    centered = atCenter
+                    onStick(x, y)
+                }
+                .onEnded { _ in
+                    active = false
+                    knob = .zero
+                    centered = true
+                    onStick(0, 0)
+                }
+        )
+        .onDisappear { onStick(0, 0) }
+    }
+}
+
+// MARK: - Avisos y estado
+
+/// Punto que late (algo está en marcha: conectando, reconectando…).
+struct PulsingDot: View {
+    let color: Color
+    var size: CGFloat = 10
+    @State private var on = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .opacity(on ? 1 : 0.35)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { on = true }
+            }
+    }
+}
+
+/// «Reconectando con X…» con su punto latiendo, para las cabeceras del mando.
+struct ReconnectingLabel: View {
+    let pcName: String
+    var font: Font = PepoFont.titleMedium()
+
+    var body: some View {
+        HStack(spacing: 8) {
+            PulsingDot(color: Pepo.warn)
+            Text(tr("status_reconnecting", pcName))
+                .font(font)
+                .foregroundColor(Pepo.text)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+    }
+}
+
+/// Aviso transitorio del receptor (`notice`): se enseña ~6 s desde que llegó,
+/// en la pantalla que esté. Un aviso ya caducado no se muestra.
+struct NoticeBanner: View {
+    @ObservedObject var link = LinkState.shared
+    @State private var shown: Notice?
+
+    var body: some View {
+        Group {
+            if let n = shown {
+                Text(n.text)
+                    .font(PepoFont.bodyMedium())
+                    .foregroundColor(Pepo.text)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: 440)
+                    .pepoCard(border: Pepo.warn, radius: 14)
+            }
+        }
+        .onReceive(link.$notice) { n in
+            guard let n else { return }
+            let remaining = 6000 - (LinkState.nowMs() - n.atMs)
+            if remaining <= 0 { return }
+            shown = n
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(Int(remaining))) {
+                if shown == n { shown = nil }
+            }
+        }
+    }
+}
+
+/// Nombre del modo del receptor para las cabeceras.
+func modeLabel(_ mode: String) -> String {
+    switch mode {
+    case LinkState.modeDolphin: return tr("mode_dolphin")
+    case LinkState.modeCemu: return tr("mode_wiiu")
+    case LinkState.modeSwitch: return tr("mode_switch")
+    case LinkState.modeRetroArch: return tr("mode_retroarch")
+    case LinkState.modeGamepad: return tr("mode_gamepad")
+    default: return tr("mode_pointer")
+    }
+}
+
+/// Modo Wii U actuando como Mando de Wii (layouts Wii de siempre, 72 bytes).
+func isWiiUAsWiimote(_ c: ConnectedLink) -> Bool {
+    c.mode == LinkState.modeCemu && c.pad == LinkState.padWiimote
+}
+
+/// Chips de modo: solo el Jugador 1; con el ajuste activo o, siempre, dentro de Wii U.
+func showModeChips(_ c: ConnectedLink, _ showChips: Bool) -> Bool {
+    c.slot == 0 && (showChips || c.mode == LinkState.modeCemu || c.mode == LinkState.modeSwitch
+        || c.mode == LinkState.modeRetroArch || c.mode == LinkState.modeGamepad)
+}
+
+/// Botón Home del Mando de Wii (vertical y apaisado): fuera del modo puntero,
+/// donde el PC no le da uso. En Dolphin es el menú HOME de la Wii; en Cemu,
+/// además, Mario Party 10 lo pide para dar por emparejado cada Mando de Wii
+/// emulado. El mando + Nunchuk y el GamePad lo tienen siempre.
+func showHomeButton(_ c: ConnectedLink) -> Bool {
+    c.mode != LinkState.modePointer
+}
+
+// MARK: - Chips de modo y botón Teclado
+
+/// Selector de modo: Puntero (controla el PC) / Dolphin (Wiimote virtual) /
+/// Wii U (GamePad para Cemu, solo si el receptor lo soporta).
+struct ModeChips: View {
+    let current: String
+    let supportsCemu: Bool
+    var supportsSwitch = false
+    var supportsRetroArch = false
+    var supportsGamepad = false
+    var supportsPointer = true
+    var compact = false
+    /// Chips estrechos (iPhone): caben cuatro en una fila.
+    var dense = false
+
+    var body: some View {
+        HStack(spacing: compact ? 6 : dense ? 8 : 10) {
+            if supportsPointer {
+                ModeChip(label: tr("mode_pointer"), selected: current == LinkState.modePointer, compact: compact, dense: dense) {
+                    LinkState.shared.requestMode(LinkState.modePointer)
+                }
+            }
+            ModeChip(label: tr("mode_dolphin"), selected: current == LinkState.modeDolphin, compact: compact, dense: dense) {
+                LinkState.shared.requestMode(LinkState.modeDolphin)
+            }
+            if supportsCemu {
+                ModeChip(label: tr("mode_wiiu"), selected: current == LinkState.modeCemu, compact: compact, dense: dense) {
+                    LinkState.shared.requestMode(LinkState.modeCemu)
+                }
+            }
+            if supportsSwitch {
+                ModeChip(label: tr("mode_switch"), selected: current == LinkState.modeSwitch, compact: compact, dense: dense) {
+                    LinkState.shared.requestMode(LinkState.modeSwitch)
+                }
+            }
+            if supportsRetroArch {
+                ModeChip(label: tr("mode_retroarch"), selected: current == LinkState.modeRetroArch, compact: compact, dense: dense) {
+                    LinkState.shared.requestMode(LinkState.modeRetroArch)
+                }
+            }
+            // Sin este chip, en el mando universal no había ninguno marcado y
+            // al tocar otro no se podía volver sin salir al inicio.
+            if supportsGamepad {
+                ModeChip(label: tr("mode_gamepad"), selected: current == LinkState.modeGamepad, compact: compact, dense: dense) {
+                    LinkState.shared.requestMode(LinkState.modeGamepad)
+                }
+            }
+        }
+    }
+}
+
+/// Chip de modo (azul cuando es el activo). `compact`: bajo y estrecho, para
+/// las cabeceras apaisadas; `dense`: solo estrecho, para que quepan cuatro en
+/// la fila de un iPhone; `toggle`: no es un modo sino un interruptor (el
+/// Nunchuk): verde encendido y con contorno verde apagado, para que se vea
+/// que es una opción activable.
+struct ModeChip: View {
+    let label: String
+    let selected: Bool
+    var compact = false
+    var dense = false
+    var toggle = false
+    let action: () -> Void
+
+    var body: some View {
+        let fill = !selected ? Pepo.card : toggle ? Pepo.ok : Pepo.blue
+        let text = !selected ? Pepo.textDim : toggle ? Pepo.onAccent : Pepo.card
+        Button(action: action) {
+            Text(label)
+                .font(PepoFont.bodyMedium())
+                .foregroundColor(text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .padding(.horizontal, compact || dense ? 12 : 18)
+                .padding(.vertical, compact ? 6 : 8)
+                .background(fill)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Pepo.ok, lineWidth: toggle && !selected ? 1.5 : 0))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Lo que pasa al tocar «Teclado», en este orden y por estos motivos. La
+/// pantalla solo tiene que abrir la hoja después.
+///
+/// 1. **Nada puede quedar pulsado.** La hoja se traga el final del gesto del
+///    dedo que estuviera sobre un botón, y con «pulsación pegajosa» ese botón
+///    se quedaría pegado.
+/// 2. **La pose se congela ANTES del clic.** Si el móvil se mueve entre el
+///    flanco de bajada y el de subida (70 ms), el PC ve un ARRASTRE: en un
+///    campo de texto eso selecciona en vez de dejar el cursor.
+/// 3. **El clic es el bit A de siempre**, con sus 70 ms garantizados por
+///    `PressLatch`. No hace falta ningún mensaje nuevo, va coordinado con la
+///    posición porque viaja en el mismo paquete, y funciona con cualquier
+///    receptor publicado.
+func openKeyboard(_ link: UiLink, _ press: PressRegistry?) {
+    press?.releaseAll()
+    ButtonState.shared.reset()
+    if Route.holdsPointerForKeyboard(link) {
+        LinkState.shared.motion?.pointerHold = true
+    }
+    if Route.clicksBeforeKeyboard(link, AppPrefs.keyboardClickFirst) {
+        ButtonState.shared.set(Btn.a, true)
+        ButtonState.shared.set(Btn.a, false)
+    }
+}
+
+/// Botón pequeño «Teclado» de las cabeceras en modo Wii U y del hueco de Home
+/// en modo puntero: abre `KeyboardDialog`.
+struct KeyboardButton: View {
+    var compact = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(tr("keyboard"))
+                .font(PepoFont.bodyMedium())
+                .foregroundColor(Pepo.text)
+                .lineLimit(1)
+                .padding(.horizontal, compact ? 12 : 16)
+                .padding(.vertical, compact ? 6 : 8)
+                .background(Pepo.card)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Pepo.cardBorder, lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Diálogo «Teclado»: el texto se escribe aquí y se manda por el canal de
+/// control. Qué se manda en cada caso lo decide `TextInput`.
+///
+/// En modo puntero (`pointer`) el botón grande es **Enviar**, que manda el
+/// texto TAL CUAL: un Intro de más en el PC envía la búsqueda, manda el
+/// mensaje del chat a medias o envía el formulario antes de tiempo. Quien lo
+/// quiera tiene «⏎» al lado. En Wii U, Switch y RetroArch nada cambia.
+struct KeyboardDialog: View {
+    let onSend: (String) -> Void
+    let onClose: () -> Void
+    var pointer = false
+    @State private var field = ""
+    @FocusState private var focused: Bool
+
+    private func apply(_ a: TextInput.Action) {
+        if let s = a.send { onSend(s) }
+        field = a.field
+        if a.close { onClose() }
+    }
+
+    /// ¿El texto acaba en una ventana del PC (puntero o mando universal) y no
+    /// en el teclado en pantalla de un emulador? Entonces el azul manda el
+    /// texto tal cual y el Intro va en su propio botón.
+    private var toPc: Bool { pointer || Route.keyboardOnPc(LinkState.shared.link) }
+
+    /// Lo que hace el botón grande (y la tecla de enviar del teclado).
+    private func primary(_ text: String) -> TextInput.Action {
+        toPc ? TextInput.send(text) : TextInput.accept(text)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            let mode = LinkState.shared.link.connected?.mode
+            Text(tr(toPc ? "kb_pointer_title" : mode == LinkState.modeRetroArch ? "kb_title_retroarch" : "kb_title"))
+                .font(PepoFont.titleMedium()).foregroundColor(Pepo.text)
+            Text(tr(pointer ? "kb_pointer_help"
+                : toPc ? "kb_pc_help"
+                : mode == LinkState.modeRetroArch ? "kb_help_retroarch"
+                : mode == LinkState.modeSwitch ? "kb_help_switch" : "kb_help")).pepoBody()
+            TextField(tr("kb_placeholder"), text: $field)
+                .textFieldStyle(.roundedBorder)
+                .focused($focused)
+                .submitLabel(.send)
+                .disableAutocorrection(true)
+                .onSubmit { apply(primary(field)) }
+            HStack(spacing: 4) {
+                TextLink(title: tr("kb_delete"), color: Pepo.text) { apply(TextInput.delete(field)) }
+                TextLink(title: tr("kb_write"), color: Pepo.text) { apply(TextInput.write(field)) }
+                Spacer()
+            }
+            HStack(spacing: 8) {
+                Spacer()
+                TextLink(title: tr("kb_close")) { apply(TextInput.close(field)) }
+                if toPc {
+                    // El Intro aparte, y con forma de botón: buscar, ir a una
+                    // dirección, mandar el chat. De texto gris no se veía que
+                    // se podía pulsar
+                    Button(action: { apply(TextInput.accept(field)) }) {
+                        Text(tr("kb_enter"))
+                            .font(PepoFont.labelLarge())
+                            .foregroundColor(Pepo.blue)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .overlay(Capsule().stroke(Pepo.blue, lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                }
+                Button(action: { apply(primary(field)) }) {
+                    Text(tr(toPc ? "kb_send" : "kb_accept"))
+                        .font(PepoFont.labelLarge())
+                        .foregroundColor(Pepo.onAccent)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Pepo.blue)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: 440)
+        .pepoCard()
+        .padding(16)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { focused = true }
+        }
+    }
+}
+
+/// Hoja que presenta el teclado de Cemu sobre la pantalla actual.
+struct KeyboardSheet: View {
+    let onClose: () -> Void
+    @ObservedObject private var state = LinkState.shared
+
+    var body: some View {
+        ZStack {
+            Pepo.background.ignoresSafeArea()
+            VStack {
+                if state.link.connected?.hasKeyboard == true {
+                    KeyboardDialog(
+                        onSend: { LinkState.shared.sendText?($0) },
+                        onClose: onClose,
+                        pointer: state.link.connected?.mode == LinkState.modePointer
+                    )
+                }
+                Spacer()
+            }
+            .padding(.top, 12)
+        }
+        .onChange(of: state.link.connected?.hasKeyboard) { available in
+            if available != true { onClose() }
+        }
+        .onAppear { if state.link.connected?.hasKeyboard != true { onClose() } }
+    }
+}
+
+// MARK: - Selector «En Cemu soy»
+
+/// «En Cemu soy: [ GamePad ] [ Mando de Wii ]»: qué mando es este móvil
+/// dentro del modo Wii U. Segmento activo relleno en azul; el pedido y aún sin
+/// eco, a medio tono. Tocar envía `pad wiimote` / `pad gamepad`.
+struct PadSelector: View {
+    let link: ConnectedLink
+    let width: CGFloat
+    var compact = false
+    var help: String? = nil
+    var switchPad = false
+    @State private var pending: String?
+    /// RetroArch: el primer segmento lleva la plantilla de consola que toca; ya elegido, abre el selector
+    @State private var pickerOpen = false
+    @ObservedObject private var state = LinkState.shared
+
+    private static let echoTimeoutMs = 2000
+
+    var body: some View {
+        Group {
+            if link.mode == LinkState.modeRetroArch { retroSelector } else if switchPad { switchSelector } else { cemuSelector }
+        }
+        .onChange(of: link.pad) { _ in pending = nil }
+        .onChange(of: link.mode) { _ in pending = nil }
+        .onChange(of: link.receiver) { _ in pending = nil }
+    }
+
+    /// «En RetroArch soy: [ RetroPad ] [ NES ] [ Pistola ]»: el mando apaisado
+    /// de dos sticks, el Mando Wii de lado (B y A) o el Mando Wii apuntando
+    /// (pistola de luz). Tocar envía `pad retropad|nes|gun`; la pantalla cambia con el eco.
+    private var retroSelector: some View {
+        let inlinePrefix = width >= 470
+        let prefixW: CGFloat = inlinePrefix ? 130 : 0
+        let segmentsW = min(max(width - prefixW - 24, 200), compact ? 360 : 400)
+        let layoutName = RetroLayouts.byId(state.wouldBeRetroLayout(link))?.name ?? tr("retropad")
+        let pads: [(String, String)] = link.receiver.retroPads.map { pad in
+            (pad, pad == LinkState.padRetroPad ? layoutName : tr(pad == LinkState.padNes ? "nes_pad" : "light_gun"))
+        }
+        return VStack(spacing: 2) {
+            if !inlinePrefix {
+                Text(tr("in_retroarch"))
+                    .font(PepoFont.nunito(11, .regular))
+                    .foregroundColor(Pepo.textDim)
+                    .lineLimit(1)
+            }
+            HStack(spacing: compact ? 8 : 10) {
+                if inlinePrefix {
+                    Text(tr("in_retroarch"))
+                        .font(PepoFont.bodyMedium())
+                        .foregroundColor(Pepo.text)
+                        .lineLimit(1)
+                }
+                HStack(spacing: 3) {
+                    ForEach(pads, id: \.0) { pad, label in
+                        Segment(label: label, selected: link.pad == pad, pending: pending == pad, compact: compact) {
+                            if link.pad != pad {
+                                pending = pad
+                                LinkState.shared.sendPad?(pad)
+                            } else if pad == LinkState.padRetroPad, pending == nil {
+                                pickerOpen = true
+                            }
+                        }
+                    }
+                }
+                .padding(3)
+                .frame(width: segmentsW)
+                .background(Pepo.card)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Pepo.cardBorder, lineWidth: 1.5))
+            }
+            if let help {
+                Text(help)
+                    .pepoBody()
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 4)
+                    .padding(.horizontal, 12)
+            }
+        }
+        .onChange(of: pending) { p in
+            guard let p else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(PadSelector.echoTimeoutMs)) {
+                if pending == p { pending = nil }
+            }
+        }
+        .sheet(isPresented: $pickerOpen) {
+            RetroLayoutPicker(link: link) { pickerOpen = false }
+        }
+    }
+
+    private var switchSelector: some View {
+        HStack(spacing: 8) {
+            Text(tr("in_switch")).foregroundColor(Pepo.textDim)
+            Text(tr("pro_controller")).foregroundColor(Pepo.text)
+        }
+        .font(PepoFont.bodyMedium())
+        .padding(.horizontal, 14)
+        .frame(height: 38)
+    }
+
+    private var cemuSelector: some View {
+        let wiimote = link.pad == LinkState.padWiimote
+        let inlinePrefix = width >= 430
+        let prefixW: CGFloat = inlinePrefix ? 110 : 0
+        let segmentsW = min(max(width - prefixW - 24, 160), compact ? 330 : 360)
+        return VStack(spacing: 2) {
+            if !inlinePrefix {
+                Text(tr("in_cemu"))
+                    .font(PepoFont.nunito(11, .regular))
+                    .foregroundColor(Pepo.textDim)
+                    .lineLimit(1)
+            }
+            HStack(spacing: compact ? 8 : 10) {
+                if inlinePrefix {
+                    Text(tr("in_cemu"))
+                        .font(PepoFont.bodyMedium())
+                        .foregroundColor(Pepo.text)
+                        .lineLimit(1)
+                }
+                HStack(spacing: 3) {
+                    Segment(
+                        label: link.player == 1 ? tr("gamepad") : tr("pro_controller"),
+                        selected: !wiimote,
+                        pending: pending == LinkState.padGamepad,
+                        compact: compact
+                    ) {
+                        if wiimote {
+                            pending = LinkState.padGamepad
+                            LinkState.shared.sendPad?(LinkState.padGamepad)
+                        }
+                    }
+                    Segment(
+                        label: tr("wii_remote"),
+                        selected: wiimote,
+                        pending: pending == LinkState.padWiimote,
+                        compact: compact
+                    ) {
+                        if !wiimote {
+                            pending = LinkState.padWiimote
+                            LinkState.shared.sendPad?(LinkState.padWiimote)
+                        }
+                    }
+                }
+                .padding(3)
+                .frame(width: segmentsW)
+                .background(Pepo.card)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Pepo.cardBorder, lineWidth: 1.5))
+            }
+            if let help {
+                Text(help)
+                    .pepoBody()
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 4)
+                    .padding(.horizontal, 12)
+            }
+        }
+        // El eco de `pad` (cambie o no el mando) cierra la espera…
+        .onChange(of: link.pad) { _ in pending = nil }
+        // …y si no llega (PC antiguo), se deja de esperar
+        .onChange(of: pending) { p in
+            guard let p else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(PadSelector.echoTimeoutMs)) {
+                if pending == p { pending = nil }
+            }
+        }
+    }
+
+    private struct Segment: View {
+        let label: String
+        let selected: Bool
+        let pending: Bool
+        let compact: Bool
+        let action: () -> Void
+
+        var body: some View {
+            let bg: Color = selected ? Pepo.blue : (pending ? Pepo.glow : Pepo.card)
+            let fg: Color = selected ? Pepo.onAccent : (pending ? Pepo.text : Pepo.textDim)
+            return Button(action: action) {
+                FitText(label, size: 15, weight: .bold, color: fg)
+                    .padding(.horizontal, compact ? 8 : 12)
+                    .padding(.vertical, compact ? 6 : 8)
+                    .frame(maxWidth: .infinity)
+                    .background(bg)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+func switchPadLabel(_ pad: String) -> String { tr("pro_controller") }
+
+// MARK: - Precisión y scroll
+
+/// Mirilla de francotirador: aro, cuatro marcas que lo cruzan y punto central.
+struct CrosshairGlyph: View {
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        Canvas { ctx, sz in
+            let px = min(sz.width, sz.height)
+            let c = CGPoint(x: sz.width / 2, y: sz.height / 2)
+            let stroke = px * 0.11
+            var ring = Path()
+            ring.addArc(center: c, radius: px * 0.30, startAngle: .zero, endAngle: .degrees(360), clockwise: false)
+            ctx.stroke(ring, with: .color(color), lineWidth: stroke)
+            let dirs: [(CGFloat, CGFloat)] = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+            for (dx, dy) in dirs {
+                var p = Path()
+                p.move(to: CGPoint(x: c.x + dx * px * 0.19, y: c.y + dy * px * 0.19))
+                p.addLine(to: CGPoint(x: c.x + dx * px * 0.47, y: c.y + dy * px * 0.47))
+                ctx.stroke(p, with: .color(color), style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+            }
+            let dot = px * 0.06
+            ctx.fill(Path(ellipseIn: CGRect(x: c.x - dot, y: c.y - dot, width: dot * 2, height: dot * 2)), with: .color(color))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// Mantener = un bit sostenido (precisión, acercar); háptico y tic al
+/// activar. Sigue activo aunque el dedo se salga: son «mantener», no botones,
+/// así que los dos ajustes de pulsación no les tocan (`sticky` siempre, nunca
+/// se deslizan).
+struct HoldBit: ViewModifier {
+    let bit: UInt32
+    @Binding var active: Bool
+
+    func body(content: Content) -> some View {
+        content.modifier(HoldGesture(
+            onDown: {
+                active = true
+                ButtonState.shared.set(bit, true)
+                Haptics.tap()
+                UiSounds.shared.tick()
+            },
+            onUp: {
+                active = false
+                ButtonState.shared.set(bit, false)
+            },
+            sticky: true,
+            slide: false
+        ))
+    }
+}
+
+/// Mantener = bit de precisión (el puntero del PC va al 40 %). Solo en modo
+/// puntero; como `HoldBit`, siempre pegajoso y sin deslizar.
+struct PrecisionHold: ViewModifier {
+    @Binding var active: Bool
+
+    func body(content: Content) -> some View {
+        content.modifier(HoldBit(bit: Btn.precision, active: $active))
+    }
+}
+
+/// Tira de precisión del borde izquierdo (espejo de la de scroll).
+struct PrecisionStrip: View {
+    let width: CGFloat
+    let height: CGFloat
+    /// Tamaño de la mirilla (crece con el iPad).
+    var glyph: CGFloat = 16
+    @State private var active = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(active ? Pepo.glow : Pepo.cardBorder)
+            CrosshairGlyph(color: Pepo.textDim, size: glyph)
+        }
+        .frame(width: width, height: height)
+        .contentShape(Rectangle())
+        .modifier(PrecisionHold(active: $active))
+    }
+}
+
+/// Píldora «Precisión» del mando apaisado (mismo gesto: mantener).
+struct PrecisionPill: View {
+    @State private var active = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            CrosshairGlyph(color: Pepo.textDim, size: 14)
+            Text(tr("precision")).pepoBody()
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 34)
+        .background(active ? Pepo.glow : Pepo.cardBorder)
+        .clipShape(Capsule())
+        .contentShape(Capsule())
+        .modifier(PrecisionHold(active: $active))
+    }
+}
+
+/// Tira «Acercar» del borde izquierdo en modo Dolphin (en el sitio de la de
+/// precisión, que ahí no hace nada): mantener acerca el Mando de Wii emulado
+/// a la pantalla (juegos que lo piden, como los microjuegos de WarioWare).
+struct NearStrip: View {
+    let width: CGFloat
+    let height: CGFloat
+    var glyph: CGFloat = 16
+    @State private var active = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(active ? Pepo.glow : Pepo.cardBorder)
+            NearGlyph(color: Pepo.textDim, size: glyph)
+        }
+        .frame(width: width, height: height)
+        .contentShape(Rectangle())
+        .modifier(HoldBit(bit: Btn.near, active: $active))
+    }
+}
+
+/// Píldora «Acercar» de los mandos apaisados en Dolphin (mismo gesto: mantener).
+struct NearPill: View {
+    @State private var active = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            NearGlyph(color: Pepo.textDim, size: 14)
+            Text(tr("near")).pepoBody()
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 34)
+        .background(active ? Pepo.glow : Pepo.cardBorder)
+        .clipShape(Capsule())
+        .contentShape(Capsule())
+        .modifier(HoldBit(bit: Btn.near, active: $active))
+    }
+}
+
+/// Pantalla (barra arriba) y flecha que se le acerca: el glifo de «Acercar».
+struct NearGlyph: View {
+    let color: Color
+    let size: CGFloat
+
+    var body: some View {
+        Canvas { ctx, sz in
+            let px = min(sz.width, sz.height)
+            let x0 = (sz.width - px) / 2
+            let y0 = (sz.height - px) / 2
+            let cx = x0 + px / 2
+            var p = Path()
+            // la pantalla: barra horizontal arriba
+            p.move(to: CGPoint(x: x0 + px * 0.15, y: y0 + px * 0.14))
+            p.addLine(to: CGPoint(x: x0 + px * 0.85, y: y0 + px * 0.14))
+            // la flecha: asta y punta hacia la barra
+            p.move(to: CGPoint(x: cx, y: y0 + px * 0.90))
+            p.addLine(to: CGPoint(x: cx, y: y0 + px * 0.34))
+            p.move(to: CGPoint(x: cx - px * 0.22, y: y0 + px * 0.54))
+            p.addLine(to: CGPoint(x: cx, y: y0 + px * 0.32))
+            p.move(to: CGPoint(x: cx + px * 0.22, y: y0 + px * 0.54))
+            p.addLine(to: CGPoint(x: cx, y: y0 + px * 0.32))
+            ctx.stroke(p, with: .color(color), style: StrokeStyle(lineWidth: px * 0.11, lineCap: .round))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// Tira de scroll del borde derecho: arrastra para hacer scroll en el PC.
+/// Los puntos se convierten a píxeles (como en Android) para que la misma
+/// distancia de dedo dé el mismo scroll.
+struct ScrollStrip: View {
+    let width: CGFloat
+    let height: CGFloat
+    @State private var active = false
+    @State private var lastY: CGFloat?
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(active ? Pepo.glow : Pepo.cardBorder)
+            VStack(spacing: 6) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Circle().fill(Pepo.textDim).frame(width: 6, height: 6)
+                }
+            }
+        }
+        .frame(width: width, height: height)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                .onChanged { v in
+                    active = true
+                    if let last = lastY {
+                        // dedo hacia arriba (delta negativo) = scroll up = positivo
+                        let dyPx = (last - v.location.y) * UIScreen.main.scale
+                        ButtonState.shared.addScroll(Int(dyPx.rounded()))
+                    }
+                    lastY = v.location.y
+                }
+                .onEnded { _ in
+                    active = false
+                    lastY = nil
+                }
+        )
+    }
+}
+
+/// Diana de recentrado: mantener 150 ms → vibra y recentra.
+struct RecenterButton: View {
+    var size: CGFloat = 64
+    @State private var down = false
+    @State private var work: DispatchWorkItem?
+
+    var body: some View {
+        ZStack {
+            Circle().fill(down ? Pepo.glow : Pepo.card)
+            Circle().fill(Pepo.background).frame(width: size * 0.41, height: size * 0.41)
+            Circle().fill(Pepo.blue).frame(width: size * 0.16, height: size * 0.16)
+        }
+        .frame(width: size, height: size)
+        .contentShape(Circle())
+        .holdGesture(
+            onDown: {
+                down = true
+                let w = DispatchWorkItem {
+                    ButtonState.shared.bumpRecenter()
+                    Haptics.longPress()
+                    UiSounds.shared.tick()
+                }
+                work = w
+                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(150), execute: w)
+            },
+            onUp: {
+                down = false
+                work?.cancel()
+                work = nil
+            }
+        )
+    }
+}
+
+/// Fila multimedia plegable; si está abierta lo decide la pantalla (el mando
+/// vertical cuenta con su alto en un iPhone bajo).
+struct MediaRow: View {
+    @Binding var expanded: Bool
+    var buttonSize: CGFloat = 46
+    /// Tamaño de los símbolos (crece con el iPad).
+    var textSize: CGFloat = 16
+
+    var body: some View {
+        VStack(spacing: 4) {
+            TextLink(title: expanded ? tr("media_open") : tr("media_closed")) {
+                expanded.toggle()
+            }
+            if expanded {
+                HStack(spacing: 12) {
+                    RoundButton(label: "⏮", size: buttonSize, bit: Btn.mediaPrev, textSize: textSize)
+                    RoundButton(label: "🔉", size: buttonSize, bit: Btn.mediaVolDown, textSize: textSize)
+                    RoundButton(label: "⏯", size: buttonSize, bit: Btn.mediaPlayPause, textSize: textSize)
+                    RoundButton(label: "🔇", size: buttonSize, bit: Btn.mediaMute, textSize: textSize)
+                    RoundButton(label: "🔊", size: buttonSize, bit: Btn.mediaVolUp, textSize: textSize)
+                    RoundButton(label: "⏭", size: buttonSize, bit: Btn.mediaNext, textSize: textSize)
+                }
+            }
+        }
+    }
+}

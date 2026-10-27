@@ -1,0 +1,159 @@
+import SwiftUI
+
+@MainActor
+struct RootView: View {
+    @EnvironmentObject var model: AppModel
+    @ObservedObject var link = LinkState.shared
+    @ObservedObject private var updates = UpdateManager.shared
+
+    private var canOfferUpdate: Bool {
+        !model.scanning && (model.screen == .home || model.screen == .settings)
+    }
+
+    /// Apaisado fijo mientras el GamePad o el mando + Nunchuk estén en
+    /// pantalla; el resto gira solo si el bloqueo de giro del Centro de
+    /// control está quitado (lo decide iOS). Cada uno de los dos va hacia su
+    /// lado elegido (Ajustes, o el que se confirme la primera vez: hasta
+    /// entonces, los dos apaisados).
+    private var orientationMask: UIInterfaceOrientationMask {
+        guard model.screen == .controller, Route.forcesLandscape(link.link, link.intent) else { return .all }
+        if Route.wiiLandscapeNunchuk(link.link) {
+            return LandscapeSide.effective(saved: model.nunchukSide, provisional: model.nunchukSideProvisional).mask
+        }
+        return LandscapeSide.effective(saved: model.gamePadSide, provisional: model.gamePadSideProvisional).mask
+    }
+
+    var body: some View {
+        ZStack {
+            Pepo.background.ignoresSafeArea()
+            screenView
+                .id(model.screen)
+                .transition(.opacity)
+            if let t = model.toast {
+                ToastView(text: t)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: model.screen)
+        .animation(.easeInOut(duration: 0.2), value: model.toast)
+        .pepoImmersive()
+        // Error de conexión: al escáner si el PC ya no reconoce el
+        // emparejamiento, o aviso y vuelta al inicio
+        .onReceive(link.$link) { l in
+            if case .failed(let code, let msg) = l { model.onLinkFailed(code: code, msg: msg) }
+        }
+        // Al salir del mando, como estaba
+        .onChange(of: orientationMask) { m in OrientationLock.set(m) }
+        .onChange(of: canOfferUpdate) { updates.setPresentationAllowed($0) }
+        .onAppear {
+            OrientationLock.set(orientationMask)
+            updates.setPresentationAllowed(canOfferUpdate)
+            updates.setForeground(UIApplication.shared.applicationState == .active)
+        }
+        .sheet(item: $updates.offer) { release in
+            UpdateOfferSheet(release: release)
+                .onAppear { updates.markOfferPresented(release) }
+        }
+        .fullScreenCover(isPresented: $model.scanning) {
+            QRScannerScreen { contents in
+                model.scanning = false
+                if let contents { model.onPairContent(contents) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var screenView: some View {
+        switch model.screen {
+        case .onboarding:
+            OnboardingScreen {
+                AppPrefs.onboarded = true
+                model.screen = .home
+            }
+        case .home:
+            HomeScreen()
+        case .pair:
+            PairScreen()
+        case .settings:
+            SettingsScreen()
+        case .nunchuk:
+            NunchukScreen(onDisconnect: { model.disconnectNunchuk() })
+        case .controller:
+            ControllerRoute()
+        }
+    }
+}
+
+/// El mando, según `Route`: GamePad de Wii U (confirmado o pedido y
+/// pendiente), Nunchuk, o los layouts Wii de siempre según la orientación.
+struct ControllerRoute: View {
+    @EnvironmentObject var model: AppModel
+    @ObservedObject var link = LinkState.shared
+
+    var body: some View {
+        GeometryReader { geo in
+            let landscape = geo.size.width > geo.size.height
+            Group {
+                switch Route.route(link.link, link.intent) {
+                case .gamePad:
+                    GamePadScreen(onDisconnect: { model.disconnect() })
+                case .nunchuk:
+                    NunchukScreen(onDisconnect: { model.disconnect() })
+                case .wii:
+                    // Selector Puntero/Dolphin/Wii U: entrando por Conectar/Mando/Wii U
+                    // con el ajuste activo (y siempre dentro de Wii U). Por Dolphin:
+                    // pantalla solo-Dolphin.
+                    let showChips = !model.controllerDolphinOnly && AppPrefs.showDolphinChips
+                    if landscape {
+                        // Dolphin con el Nunchuk en el mismo móvil (confirmado por el
+                        // receptor): mando + Nunchuk a dos manos; si no, el NES de siempre
+                        if Route.wiiLandscapeNunchuk(link.link) {
+                            WiimoteNunchukScreen(showChips: showChips, onDisconnect: { model.disconnect() })
+                        } else {
+                            ControllerLandscapeScreen(showChips: showChips, onDisconnect: { model.disconnect() })
+                        }
+                    } else {
+                        ControllerScreen(showChips: showChips, onDisconnect: { model.disconnect() })
+                    }
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+    }
+}
+
+/// Aviso corto abajo (el Toast de Android).
+struct ToastView: View {
+    let text: String
+
+    var body: some View {
+        VStack {
+            Spacer()
+            Text(text)
+                .font(PepoFont.bodyMedium())
+                .foregroundColor(Pepo.text)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Pepo.card)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Pepo.cardBorder, lineWidth: 1.5))
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+extension View {
+    /// Inmersivo, como en Android: sin barra de estado mientras se usa la app
+    /// y, en iOS 16+, con el indicador de inicio atenuado (vuelve al deslizar).
+    @ViewBuilder
+    func pepoImmersive() -> some View {
+        if #available(iOS 16.0, *) {
+            self.statusBarHidden(true).persistentSystemOverlays(.hidden)
+        } else {
+            self.statusBar(hidden: true)
+        }
+    }
+}

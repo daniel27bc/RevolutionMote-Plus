@@ -1,0 +1,224 @@
+# SETUP-DOLPHIN — jugar a la Wii con PepoMote
+
+## Multijugador (v1.1): se configura solo
+
+Conecta el segundo móvil escaneando el MISMO QR: entra como Jugador 2. Con
+Dolphin CERRADO y el modo Dolphin activo, PepoMote deja Dolphin listo por ti:
+selecciona **Emular el adaptador Bluetooth de la Wii** (con "Acceder
+directamente a un adaptador de Bluetooth" el juego se cierra al arrancar),
+escribe un mando emulado por móvil conectado (Wiimote N = móvil N por orden
+de conexión) con el mapeo PepoMote, deja los demás en «Ninguno» (un mando de
+más aparece en pantalla en los juegos y molesta), registra el servidor DSU y
+activa **Background Input** (desde 1.6: sin él Dolphin ignora el mando en
+cuanto su ventana pierde el foco). Deja copia `.pepomote.bak` de cada archivo que
+toca. Abre Dolphin y a jugar: cada móvil es su propio Wiimote. Si Dolphin
+estaba abierto, PepoMote lo deja pendiente y lo escribe solo en cuanto lo
+cierras (Dolphin pisa su configuración al salir): ciérralo, ábrelo y listo.
+El automatismo se puede apagar en Ajustes. Los pasos manuales de abajo solo
+hacen falta si prefieres mapear a mano.
+
+Dónde escribe: en la carpeta de usuario que usa tu Dolphin, con la misma
+lógica que Dolphin (portable.txt junto al exe → registro → `Documentos\Dolphin
+Emulator` si existe → `AppData\Roaming\Dolphin Emulator`; en Linux
+`~/.config/dolphin-emu` o el Flatpak). La ventana del PC lo dice («carpeta:
+portable…», «AppData…»). Un Dolphin portable (RetroBat, LaunchBox, una
+carpeta suelta) se reconoce al verlo abierto; si no, pon la carpeta del
+`Dolphin.exe` en Ajustes → Carpeta de Dolphin → Detectar.
+
+Requisitos: Dolphin 5.0+ reciente (2023 en adelante), PepoMote en el PC y el
+móvil emparejado. Para el puntero IR completo (acercar el mando a la pantalla
+y el giro del cursor con el roll del móvil) hace falta **Dolphin 2407 o
+posterior** (grupo «Point (Passthrough)» del Wiimote emulado); con uno
+anterior el puntero sigue siendo el puntero IMU de Dolphin, como siempre.
+
+## Nunchuk en el mismo móvil (un solo móvil)
+
+Muchos juegos de Wii piden el Nunchuk (Super Mario Galaxy, Zelda, Metroid
+Prime, Mario Kart con stick…): «Conecta un Nunchuk al Mando de Wii del
+Jugador 1». Con un solo móvil no hace falta nada más: el ajuste **Nunchuk en
+el mismo móvil** (apagado de serie: enciéndelo en Ajustes de la app o con el
+chip verde **Nunchuk** de la cabecera del mando en Dolphin, a la derecha de
+los modos; se recuerda) hace
+que tu mando lleve su propio Nunchuk. La ventana del PC lo lista como «J1 · Mando + Nunchuk» y
+el Wiimote emulado de Dolphin sale con `Extension = Nunchuk` leyendo del
+mismo pad.
+
+Para jugar, **el mando pasa solo a apaisado** (como el GamePad; no hace falta
+girar nada): sale el mando a dos manos, con el
+Nunchuk a la izquierda (Z y C arriba, bajo el índice, y el stick para el
+pulgar) y el Mando de Wii a la derecha (B arriba, que es el gatillo; la
+cruceta y la A grande abajo; −, la diana de recentrado, +, 1, Home y 2 en el
+centro). El puntero sigue siendo el de siempre: se apunta con el móvil de
+lado, como con un GamePad, y agitar el móvil es agitar el mando (y el
+Nunchuk, que comparte sensores). Al apagar el Nunchuk (chip o Ajustes) el mando
+vuelve a seguir al móvil: vertical, o NES de lado.
+
+Arriba, en el centro, no hay botones: solo una **pastilla con el modo**
+(«Dolphin + Nunchuk», por ejemplo), para que no quede nada justo encima de B
+ni de Z y C, donde suben los índices. Tócala y baja una tarjeta con el
+nombre del PC, los chips de modo, el chip **Nunchuk**, **Teclado** y
+**Salir**; se pliega sola a los 4 segundos, y mientras la estés usando no se
+pliega. Al entrar sale desplegada.
+
+La primera vez que sale el mando apaisado, la app pregunta encima «**¿El
+mando está bien así?**»: si tu móvil lo ha girado del revés, «Darle la
+vuelta»; cuando esté como quieres, «Así lo quiero», y se queda fijo hacia ese
+lado para siempre (el sensor de giro de algunos móviles le daba la vuelta al
+mando con muy poco, o sin motivo). En Ajustes de la app, «**Lado del mando +
+Nunchuk**» lo cambia: Izquierda (el borde de la cámara queda a la izquierda),
+Derecha o Según el sensor, como antes.
+
+Para los juegos 2D con el mando de lado (New Super Mario Bros. Wii y
+parecidos) **apaga el Nunchuk** con el chip o en Ajustes: esos juegos cambian
+de esquema de control si detectan un Nunchuk, y así el apaisado vuelve a ser
+el mando NES. Ponerlo o quitarlo cambia la configuración del Wiimote
+emulado, y Dolphin solo la lee al arrancar: **cierra y vuelve a abrir
+Dolphin** al cambiarlo (el receptor lo avisa si Dolphin está abierto).
+
+## Mando de lado (NES)
+
+Con el Nunchuk apagado, gira el móvil y tienes el mando de lado: cruceta a
+la izquierda, 1 y 2 grandes a la derecha (y en el centro −, la diana, +, A y
+Home, pequeño, junto a A), como se sostiene el Mando de Wii
+en los juegos 2D (New Super Mario Bros. Wii, Kirby, Donkey Kong Country
+Returns…) y con el volante de Mario Kart. El móvil es entonces un mando
+girado con el extremo IR a la izquierda, que es lo que esos juegos esperan y
+lo que ellos mismos giran: la cruceta manda los botones del mando girado
+(lo que en pantalla es ▶ es el DOWN del mando), así ▶ mueve a la derecha, y
+el acelerómetro llega como el de un mando de lado: para el volante de Mario
+Kart gira el móvil como un volante (da igual hacia qué lado hayas girado el
+móvil: se normaliza). En modo puntero, de lado, las flechas siguen siendo
+flechas del PC y el cursor sigue el borde largo del móvil, como con el
+GamePad. Para pasar al mando de lado gira el móvil con el giro automático del
+sistema activo: con el bloqueo de giro puesto la app no gira (solo el GamePad
+y el mando + Nunchuk se ponen solos en apaisado).
+
+La cabecera es la misma que la del mando + Nunchuk: arriba en el centro solo
+está la **pastilla con el modo**, y tocarla despliega la tarjeta con el
+nombre del PC, los chips de modo, el chip **Nunchuk**, **Teclado** y
+**Salir**, que se pliega sola a los 4 segundos. Así el chip Nunchuk deja de
+estar pegado a Salir y no hay nada encima de los botones.
+
+La cruceta (en todos los mandos de la app) es de una pieza, como la del Mando
+de Wii: se puede deslizar el pulgar de una dirección a otra sin levantarlo,
+las esquinas entre dos brazos son diagonales y el centro muerto es pequeño.
+
+## Nunchuk: dos móviles, uno en cada mano
+
+Abre PepoMote en un segundo móvil y toca **Nunchuk**: entra emparejado con el
+mando del Jugador 1 (la ventana del PC lo lista como «J1 · Nunchuk»). En el
+móvil tienes el stick, C y Z; su acelerómetro también llega a Dolphin (agitar
+e inclinar el Nunchuk: boxeo de Wii Sports). El receptor configura solo el
+Wiimote del jugador con `Extension = Nunchuk` leyendo del pad de ese segundo
+móvil, con Dolphin cerrado como siempre. Con más jugadores, el segundo
+Nunchuk que entre es el del Jugador 2, y así. El móvil Nunchuk no mueve el
+cursor del PC ni cambia el modo: eso lo decide el mando.
+
+## Acercar el mando a la pantalla (WarioWare y otros)
+
+Algunos juegos piden acercar el Mando de Wii a la pantalla (los microjuegos
+de WarioWare: Smooth Moves, por ejemplo): miden la distancia por la
+separación de los dos puntos IR de la barra sensora. El móvil no sabe a qué
+distancia está la TV, así que en modo Dolphin la tira del borde izquierdo
+del mando (y la píldora de los mandos apaisados; en modo puntero ahí va la
+precisión) es **Acercar**: mientras la mantienes, el mando emulado se acerca
+en cuatro pasos (de 2 m a medio metro) y al soltar vuelve. Hace falta Dolphin
+2407 o posterior: el receptor genera él mismo los puntos IR (grupo «Point
+(Passthrough)» del perfil, escrito solo con Dolphin cerrado), el cursor va
+como en modo puntero (recentrado con la diana incluido) y gira con el móvil.
+La barra sensora se supone **arriba** de la TV (el valor por defecto de la
+Wii y de Dolphin: Configuración → Wii → Posición de la barra sensora); con
+«abajo» el cursor sale desplazado en vertical.
+
+## 1. Activar el modo Dolphin
+
+En el móvil, dentro del mando: chip **Dolphin** (o la tarjeta Dolphin del menú
+principal). La ventana del PC pasa a "Modo Dolphin" y deja de mover el cursor:
+todo el movimiento va ahora al servidor DSU en `127.0.0.1:26760`.
+
+## 2. Conectar Dolphin al servidor (una sola vez)
+
+1. Dolphin → **Opciones → Configuración del mando** (Controllers).
+2. Abajo: **Alternate Input Sources** → marcar **Enable**.
+3. Add server: descripción **PepoMote** (importante: este nombre exacto, el
+   perfil lo referencia), dirección `127.0.0.1`, puerto `26760`. Aceptar.
+4. En la ventana de PepoMote del PC verás "Dolphin: 1 cliente(s) DSU" —
+   confirmación de que Dolphin está escuchando.
+
+## 3. Perfil del Wiimote (una sola vez)
+
+1. Copia `assets/dolphin/PepoMote.ini` a la carpeta de perfiles de Dolphin:
+   - Windows: `Documentos\Dolphin Emulator\Config\Profiles\Wiimote\`
+   - Linux: `~/.config/dolphin-emu/Profiles/Wiimote/` (o el equivalente flatpak)
+2. Dolphin → Controllers → en «Mandos de Wii» marca **Emular el adaptador
+   Bluetooth de la Wii** y pon **Wiimote 1 = Emulated Wii Remote** → Configure.
+3. Arriba a la derecha, en **Profile**: elige `PepoMote` → **Load**.
+4. Comprueba en vivo: pestaña **Motion Input** — al mover el móvil, las barras
+   de `Accel` y `Gyro` deben moverse; plano sobre la mesa, `Accel Up` marcada.
+
+Si prefieres mapear a mano (o el perfil no carga): en Configure, Device =
+`DSUClient/0/PepoMote`, y asigna A=Cross, B=Circle, 1=Square, 2=Triangle,
+−=Share, +=Options, Home=PS, cruceta=`Pad N/S/W/E` (así llama Dolphin a la
+cruceta del DSU), y en Motion Input los seis `Accel *` y los seis `Gyro *` a
+sus homónimos. `IMUIR/Recenter` = `Touch Button` (la diana del móvil manda un
+pulso de Touch al recentrar; el grupo del puntero IMU se llama `IMUIR` en
+Dolphin). En Motion Input pon también `Calibration Period` del giroscopio a
+0: la calibración la hace el receptor (con el móvil quieto de verdad y nunca
+mientras vibra) y la de Dolphin, que promedia 3 s de muestras dentro de la
+zona muerta, aprendía como cero la vibración del motor o un movimiento lento
+de la mano. El puntero IR por passthrough (acercar, giro) no se mapea a mano:
+cárgalo del perfil `PepoMote.ini`, que lleva las expresiones del grupo
+«Point (Passthrough)».
+
+## 4. Calibración de ejes (verificación de h3)
+
+Con el diálogo de mapeo abierto (barras en vivo):
+
+**6 poses estáticas** — cada una debe encender SOLO su barra de accel:
+1. Plano sobre la mesa, pantalla arriba → `Accel Up`
+2. Boca abajo → `Accel Down`
+3. De canto, borde izquierdo abajo → `Accel Left`
+4. De canto, borde derecho abajo → `Accel Right`
+5. Vertical, borde superior arriba (pantalla hacia ti) → `Accel Forward`
+6. Vertical, borde superior abajo → `Accel Backward`
+
+**3 rotaciones puras** — móvil apuntando a la TV:
+1. Muñeca arriba/abajo → `Gyro Pitch Up/Down`
+2. Girar a izquierda/derecha (plano horizontal) → `Gyro Yaw Left/Right`
+3. Rotar sobre el eje de apuntado → `Gyro Roll Left/Right`
+
+Si alguna barra sale invertida o cruzada, se corrige en UN único archivo:
+`desktop/src/dsu/mapping.rs` (matriz de signos comentada por eje).
+
+## 5. Jugar
+
+Wii Sports: en el menú, apunta con el móvil, diana para recentrar. Bolos:
+mantén B, balancea y suelta. Boxeo: puños con el móvil.
+
+WarioWare: Smooth Moves: cuando un microjuego pida acercar el mando a la
+pantalla, mantén **Acercar** (la tira izquierda del mando, o la píldora de
+lado) y suéltalo después.
+
+## Problemas típicos
+
+- **Dolphin enseña el mando desconectado (y el PC dice «1 cliente(s) DSU»)**:
+  el DSU llega pero el Wiimote emulado no está activo en ESE Dolphin. Por
+  orden: (1) el móvil tiene que estar en modo Dolphin; (2) cierra Dolphin y
+  vuelve a abrirlo (si estaba abierto al conectar, la configuración queda
+  pendiente y se escribe al cerrarse); (3) tiene que ser un juego de Wii, no
+  de GameCube; (4) mira qué carpeta dice haber configurado la ventana del PC
+  y compárala con Dolphin → Archivo → Abrir carpeta de usuario: si no es la
+  misma (Dolphin portable), Ajustes → Carpeta de Dolphin → Detectar, o
+  escribe la carpeta del Dolphin.exe a mano; (5) en Dolphin → Mandos, «Wii
+  Remote 1» debe estar en «Emulated Wii Remote» y el adaptador Bluetooth en
+  «Emular».
+- **Dolphin no lista el servidor**: ¿modo Dolphin activo en el móvil? ¿"1
+  cliente(s) DSU" en la ventana? Reinicia Dolphin tras añadir el servidor.
+- **El puntero del menú deriva**: recentra (diana). Con Dolphin 2407+ el
+  puntero es el del receptor (el mismo que en modo puntero). Con uno anterior
+  (puntero IMU de Dolphin) ajusta `IMUIR/Total Yaw` en Motion Input a tu
+  gusto (más grados = menos sensible).
+- **El cursor sale desplazado en vertical (Dolphin 2407+)**: Configuración →
+  Wii → Posición de la barra sensora tiene que ser «Arriba».
+- **Movimiento invertido en un juego**: comprueba la calibración del punto 4
+  antes de tocar nada más.
