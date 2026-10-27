@@ -92,7 +92,7 @@ fun RightStickTrackpad(
             Text(
                 "Aim",
                 style = MaterialTheme.typography.bodySmall,
-                color = PepoColors.DimText,
+                color = PepoColors.TextDim,
                 fontSize = 10.sp
             )
         }
