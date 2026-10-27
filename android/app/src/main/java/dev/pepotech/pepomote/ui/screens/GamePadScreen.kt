@@ -42,9 +42,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.IntOffset
 import dev.pepotech.pepomote.control.CustomLayoutPrefs
 import dev.pepotech.pepomote.ui.components.RightStickTrackpad
 import kotlin.math.roundToInt
@@ -222,7 +219,6 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
         if (operative) engine?.rotation = rotation
     }
 
-    val context = LocalContext.current
     // Ajustes «GamePad sin pantalla táctil» y «pantalla completa»: se leen al
     // entrar (Ajustes es otra pantalla)
     val noScreenPref = remember { AppPrefs.gamePadNoScreen(context) }
@@ -778,7 +774,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                             leftShouldersOffset = Offset.Zero
                             rightShouldersOffset = Offset.Zero
                         }) {
-                            Text(stringResource(R.string.layout_reset), color = PepoColors.Red)
+                            Text(stringResource(R.string.layout_reset), color = PepoColors.Error)
                         }
                         TextButton(onClick = { editLayoutMode = false }) {
                             Text(stringResource(R.string.layout_save), color = PepoColors.Glow)
