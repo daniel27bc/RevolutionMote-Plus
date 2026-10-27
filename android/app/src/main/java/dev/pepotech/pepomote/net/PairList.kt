@@ -1,0 +1,96 @@
+package dev.pepotech.pepomote.net
+
+import java.net.URLDecoder
+import java.net.URLEncoder
+
+/**
+ * Varios PCs guardados: funciones puras sobre la lista (sin Android),
+ * testeadas en PairListTest. Un token es un PC; su nombre y su IP pueden
+ * cambiar (renombrado, DHCP) y se actualizan sin perder el token.
+ */
+object PairList {
+    /** Four digits on PC/current Android; six on Android 1.8.0. Keep leading zeroes. */
+    fun isPairingCode(value: String): Boolean = value.length in listOf(4, 6) && value.all { it in '0'..'9' }
+
+    fun isTemporaryCode(p: Pairing): Boolean = isPairingCode(p.token)
+    private fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
+    private fun dec(s: String): String = URLDecoder.decode(s, "UTF-8")
+
+    /** Una línea por PC: `t=…&host=…&port=…&name=…`, valores URL-encoded. */
+    fun encode(list: List<Pairing>): String =
+        list.joinToString("\n") { p -> "t=${enc(p.token)}&host=${enc(p.host)}&port=${p.port}&name=${enc(p.pcName)}" +
+            if (p.platform == ReceiverCapabilities.ANDROID) "&platform=android" else "" }
+
+    fun decode(text: String?): List<Pairing> =
+        text.orEmpty().lines().filter { it.isNotBlank() }.mapNotNull { line ->
+            val f = line.split("&").mapNotNull { kv ->
+                val i = kv.indexOf('=')
+                if (i <= 0) null else kv.substring(0, i) to dec(kv.substring(i + 1))
+            }.toMap()
+            val token = f["t"] ?: return@mapNotNull null
+            val host = f["host"] ?: return@mapNotNull null
+            Pairing(host, f["port"]?.toIntOrNull() ?: 26761, token, f["name"] ?: "PC", ReceiverCapabilities.platform(f["platform"]))
+        }
+
+    /** Añade o actualiza (por token) conservando el orden. */
+    fun upsert(list: List<Pairing>, p: Pairing): List<Pairing> =
+        if (list.any { it.token == p.token }) list.map { if (it.token == p.token) p else it } else list + p
+
+    fun forget(list: List<Pairing>, token: String): List<Pairing> = list.filter { it.token != token }
+
+    /** PC actual tras olvidar `forgotten`: el mismo si sigue en la lista; si no, el primero que quede. */
+    fun nextCurrent(list: List<Pairing>, current: String?, forgotten: String): String? =
+        if (current != forgotten && list.any { it.token == current }) current else list.firstOrNull()?.token
+
+    /**
+     * Un PC guardado se ve en la red (por nombre o por IP), o es el PC del
+     * enlace vivo (`linkedToken`): con ese hay sesión abierta ahora mismo y no
+     * hace falta esperar a que conteste al sondeo para darlo por visto.
+     */
+    fun isOnline(p: Pairing, receivers: List<ReceiverInfo>, linkedToken: String? = null): Boolean =
+        (linkedToken != null && p.token == linkedToken) || receivers.any { it.name == p.pcName || it.host == p.host }
+
+    /**
+     * Token del PC guardado con el que hay sesión abierta: el actual, y solo
+     * si su nombre es el del enlace (`connectedName`, null = sin sesión).
+     * Olvidado el PC del enlace, el «actual» pasa a ser otro PC, y ese no
+     * tiene sesión: no se le pone en verde por ello.
+     */
+    fun linkedToken(list: List<Pairing>, current: String?, connectedName: String?): String? {
+        if (connectedName == null) return null
+        return list.firstOrNull { it.token == current && it.pcName == connectedName }?.token
+    }
+
+    /**
+     * Lo visto en un sondeo a medias, encima de lo que ya se enseñaba: se
+     * añade y se actualiza por IP, y no se quita nada hasta que el sondeo
+     * acabe (entonces la lista completa reemplaza a esta), así el punto verde
+     * no parpadea al empezar cada sondeo nuevo.
+     */
+    fun merge(shown: List<ReceiverInfo>, seen: List<ReceiverInfo>): List<ReceiverInfo> {
+        val byHost = LinkedHashMap<String, ReceiverInfo>()
+        shown.forEach { byHost[it.host] = it }
+        seen.forEach { byHost[it.host] = it }
+        return byHost.values.toList()
+    }
+
+    /** Receptores de la red que no son ninguno de los guardados. */
+    fun unknown(receivers: List<ReceiverInfo>, list: List<Pairing>): List<ReceiverInfo> =
+        receivers.filter { r -> list.none { it.pcName == r.name || it.host == r.host } }
+
+    /**
+     * IP y puerto de los PCs guardados que la red enseña en otro sitio (DHCP,
+     * otra Wi-Fi), por nombre. Un sitio ya ocupado por OTRO PC guardado (otro
+     * token) no se adopta: dos PCs con el mismo nombre no se pisan.
+     */
+    fun refreshFrom(list: List<Pairing>, receivers: List<ReceiverInfo>): List<Pairing> =
+        list.map { p -> relocateTarget(p, list, receivers) }
+
+    /** `p` con la IP/puerto donde la red dice que está ahora su nombre (o tal cual). */
+    fun relocateTarget(p: Pairing, list: List<Pairing>, receivers: List<ReceiverInfo>): Pairing {
+        val found = receivers.firstOrNull { it.name == p.pcName && (it.host != p.host || it.tcpPort != p.port) }
+            ?: return p
+        val claimed = list.any { it.token != p.token && it.host == found.host && it.port == found.tcpPort }
+        return if (claimed) p else p.copy(host = found.host, port = found.tcpPort)
+    }
+}

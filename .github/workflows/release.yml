@@ -1,0 +1,457 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pruebas del manifiesto de actualización
+        run: python3 -m unittest discover -s packaging/updates -p 'test_*.py'
+      - name: Validar novedades breves en español e inglés
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python3 packaging/updates/manifest.py --tag "$TAG" --notes "docs/releases/$TAG.json" --validate-notes
+      - name: Comprobar versiones y notas antes de compilar
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import os, re, tomllib
+          from pathlib import Path
+          tag = os.environ["TAG"]
+          if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+              raise SystemExit(f"Tag de versión no válido: {tag}")
+          expected = tag[1:]
+          versions = {}
+          for folder, name in [("desktop", "pepomote"), ("mobile-linux", "pepomote-mobile"), ("pmp", "pmp")]:
+              manifest = Path(folder, "Cargo.toml")
+              versions[str(manifest)] = tomllib.loads(manifest.read_text(encoding="utf-8"))["package"]["version"]
+              lock = Path(folder, "Cargo.lock")
+              packages = tomllib.loads(lock.read_text(encoding="utf-8"))["package"]
+              for package in {name, "pmp"}:
+                  versions[f"{lock}:{package}"] = next(p["version"] for p in packages if p["name"] == package)
+          for path, pattern in [
+              ("android/app/build.gradle.kts", r'versionName\s*=\s*"([^"]+)"'),
+              ("ios/project.yml", r'MARKETING_VERSION:\s*"([^"]+)"'),
+          ]:
+              versions[path] = re.search(pattern, Path(path).read_text(encoding="utf-8")).group(1)
+          for source, version in versions.items():
+              if version != expected:
+                  raise SystemExit(f"{source}: versión {version}, se esperaba {expected}")
+          notes = Path("docs/releases", f"{tag}.md")
+          if not notes.is_file() or not notes.read_text(encoding="utf-8").strip():
+              raise SystemExit(f"Faltan las notas de la versión: {notes}")
+          print(f"Todas las versiones coinciden con {tag}; notas presentes.")
+          PY
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build (release)
+        working-directory: desktop
+        run: cargo build --release --locked
+      - name: Pruebas del protocolo y del receptor
+        run: |
+          cargo test --release --locked --manifest-path pmp/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --release --locked --manifest-path desktop/Cargo.toml
+      - name: Actualización y recuperación con el instalador real (archivos aislados)
+        shell: pwsh
+        run: ./desktop/tests/update-handoff.ps1 -Receiver desktop/target/release/PepoMote.exe
+      # Sin el driver del mando virtual en el runner: el Windows Server de GitHub
+      # no trae xusb22 (el driver de clase del mando de Xbox 360), así que un
+      # mando de ViGEm nunca está listo allí y el receptor se queda terminando
+      # (medido: e2e colgado media hora). El e2e del mando universal (XInput
+      # real) se ejecuta en un PC con el driver; aquí se salta solo, con 0.
+      - name: Mandos de extremo a extremo (RetroArch, Eden, Cemu, Dolphin y mando universal)
+        timeout-minutes: 12
+        env:
+          PEPOMOTE_E2E_SUITES: e2e_retroarch,e2e_eden,e2e_cemu,e2e_nunchuk,e2e_dolphin_ir,e2e_gamepad,e2e_rumble
+        run: python desktop/e2e/run_switch_preview.py desktop/target/release/PepoMote.exe dist/e2e
+      # La ventana de verdad en un Windows sin GPU (OpenGL 1.1 de Microsoft,
+      # como un PC sin driver): tiene que pintar con Direct3D 12 por WARP.
+      - name: Humo de la ventana (Windows sin GPU)
+        timeout-minutes: 10
+        continue-on-error: true
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python desktop/e2e/e2e_window_windows.py desktop/target/release/PepoMote.exe dist/e2e-window --cases normal,sin_opengl,sonda_colgada,reintento,marca,nada,carpeta,carpeta_min,aviso
+      - name: Procesos del receptor que se quedaron terminando
+        if: always()
+        shell: pwsh
+        run: Get-Process PepoMote -ErrorAction SilentlyContinue | Format-Table Id, StartTime, HasExited, Responding
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-windows-logs
+          path: |
+            dist/e2e/**/checks.log
+            dist/e2e/**/receiver.out
+            dist/e2e/**/receptor.log
+            dist/e2e-window/**/receptor.log
+          if-no-files-found: warn
+      - name: Diagnóstico de cierre de Windows
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-10)} -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match 'PepoMote' } |
+            Format-List TimeCreated, Id, ProviderName, Message
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: desktop/target/release/PepoMote.exe
+
+  linux:
+    needs: version
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: System deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libxcb-render0-dev libxcb-shape0-dev \
+            libxcb-xfixes0-dev libxkbcommon-dev libssl-dev libasound2-dev libudev-dev file wget
+      - name: Build (release)
+        working-directory: desktop
+        run: cargo build --release --locked
+      - name: Pruebas del protocolo y del receptor
+        run: |
+          cargo test --release --locked --manifest-path pmp/Cargo.toml
+          cargo test --release --locked --manifest-path desktop/Cargo.toml
+      - name: RetroArch de extremo a extremo
+        env:
+          PEPOMOTE_E2E_SUITES: e2e_retroarch
+        run: python3 desktop/e2e/run_switch_preview.py desktop/target/release/PepoMote
+      - name: AppImage
+        run: bash packaging/linux/appimage.sh
+      - name: Tarball (binario + lanzador + install.sh)
+        run: bash packaging/linux/tarball.sh
+      # La ventana se abre de verdad (Wayland y X11, binario y AppImage) antes
+      # de publicar: desktop/e2e/smoke_gui.sh
+      - name: Humo de la ventana
+        run: |
+          sudo apt-get install -y --no-install-recommends sway xvfb x11-utils libegl1 libgl1 libgl1-mesa-dri libgles2 libwayland-egl1 libxkbcommon-x11-0 libnotify-bin
+          bash desktop/e2e/smoke_gui.sh wayland
+          bash desktop/e2e/smoke_gui.sh x11
+          PEPOMOTE_BIN=dist/PepoMote-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh wayland
+          PEPOMOTE_BIN=dist/PepoMote-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh x11
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/PepoMote-x86_64.AppImage
+            dist/PepoMote-linux-x86_64.tar.gz
+            dist/PepoMote-linux-x86_64
+
+  # Receptor para macOS (Apple Silicon): .app firmado con la identidad del
+  # secret (o ad hoc) y DMG. Todas las plataformas deben terminar correctamente.
+  macos:
+    needs: version
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+      # Notarización solo con una cuenta Developer ID (secrets APPLE_NOTARY_*)
+      HAS_NOTARY: ${{ secrets.APPLE_NOTARY_KEY_B64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build (release)
+        working-directory: desktop
+        run: cargo build --release --locked
+      - name: Pruebas del protocolo y del receptor
+        run: |
+          cargo test --release --locked --manifest-path pmp/Cargo.toml
+          cargo test --release --locked --manifest-path desktop/Cargo.toml
+      - name: Identidad de firma (secret) o ad hoc
+        env:
+          MACOS_SIGN_P12_B64: ${{ secrets.MACOS_SIGN_P12_B64 }}
+          MACOS_SIGN_P12_PASSWORD: ${{ secrets.MACOS_SIGN_P12_PASSWORD }}
+        run: bash packaging/macos/import-identity.sh
+      - name: .app + DMG
+        run: |
+          if [ "$HAS_NOTARY" = "true" ]; then export NOTARIZE=1; fi
+          bash packaging/macos/bundle.sh
+      - name: Comprobar el arranque del receptor empaquetado
+        run: |
+          out="$(dist/PepoMote.app/Contents/MacOS/PepoMote --diag)"
+          echo "$out" | grep -q "diagnóstico"
+          echo "$out" | grep -q "^macOS: bundle: .*PepoMote.app"
+      # OPCIONAL: solo con una cuenta Developer ID (secrets APPLE_NOTARY_*).
+      # Con el certificado autofirmado este paso no se ejecuta y la primera
+      # apertura pasa por «Abrir igualmente» (docs/MACOS.md).
+      - name: Notarización (opcional, Developer ID)
+        if: env.HAS_NOTARY == 'true'
+        env:
+          APPLE_NOTARY_KEY_B64: ${{ secrets.APPLE_NOTARY_KEY_B64 }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER }}
+        run: |
+          echo "$APPLE_NOTARY_KEY_B64" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
+          xcrun notarytool submit dist/PepoMote-macOS.dmg --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$APPLE_NOTARY_KEY_ID" --issuer "$APPLE_NOTARY_ISSUER" --wait
+          xcrun stapler staple dist/PepoMote-macOS.dmg
+          xcrun stapler staple dist/PepoMote.app
+          ditto -c -k --keepParent --norsrc dist/PepoMote.app dist/PepoMote-macOS.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            dist/PepoMote-macOS.dmg
+            dist/PepoMote-macOS.zip
+
+  mobile:
+    needs: version
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: System deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libxcb-render0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libgl1-mesa-dev file wget
+      - name: Build (release)
+        working-directory: mobile-linux
+        run: cargo build --release --locked
+      - name: Pruebas del protocolo y del mando
+        run: |
+          cargo test --release --locked --manifest-path pmp/Cargo.toml
+          cargo test --release --locked --manifest-path mobile-linux/Cargo.toml
+      - name: AppImage
+        run: bash packaging/linux-mobile/appimage.sh aarch64
+      - name: Debian package (Mobian)
+        run: bash packaging/linux-mobile/deb.sh arm64
+      - name: Ejecutable para actualizaciones del usuario
+        run: install -m 0755 mobile-linux/target/release/PepoMote-Mobile dist/PepoMote-Mobile-aarch64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile
+          path: |
+            dist/PepoMote-Mobile-aarch64.AppImage
+            dist/PepoMote-Mobile-aarch64
+            dist/pepomote-mobile*arm64.deb
+
+  mobile_musl:
+    needs: version
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build in Alpine (musl)
+        run: |
+          # El rust empaquetado en Alpine va por detrás del MSRV de varios crates del
+          # lockfile: rustup stable dentro del contenedor (host aarch64-unknown-linux-musl)
+          docker run --rm -v "$PWD:/src" -w /src/mobile-linux alpine:3.22 sh -c '
+            set -e
+            apk add --no-cache build-base curl
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+            export PATH="$HOME/.cargo/bin:$PATH"
+            # DINÁMICO: el musl estático (por defecto en Rust) no puede hacer dlopen
+            # y winit carga libwayland-client/libEGL así → la app moría al arrancar
+            export RUSTFLAGS="-C target-feature=-crt-static"
+            cargo build --release --locked
+            cargo test --release --locked --manifest-path ../pmp/Cargo.toml
+            cargo test --release --locked'
+      - name: Tarball
+        run: bash packaging/linux-mobile/tarball.sh aarch64-musl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile_musl
+          path: |
+            dist/PepoMote-Mobile-aarch64-musl.tar.gz
+            dist/PepoMote-Mobile-aarch64-musl
+
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - name: Restore keystore from secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Falta el secret KEYSTORE_B64 (ver docs/RELEASE.md)"; exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > android/pepomote.jks
+      - name: Pruebas, lint y APK firmada
+        working-directory: android
+        env:
+          KEYSTORE_PATH: pepomote.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: chmod +x gradlew && ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleRelease --no-daemon
+      - name: Comprobar firma y alineación
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 android/app/build/outputs/apk/release/app-release.apk
+      - name: Rename
+        run: cp android/app/build/outputs/apk/release/app-release.apk PepoMote.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: PepoMote.apk
+
+  ios:
+    needs: version
+    runs-on: macos-15
+    timeout-minutes: 45
+    # IPA sin firmar (AltStore / Sideloadly lo firman con el Apple ID de quien lo
+    # instala). El IPA es obligatorio para completar la versión.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode + XcodeGen
+        run: |
+          latest="$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)"
+          if [ -n "$latest" ]; then sudo xcode-select -s "$latest"; fi
+          xcodebuild -version
+          brew install xcodegen
+      - name: Generar proyecto
+        working-directory: ios
+        run: xcodegen generate
+      - name: Pruebas en el simulador
+        working-directory: ios
+        run: |
+          mkdir -p ../build
+          device="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for k,vs in d["devices"].items() if "iOS" in k for v in vs if v.get("isAvailable") and v["name"].startswith("iPhone")))')"
+          xcodebuild test -project PepoMote.xcodeproj -scheme PepoMote \
+            -destination "platform=iOS Simulator,id=$device" -resultBundlePath ../build/tests.xcresult \
+            CODE_SIGNING_ALLOWED=NO -quiet
+      - name: IPA sin firmar
+        working-directory: ios
+        run: |
+          xcodebuild build -project PepoMote.xcodeproj -scheme PepoMote -configuration Release \
+            -sdk iphoneos -destination "generic/platform=iOS" -derivedDataPath ../build/dd \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" -quiet
+          app="$(find ../build/dd/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)"
+          test -n "$app"
+          rm -rf Payload && mkdir Payload && cp -R "$app" Payload/
+          zip -qr ../PepoMote.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: PepoMote.ipa
+
+  publish:
+    needs: [windows, linux, macos, mobile, mobile_musl, android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      # Fuente de AltStore: apuntando al IPA de esta release (tamaño real). Se
+      # añade en AltStore por su URL estable: .../releases/latest/download/altstore.json
+      - name: altstore.json
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'EOF'
+          import datetime, json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path("packaging/updates")))
+          from manifest import file_metadata, validate_notes
+          ipa = "PepoMote.ipa"
+          if not os.path.exists(ipa):
+              print("sin IPA: sin fuente de AltStore"); raise SystemExit(0)
+          tag, repo = os.environ["TAG"], os.environ["REPO"]
+          base = f"https://github.com/{repo}"
+          raw = f"https://raw.githubusercontent.com/{repo}/main"
+          version = tag.lstrip("v")
+          today = datetime.date.today().isoformat()
+          brief = validate_notes(json.loads(Path("docs/releases", f"{tag}.json").read_text(encoding="utf-8")))
+          notes = "\n\n".join("\n".join(f"• {line}" for line in brief[lang]) for lang in ("es", "en"))
+          notes += f"\n\n{base}/releases/tag/{tag}"
+          ipa_metadata = file_metadata(Path("."), ipa)
+          src = {
+              "name": "PepoTech",
+              "identifier": "dev.pepotech.altstore",
+              "subtitle": "PepoMote: tu iPhone o iPad, mando de tu PC",
+              "description": "Fuente oficial de PepoMote para AltStore. Codigo abierto (GPL-3.0).",
+              "iconURL": f"{raw}/assets/brand/logo.png",
+              "headerURL": f"{raw}/assets/brand/logo.png",
+              "website": base,
+              "tintColor": "3FA9F5",
+              "featuredApps": ["dev.pepotech.pepomote"],
+              "apps": [{
+                  "name": "PepoMote",
+                  "bundleIdentifier": "dev.pepotech.pepomote",
+                  "developerName": "PepoTech",
+                  "subtitle": "Tu iPhone o iPad, mando de tu PC",
+                  "localizedDescription": "Mueve el cursor del PC como con un mando de Wii, juega a Dolphin con un Wiimote virtual, a Cemu con un GamePad de Wii U con doble pantalla, a Eden con un Pro Controller y a RetroArch con el mando de cada consola. Los botones y sticks funcionan aunque el dispositivo no tenga giroscopio. Necesita el receptor PepoMote en Windows, Linux o macOS, o el servidor Android para Dolphin, Eden y RetroArch. El puntero, la pistola y el teclado de RetroArch necesitan un receptor en PC.",
+                  "iconURL": f"{raw}/assets/brand/logo.png",
+                  "tintColor": "3FA9F5",
+                  "category": "utilities",
+                  "screenshotURLs": [],
+                  "versions": [{
+                      "version": version,
+                      "date": today,
+                      "localizedDescription": notes,
+                      "downloadURL": f"{base}/releases/download/{tag}/PepoMote.ipa",
+                      "size": ipa_metadata["size"],
+                      "sha256": ipa_metadata["sha256"],
+                      "minOSVersion": "15.0",
+                  }],
+                  "appPermissions": {
+                      "entitlements": [],
+                      "privacy": {
+                          "NSCameraUsageDescription": "Para escanear el QR de PepoMote en tu PC.",
+                          "NSLocalNetworkUsageDescription": "PepoMote habla con el receptor de tu PC por la red local (Wi-Fi).",
+                      },
+                  },
+              }],
+              "news": [],
+          }
+          json.dump(src, open("altstore.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          print(open("altstore.json", encoding="utf-8").read())
+          EOF
+      - name: Comprobar todos los paquetes y generar update.json y SHA256SUMS
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python3 packaging/updates/manifest.py --tag "$TAG" --notes "docs/releases/$TAG.json"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            PepoMote.exe
+            PepoMote-x86_64.AppImage
+            PepoMote-linux-x86_64.tar.gz
+            PepoMote-linux-x86_64
+            PepoMote-macOS.dmg
+            PepoMote-macOS.zip
+            PepoMote.apk
+            PepoMote-Mobile-aarch64.AppImage
+            PepoMote-Mobile-aarch64
+            pepomote-mobile*arm64.deb
+            PepoMote-Mobile-aarch64-musl.tar.gz
+            PepoMote-Mobile-aarch64-musl
+            PepoMote.ipa
+            altstore.json
+            update.json
+            SHA256SUMS.txt
+          body_path: docs/releases/${{ github.ref_name }}.md
+          name: PepoMote ${{ github.ref_name }}
+          draft: true
+          make_latest: false
+          fail_on_unmatched_files: true

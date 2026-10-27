@@ -1,0 +1,712 @@
+package dev.pepotech.pepomote
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.os.Bundle
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowCompat
+import android.view.WindowManager
+import android.os.Build
+import android.view.HapticFeedbackConstants
+import android.view.KeyEvent
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import dev.pepotech.pepomote.control.AppPrefs
+import dev.pepotech.pepomote.control.ButtonState
+import dev.pepotech.pepomote.control.Haptics
+import dev.pepotech.pepomote.control.LocaleHelper
+import dev.pepotech.pepomote.control.PressMode
+import dev.pepotech.pepomote.control.GameRumble
+import dev.pepotech.pepomote.control.UiSounds
+import dev.pepotech.pepomote.control.UpdateCheck
+import dev.pepotech.pepomote.service.RotationSuggester
+import dev.pepotech.pepomote.service.UpdateNotice
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import dev.pepotech.pepomote.net.PairStore
+import dev.pepotech.pepomote.net.Pairing
+import dev.pepotech.pepomote.net.PairList
+import dev.pepotech.pepomote.net.ReceiverCapabilities
+import dev.pepotech.pepomote.server.ServerForegroundService
+import dev.pepotech.pepomote.server.ServerScreen
+import dev.pepotech.pepomote.server.ServerState
+import dev.pepotech.pepomote.service.LinkFailure
+import dev.pepotech.pepomote.service.LaunchAction
+import dev.pepotech.pepomote.service.GamePadSide
+import dev.pepotech.pepomote.service.LandscapeOrientation
+import dev.pepotech.pepomote.service.LandscapeSide
+import dev.pepotech.pepomote.service.LinkForegroundService
+import dev.pepotech.pepomote.service.LinkState
+import dev.pepotech.pepomote.service.NunchukSide
+import dev.pepotech.pepomote.service.PadScreen
+import dev.pepotech.pepomote.service.Route
+import dev.pepotech.pepomote.service.ScreenLink
+import dev.pepotech.pepomote.service.UiLink
+import dev.pepotech.pepomote.service.alive
+import dev.pepotech.pepomote.ui.screens.HomeStatus
+import dev.pepotech.pepomote.ui.screens.HomeTone
+import dev.pepotech.pepomote.ui.screens.ControllerLandscapeScreen
+import dev.pepotech.pepomote.ui.screens.WiimoteNunchukScreen
+import dev.pepotech.pepomote.ui.screens.ControllerScreen
+import dev.pepotech.pepomote.ui.screens.GamePadScreen
+import dev.pepotech.pepomote.ui.screens.HomeScreen
+import dev.pepotech.pepomote.ui.screens.NunchukScreen
+import dev.pepotech.pepomote.ui.screens.OnboardingScreen
+import dev.pepotech.pepomote.ui.screens.PairScreen
+import dev.pepotech.pepomote.ui.screens.SettingsScreen
+import dev.pepotech.pepomote.ui.theme.PepoMoteTheme
+import dev.pepotech.pepomote.ui.components.UpdateHost
+
+/**
+ * `Controller` es el mando en general: la pantalla real (GamePad de Wii U,
+ * layouts Wii o Nunchuk) la decide [Route] a partir del enlace y de la
+ * intención pendiente del usuario.
+ */
+internal enum class Screen { Onboarding, Home, Pair, Controller, Nunchuk, Settings, Server }
+
+class MainActivity : ComponentActivity() {
+
+    internal var foreground by mutableStateOf(false)
+
+    internal var currentScreen by mutableStateOf(Screen.Home)
+
+    /** true = se entró al mando por la tarjeta Dolphin (pantalla solo-Dolphin). */
+    internal var controllerDolphinOnly by mutableStateOf(false)
+
+    /**
+     * Rol con el que se entró (Mando/Dolphin/Wii U = wiimote, Nunchuk = nunchuk):
+     * tras escanear el QR (o abrir el enlace profundo) el enlace arranca con él
+     * y se abre su pantalla.
+     */
+    internal var linkRole by mutableStateOf(LinkState.ROLE_WIIMOTE)
+
+    /**
+     * Por qué está abierta la pantalla Conectar: el PC rechazó el
+     * emparejamiento guardado (`bad_token`) y el escáner se ofrece ahí mismo
+     * con la explicación. null = emparejamiento normal (primera vez, Ajustes).
+     */
+    internal var pairReason by mutableStateOf<String?>(null)
+
+    /** Sube con cada cambio de la lista de PCs guardados (la pantalla Conectar la relee). */
+    internal var pairVersion by mutableIntStateOf(0)
+
+    /** A la pantalla Conectar (escáner QR), con explicación si viene de un rechazo. */
+    internal fun openPair(reason: String? = null) {
+        pairReason = reason
+        currentScreen = Screen.Pair
+    }
+
+    /**
+     * El enlace ha muerto con error (el servicio ya se ha parado). Si el PC no
+     * reconoce el emparejamiento, al escáner con la explicación: el rol y el
+     * modo pedidos se conservan y al escanear se sigue donde se estaba. Con
+     * cualquier otro error, aviso y vuelta al inicio (y el modo pedido se
+     * olvida, que no salte en una reconexión posterior).
+     */
+    internal fun onLinkFailed(failure: UiLink.Failed) {
+        LinkState.clearFailure()
+        val pc = LinkFailure.pcLabel(PairStore.load(this)?.pcName, getString(R.string.your_pc))
+        if (LinkFailure.needsNewQr(failure.code)) {
+            val previous = PairStore.load(this)
+            if (previous != null && PairList.isTemporaryCode(previous)) {
+                PairStore.forget(this, previous.token)
+                pairVersion++
+                openPair(getString(R.string.server_code_failed))
+            } else openPair(getString(R.string.re_pair_reason, pc))
+        } else if (LinkFailure.offerAnotherPc(failure.code, PairStore.all(this).size)) {
+            // Con varios PCs guardados, un PC que no responde no es el final:
+            // a Conectar a elegir otro (lo pedido se conserva)
+            openPair(getString(R.string.pc_not_responding, pc))
+        } else {
+            Toast.makeText(this, getString(R.string.error_prefix, failure.msg), Toast.LENGTH_LONG).show()
+            LinkState.pendingMode = null
+            currentScreen = Screen.Home
+        }
+    }
+
+    /** Hay un enlace vivo (o arrancando o rehaciéndose) como Nunchuk. */
+    private fun linkIsNunchuk(): Boolean =
+        LinkState.flow.value.alive && LinkState.role == LinkState.ROLE_NUNCHUK
+
+    /**
+     * Al mando (wiimote) en el modo pedido. El rol no se cambia en caliente:
+     * un enlace vivo como Nunchuk se rehace como mando. `cemu` deja intención
+     * Wii U: el GamePad se abre al instante. `dolphinOnly`: se entra por la
+     * tarjeta Dolphin (pantalla solo-Dolphin, sin selector de modo).
+     */
+    internal fun openController(mode: String, dolphinOnly: Boolean) {
+        val androidReceiver = PairStore.load(this)?.platform == ReceiverCapabilities.ANDROID
+        // RetroArch se pide con optimismo: el ok del servidor Android decide si lo tiene
+        val requested = if (androidReceiver) ReceiverCapabilities.select(mode, LinkState.MODE_DOLPHIN,
+            ReceiverCapabilities.ANDROID, false, true, true) else mode
+        controllerDolphinOnly = dolphinOnly && !androidReceiver
+        linkRole = LinkState.ROLE_WIIMOTE
+        when {
+            // Ya conectado como mando (por Dolphin o lo que sea): al mando en
+            // ese modo — nunca al escáner
+            LinkState.flow.value.alive && !linkIsNunchuk() -> {
+                LinkState.requestMode(requested)
+                currentScreen = Screen.Controller
+            }
+
+            PairStore.load(this) != null -> {
+                LinkState.requestMode(requested) // se aplica al llegar el ok
+                LinkForegroundService.start(this)
+                currentScreen = Screen.Controller
+            }
+
+            // Sin emparejar: al escáner, y el modo pedido se aplica al
+            // conectar tras el QR (Wii U abre el GamePad)
+            else -> {
+                LinkState.requestMode(requested)
+                openPair()
+            }
+        }
+    }
+
+    /** Tarjeta «Mando»: al mando sin tocar el modo del receptor. */
+    internal fun openPad() {
+        controllerDolphinOnly = false
+        linkRole = LinkState.ROLE_WIIMOTE
+        when {
+            // Sin emparejar no hay mando que abrir: al escáner
+            PairStore.load(this) == null -> openPair()
+
+            else -> {
+                if (linkIsNunchuk()) LinkForegroundService.start(this)
+                currentScreen = Screen.Controller
+            }
+        }
+    }
+
+    /**
+     * Un PC de «Tus PCs»: pasa a ser el actual y se conecta con él, con el
+     * mismo papel y modo que se habían pedido.
+     */
+    internal fun onSavedPcChosen(p: Pairing) {
+        adaptToReceiver(p)
+        PairStore.select(this, p.token)
+        pairVersion++
+        pairReason = null
+        LinkForegroundService.start(this, linkRole)
+        if (linkRole == LinkState.ROLE_WIIMOTE) LinkState.pendingMode?.let { LinkState.requestMode(it) }
+        currentScreen = if (linkRole == LinkState.ROLE_NUNCHUK) Screen.Nunchuk else Screen.Controller
+    }
+
+    internal fun onForgetPc(p: Pairing) {
+        PairStore.forget(this, p.token)
+        pairVersion++
+    }
+
+    /** Tarjeta «Nunchuk»: el móvil de la otra mano. */
+    internal fun openNunchuk() {
+        if (PairStore.load(this)?.platform == ReceiverCapabilities.ANDROID) {
+            openController(LinkState.MODE_DOLPHIN, dolphinOnly = false)
+            return
+        }
+        linkRole = LinkState.ROLE_NUNCHUK
+        when {
+            linkIsNunchuk() -> currentScreen = Screen.Nunchuk
+
+            PairStore.load(this) != null -> {
+                // Rehace el enlace si estaba vivo como mando
+                LinkForegroundService.start(this, LinkState.ROLE_NUNCHUK)
+                currentScreen = Screen.Nunchuk
+            }
+
+            else -> openPair()
+        }
+    }
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
+    /** Botón ES/EN del inicio: guarda el otro idioma y recrea la actividad con él. */
+    internal fun toggleLanguage() {
+        AppPrefs.setLang(this, LocaleHelper.otherCode(this))
+        recreate()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        hideSystemBars()
+        UiSounds.init(this)
+        // Motor de la vibración que piden los juegos (aparte de la de los botones)
+        GameRumble.attach(this)
+        PressMode.init(this)
+        NunchukSide.load(this)
+        GamePadSide.load(this)
+        UpdateNotice.refresh(this)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                delay(UpdateCheck.FIRST_DELAY_MS)
+                while (true) {
+                    UpdateNotice.checkIfDue(this@MainActivity)
+                    delay(60_000)
+                }
+            }
+        }
+        if (!AppPrefs.onboarded(this)) currentScreen = Screen.Onboarding
+        setContent {
+            PepoMoteTheme {
+                Root(this)
+            }
+        }
+        // Enlace profundo pepomote://pair?… o acceso directo, al abrir la app (no al recrearla)
+        if (savedInstanceState == null) {
+            intent?.data?.let { onPairContent(it.toString()) }
+            handleLaunchIntent(intent)
+        }
+    }
+
+    /** singleTop: con la app ya abierta, el enlace profundo o el acceso directo llegan aquí. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.data?.let { onPairContent(it.toString()) }
+        handleLaunchIntent(intent)
+    }
+
+    /** Acceso directo del icono (xml/shortcuts.xml): directo a esa pantalla (tras el onboarding). */
+    private fun handleLaunchIntent(intent: Intent?) {
+        if (intent?.action == ServerForegroundService.ACTION_OPEN) {
+            currentScreen = Screen.Server
+            return
+        }
+        val action = LaunchAction.parse(intent?.action) ?: return
+        if (!AppPrefs.onboarded(this)) return
+        when (action) {
+            LaunchAction.Pointer -> openController(LinkState.MODE_POINTER, dolphinOnly = false)
+            LaunchAction.Dolphin -> openController(LinkState.MODE_DOLPHIN, dolphinOnly = true)
+            LaunchAction.WiiU -> openController(LinkState.MODE_CEMU, dolphinOnly = false)
+            LaunchAction.Switch -> openController(LinkState.MODE_SWITCH, dolphinOnly = false)
+            LaunchAction.RetroArch -> openController(LinkState.MODE_RETROARCH, dolphinOnly = false)
+            LaunchAction.Nunchuk -> openNunchuk()
+        }
+    }
+
+    /**
+     * Cambio de tema del sistema (uiMode) en caliente: la actividad NO se
+     * recrea (que una partida no vuelva al inicio al anochecer); Compose
+     * repinta con la otra paleta y las barras del sistema se adaptan.
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        enableEdgeToEdge()
+        hideSystemBars()
+    }
+
+    /**
+     * Inmersivo: barras de estado y navegación escondidas mientras se usa la
+     * app; deslizar desde un borde las enseña unos segundos y se vuelven a
+     * ir. Con muesca, el contenido llega al borde también en apaisado (las
+     * pantallas apartan la muesca con displayCutoutPadding). Se repite al
+     * volver a la app y al recuperar el foco (tras diálogos o el escáner).
+     */
+    private fun hideSystemBars() {
+        if (Build.VERSION.SDK_INT >= 28) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        foreground = true
+        hideSystemBars()
+        RotationSuggester.start(this)
+    }
+
+    override fun onPause() {
+        foreground = false
+        RotationSuggester.stop()
+        super.onPause()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
+    }
+
+    /**
+     * La doble pantalla del GamePad solo se recibe con la app a la vista:
+     * en segundo plano (ON_STOP) se cierra el canal y al volver se reabre.
+     * El servicio del enlace, igual: con la app en pantalla va sin
+     * notificación; en segundo plano sube a primer plano con ella.
+     */
+    override fun onStart() {
+        super.onStart()
+        ScreenLink.setForeground(true)
+        LinkForegroundService.setAppVisible(true)
+    }
+
+    override fun onStop() {
+        ScreenLink.setForeground(false)
+        LinkForegroundService.setAppVisible(false)
+        super.onStop()
+    }
+
+    /** Cerrar la app (Atrás desde el inicio) = desconectar; recrearla (idioma, tema) no. */
+    override fun onDestroy() {
+        if (isFinishing) LinkForegroundService.stop(this)
+        super.onDestroy()
+    }
+
+    /**
+     * Contenido del QR o del enlace profundo (pepomote://pair?v=1&host=…&port=…&t=…&name=…):
+     * si vale, empareja, arranca el enlace con el rol elegido y abre su pantalla.
+     */
+    internal fun onPairContent(contents: String) {
+        val pairing = PairStore.parsePairUrl(contents)
+        if (pairing == null) {
+            Toast.makeText(this, getString(R.string.qr_not_pepomote), Toast.LENGTH_LONG).show()
+            return
+        }
+        PairStore.save(this, pairing)
+        adaptToReceiver(pairing)
+        pairVersion++
+        pairReason = null
+        // Lo pedido antes de tener que escanear (Wii U, Dolphin…) se vuelve a
+        // pedir: la intención se restaura y el modo va en cuanto llegue el ok
+        // Servicio ANTES del diálogo de permiso: pedirlo primero dejaba el
+        // arranque del servicio compitiendo con el diálogo del sistema y el
+        // primer emparejamiento fallaba en algunos OEMs.
+        LinkForegroundService.start(this, linkRole)
+        if (linkRole == LinkState.ROLE_WIIMOTE) LinkState.pendingMode?.let { LinkState.requestMode(it) }
+        currentScreen = if (linkRole == LinkState.ROLE_NUNCHUK) Screen.Nunchuk else Screen.Controller
+    }
+
+    private fun adaptToReceiver(pairing: Pairing) {
+        if (pairing.platform != ReceiverCapabilities.ANDROID) return
+        linkRole = LinkState.ROLE_WIIMOTE
+        controllerDolphinOnly = false
+        // Saved PC shortcuts and pending Nunchuk requests cannot leak into an Android session.
+        LinkState.pendingMode = LinkState.pendingMode?.takeIf {
+            it == LinkState.MODE_DOLPHIN || it == LinkState.MODE_SWITCH || it == LinkState.MODE_RETROARCH
+        }
+        LinkState.clearIntent()
+    }
+
+    internal fun openServer() {
+        currentScreen = Screen.Server
+        if (!ServerState.flow.value.active) ServerForegroundService.start(this)
+    }
+
+    /** Bits pulsados por las teclas de volumen: su UP se procesa SIEMPRE. */
+    private var volumeHeld = 0
+
+    /**
+     * Botones físicos de volumen mientras el mando (o el GamePad) está abierto:
+     * subir = A, bajar = gatillo B. Configurable en Ajustes. Se activa al recibir
+     * el DOWN; Android puede retener antes las teclas para detectar sus atajos.
+     * ButtonState conserva los toques cortos y pide el siguiente envío disponible.
+     */
+    // Activity's public key hook is inherited through AndroidX Core's restricted override.
+    @SuppressLint("RestrictedApi")
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val bit = when (event.keyCode) {
+            KeyEvent.KEYCODE_VOLUME_UP -> AppPrefs.volUpBit(this)
+            KeyEvent.KEYCODE_VOLUME_DOWN -> AppPrefs.volDownBit(this)
+            else -> return super.dispatchKeyEvent(event)
+        }
+        if (bit == 0) return super.dispatchKeyEvent(event)
+        when (event.action) {
+            KeyEvent.ACTION_DOWN -> if (currentScreen == Screen.Controller && AppPrefs.volDownIsB(this)) {
+                if (event.repeatCount == 0) {
+                    volumeHeld = volumeHeld or bit
+                    ButtonState.set(bit, true)
+                    if (bit == ButtonState.A) UiSounds.pop() else UiSounds.blip()
+                    Haptics.tap(window.decorView, HapticFeedbackConstants.KEYBOARD_TAP)
+                }
+                return true
+            }
+
+            // Lo que pulsamos nosotros lo soltamos nosotros, aunque ya no
+            // estemos en el mando: si no, el botón se quedaba pulsado
+            KeyEvent.ACTION_UP -> if (volumeHeld and bit != 0) {
+                volumeHeld = volumeHeld and bit.inv()
+                ButtonState.set(bit, false)
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+}
+
+@Composable
+private fun Root(activity: MainActivity) {
+    val context = LocalContext.current
+    val link by LinkState.flow.collectAsState()
+    val update by UpdateNotice.pending.collectAsState()
+    val server by ServerState.flow.collectAsState()
+
+    val updateSafeScreen = activity.currentScreen == Screen.Home || activity.currentScreen == Screen.Settings
+    UpdateHost(activity, activity.foreground, updateSafeScreen, updateSafeScreen && !link.alive && !server.active)
+
+    // Error de conexión como EFECTO (no en plena composición, que lo
+    // repetía), esté la pantalla que esté: al escáner si el PC ya no
+    // reconoce el emparejamiento, o aviso y vuelta al inicio; el estado se
+    // limpia para que el próximo Conectar no rebote con el error viejo.
+    LaunchedEffect(link) {
+        (link as? UiLink.Failed)?.let { activity.onLinkFailed(it) }
+    }
+
+    // Gesto/botón atrás: dentro de la app vuelve al inicio en vez de salir.
+    // En Home (y en el onboarding) se comporta como siempre: sale.
+    androidx.activity.compose.BackHandler(
+        enabled = activity.currentScreen != Screen.Home &&
+            activity.currentScreen != Screen.Onboarding
+    ) {
+        activity.currentScreen = Screen.Home
+    }
+
+    // Sin petición de permiso de notificaciones: el servicio funciona igual
+    // sin él; si el usuario lo concede a mano, la notificación con
+    // "Desconectar" aparece. Cero fricción en el primer arranque.
+    val qrLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val contents = result.contents ?: return@rememberLauncherForActivityResult
+        activity.onPairContent(contents)
+    }
+
+    fun scanQr() {
+        qrLauncher.launch(
+            ScanOptions()
+                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                .setPrompt(context.getString(R.string.scan_prompt))
+                .setBeepEnabled(false)
+                .setOrientationLocked(true)
+                .setCaptureActivity(PortraitCaptureActivity::class.java)
+        )
+    }
+
+    // Orientación: el GamePad y el mando + Nunchuk de Dolphin van fijos en
+    // apaisado; todo lo demás gira si el giro automático del sistema está
+    // activo y, con el bloqueo de giro puesto, solo si el usuario acepta la
+    // propuesta de girar (RotationSuggester: el móvil nota que lo has girado
+    // y te lo propone; nunca gira solo). Cada uno de los dos apaisados fijos
+    // va hacia su lado elegido (Ajustes, o el que se confirme la primera vez:
+    // hasta entonces, el sensor). Al salir del mando, como estaba.
+    val padIntent by LinkState.intent.collectAsState()
+    val nunchukSaved by NunchukSide.saved.collectAsState()
+    val nunchukProvisional by NunchukSide.provisional.collectAsState()
+    val gamePadSaved by GamePadSide.saved.collectAsState()
+    val gamePadProvisional by GamePadSide.provisional.collectAsState()
+    val wantLandscape = activity.currentScreen == Screen.Controller && Route.forcesLandscape(link, padIntent)
+    val landscapeSide = when {
+        !wantLandscape -> LandscapeSide.Sensor
+        Route.wiiLandscapeNunchuk(link) -> LandscapeSide.effective(nunchukSaved, nunchukProvisional)
+        else -> LandscapeSide.effective(gamePadSaved, gamePadProvisional)
+    }
+    val freeOrientation = activity.currentScreen == Screen.Controller && !wantLandscape
+    LaunchedEffect(freeOrientation) {
+        RotationSuggester.active = freeOrientation
+    }
+    val acceptedOrientation by RotationSuggester.accepted.collectAsState()
+    LaunchedEffect(wantLandscape, landscapeSide, acceptedOrientation) {
+        activity.requestedOrientation = when {
+            !wantLandscape -> acceptedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            else -> when (landscapeSide.orientation) {
+                LandscapeOrientation.Landscape -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                LandscapeOrientation.ReverseLandscape -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                LandscapeOrientation.SensorLandscape -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            }
+        }
+    }
+
+    // Transición suave entre pantallas: fundido y un deslizamiento sutil
+    // (hacia dentro al entrar en una pantalla; hacia fuera al volver al inicio)
+    AnimatedContent(
+        targetState = activity.currentScreen,
+        transitionSpec = { screenTransition(initialState, targetState) },
+        label = "screen"
+    ) { screen ->
+    when (screen) {
+        Screen.Onboarding -> OnboardingScreen(onDone = {
+            AppPrefs.setOnboarded(context)
+            activity.currentScreen = Screen.Home
+        })
+
+        Screen.Home -> {
+            val l = link
+            val pcName = PairStore.load(context)?.pcName
+            val androidReceiver = (l as? UiLink.Connected)?.platform == ReceiverCapabilities.ANDROID ||
+                (l !is UiLink.Connected && PairStore.load(context)?.platform == ReceiverCapabilities.ANDROID)
+            val status = if (server.active) HomeStatus(HomeTone.On, stringResource(R.string.server_running_short)) else when (l) {
+                is UiLink.Connected -> HomeStatus(HomeTone.On, stringResource(R.string.status_connected_to, l.pcName))
+                is UiLink.Connecting -> HomeStatus(HomeTone.Busy, stringResource(R.string.status_connecting))
+                is UiLink.Reconnecting -> HomeStatus(HomeTone.Busy, stringResource(R.string.status_reconnecting, l.pcName))
+                else -> HomeStatus(
+                    HomeTone.Off,
+                    if (pcName != null) stringResource(R.string.status_disconnected_pc, pcName)
+                    else stringResource(R.string.status_disconnected)
+                )
+            }
+            HomeScreen(
+                status = status,
+                langLabel = LocaleHelper.activeCode(context).uppercase(),
+                langSwitchHint = stringResource(R.string.lang_switch_to, LocaleHelper.name(LocaleHelper.otherCode(context))),
+                onToggleLang = { activity.toggleLanguage() },
+                onConnect = {
+                    activity.linkRole = LinkState.ROLE_WIIMOTE
+                    activity.controllerDolphinOnly = false
+                    LinkState.pendingMode = null
+                    activity.openPair()
+                },
+                onController = { activity.openPad() },
+                onDolphin = { activity.openController(LinkState.MODE_DOLPHIN, dolphinOnly = true) },
+                onWiiU = { activity.openController(LinkState.MODE_CEMU, dolphinOnly = false) },
+                onSwitch = { activity.openController(LinkState.MODE_SWITCH, dolphinOnly = false) },
+                onRetroArch = { activity.openController(LinkState.MODE_RETROARCH, dolphinOnly = false) },
+                onGamepad = { activity.openController(LinkState.MODE_GAMEPAD, dolphinOnly = false) },
+                onNunchuk = { activity.openNunchuk() },
+                onNewPairing = { activity.currentScreen = Screen.Settings },
+                onServer = { activity.openServer() },
+                androidReceiver = androidReceiver,
+                serverRunning = server.active,
+                update = update,
+                onOpenUpdate = { UpdateNotice.show(context) },
+                onDismissUpdate = { v -> UpdateNotice.dismiss(context, v) }
+            )
+        }
+
+        Screen.Pair -> {
+            val saved = remember(activity.pairVersion) { PairStore.all(context) }
+            val current = remember(activity.pairVersion) { PairStore.current(context)?.token }
+            PairScreen(
+                reason = activity.pairReason,
+                onScanQr = { scanQr() },
+                onBack = {
+                    LinkState.pendingMode = null // lo pedido antes del QR ya no va
+                    activity.currentScreen = Screen.Home
+                },
+                saved = saved,
+                currentToken = current,
+                // El PC de la sesión abierta sale en verde al momento, sin sondeo
+                linkedToken = PairList.linkedToken(saved, current, (link as? UiLink.Connected)?.pcName),
+                onChoose = { activity.onSavedPcChosen(it) },
+                onPairLink = { activity.onPairContent(it) },
+                onForget = { activity.onForgetPc(it) },
+                onDiscovered = { receiver, code ->
+                    val pairing = Pairing(receiver.host, receiver.tcpPort, code, receiver.name, receiver.platform)
+                    PairStore.save(context, pairing)
+                    activity.onSavedPcChosen(pairing)
+                }
+            )
+        }
+
+        Screen.Settings -> SettingsScreen(
+            onNewPairing = {
+                activity.linkRole = LinkState.ROLE_WIIMOTE // QR desde Ajustes: mando
+                LinkState.pendingMode = null
+                activity.openPair()
+            },
+            onBack = { activity.currentScreen = Screen.Home }
+        )
+
+        Screen.Nunchuk -> {
+            NunchukScreen(
+                link = link,
+                onDisconnect = {
+                    LinkForegroundService.stop(context)
+                    activity.currentScreen = Screen.Home
+                }
+            )
+        }
+
+        Screen.Controller -> ControllerRoute(activity, link)
+        Screen.Server -> ServerScreen(onBack = { activity.currentScreen = Screen.Home })
+    }
+    }
+}
+
+private fun screenDepth(s: Screen): Int = if (s == Screen.Home || s == Screen.Onboarding) 0 else 1
+
+private fun screenTransition(from: Screen, to: Screen): ContentTransform {
+    val forward = screenDepth(to) >= screenDepth(from)
+    val enter = fadeIn(tween(180)) + slideInHorizontally(tween(180)) { w -> if (forward) w / 12 else -w / 12 }
+    val exit = fadeOut(tween(120)) + slideOutHorizontally(tween(120)) { w -> if (forward) -w / 12 else w / 12 }
+    return enter togetherWith exit
+}
+
+/**
+ * El mando, según [Route]: GamePad de Wii U (confirmado o pedido y pendiente;
+ * se fuerza apaisado), Nunchuk, o los layouts Wii de siempre según la
+ * orientación.
+ */
+@Composable
+private fun ControllerRoute(activity: MainActivity, link: UiLink) {
+    val context = LocalContext.current
+    val intent by LinkState.intent.collectAsState()
+
+    val onDisconnect = {
+        LinkState.clearIntent()
+        LinkForegroundService.stop(context)
+        activity.currentScreen = Screen.Home
+    }
+
+    when (Route.route(link, intent)) {
+        PadScreen.GamePad -> GamePadScreen(link = link, onDisconnect = onDisconnect)
+
+        PadScreen.Nunchuk -> NunchukScreen(link = link, onDisconnect = onDisconnect)
+
+        PadScreen.Wii -> {
+            val landscape =
+                LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+            // Selector Puntero/Dolphin/Wii U: entrando por Conectar/Mando/Wii U
+            // con el ajuste activo (y siempre dentro de Wii U). Por Dolphin:
+            // pantalla solo-Dolphin. Igual en vertical y de lado.
+            val showChips = !activity.controllerDolphinOnly && AppPrefs.showDolphinChips(context)
+            if (landscape) {
+                // Dolphin con el Nunchuk en el mismo móvil (confirmado por el
+                // receptor): mando + Nunchuk a dos manos; si no, el NES de siempre
+                if (Route.wiiLandscapeNunchuk(link)) {
+                    WiimoteNunchukScreen(link = link, showChips = showChips, onDisconnect = onDisconnect)
+                } else {
+                    ControllerLandscapeScreen(link = link, showChips = showChips, onDisconnect = onDisconnect)
+                }
+            } else {
+                ControllerScreen(link = link, showChips = showChips, onDisconnect = onDisconnect)
+            }
+        }
+    }
+}

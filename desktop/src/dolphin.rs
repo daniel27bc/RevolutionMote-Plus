@@ -1,0 +1,1370 @@
+//! Auto-configuración de Dolphin para multijugador: deja el adaptador
+//! Bluetooth EMULADO en Dolphin.ini (con el acceso directo a un adaptador
+//! real, Dolphin ignora los mandos emulados y el juego se cierra al arrancar),
+//! escribe en WiimoteNew.ini tantos mandos emulados como móviles conectados
+//! ([Wiimote1..N] con Source=1 + mapeo DSU validado en h3) y deja los demás
+//! en Source=0: un mando emulado de más aparece en pantalla en los juegos y
+//! molesta. Registra el servidor en DSUClient.ini. Nunca escribe con Dolphin
+//! abierto (su config se sobreescribe al salir): lo deja pendiente y lo
+//! aplica en cuanto se cierra. Siempre deja backup .pepomote.bak. Busca la
+//! carpeta de usuario con la misma lógica que Dolphin (portable, registro,
+//! Documentos, AppData; XDG/Flatpak en Linux).
+
+use crate::state::LockTolerant;
+use crate::state::{Mode, SharedState};
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use crate::state::CfgStatus;
+use crate::tr;
+
+/// Dos móviles conectando a la vez disparan dos configuraciones: en serie,
+/// o se pisan el leer-modificar-escribir del mismo INI.
+static CONFIGURE_LOCK: Mutex<()> = Mutex::new(());
+
+/// Mapeo validado contra Dolphin real (h3): botones por bytes analógicos,
+/// cruceta "Pad N/S/W/E", IMU completo y recentrado por botón Touch. El
+/// puntero IMU de Dolphin es el grupo `IMUIR` (así se llama en su código;
+/// un `IMUPointer/...` se ignora en silencio): queda como respaldo para un
+/// Dolphin sin passthrough (anterior a 2407), ver `ir_passthrough`.
+/// `IMUGyroscope/Calibration Period = 0`: la calibración del giroscopio la
+/// hace el receptor (el sesgo aprendido por el motor del puntero con el
+/// móvil quieto de verdad, el quat de testigo y nunca vibrando; se resta
+/// antes de mandarlo, telemetry.rs). La de Dolphin es la media de 3 s de
+/// muestras dentro de la zona muerta, y aprendía como cero un movimiento
+/// lento de la mano o lo que mete el motor de vibración: el MotionPlus
+/// emulado se iba solo hasta la siguiente pausa. La zona muerta sigue.
+/// {DEV} = índice de pad del cliente DSU (slot).
+const MAPPING: &str = "Device = DSUClient/{DEV}/PepoMote
+Source = 1
+Buttons/A = Cross
+Buttons/B = Circle
+Buttons/1 = Square
+Buttons/2 = Triangle
+Buttons/- = Share
+Buttons/+ = Options
+Buttons/Home = PS
+D-Pad/Up = `Pad N`
+D-Pad/Down = `Pad S`
+D-Pad/Left = `Pad W`
+D-Pad/Right = `Pad E`
+IMUAccelerometer/Up = `Accel Up`
+IMUAccelerometer/Down = `Accel Down`
+IMUAccelerometer/Left = `Accel Left`
+IMUAccelerometer/Right = `Accel Right`
+IMUAccelerometer/Forward = `Accel Forward`
+IMUAccelerometer/Backward = `Accel Backward`
+IMUGyroscope/Pitch Up = `Gyro Pitch Up`
+IMUGyroscope/Pitch Down = `Gyro Pitch Down`
+IMUGyroscope/Roll Left = `Gyro Roll Left`
+IMUGyroscope/Roll Right = `Gyro Roll Right`
+IMUGyroscope/Yaw Left = `Gyro Yaw Left`
+IMUGyroscope/Yaw Right = `Gyro Yaw Right`
+IMUGyroscope/Dead Zone = 3.
+IMUGyroscope/Calibration Period = 0.
+IMUIR/Enabled = True
+IMUIR/Recenter = `Touch Button`
+IMUIR/Total Yaw = 25.000000000000000
+Options/Battery = `Battery`
+";
+
+/// Puntero IR por passthrough (grupo `IRPassthrough`, Dolphin ≥ 2407): el
+/// receptor genera los dos puntos de la barra sensora con su motor de
+/// puntero (el mismo que en Cemu) y el perfil los reconstruye de los bytes
+/// DSU que el perfil Wii deja libres (protocol/DSU.md, «Puntero IR»). Así
+/// el mando puede acercarse a la pantalla (juegos que lo piden: WarioWare)
+/// y el par gira con el roll del móvil. Con passthrough ligado Dolphin
+/// ignora su puntero IMU; un Dolphin anterior ignora estas claves y sigue
+/// con `IMUIR`.
+///
+/// Entradas del cliente DSU de Dolphin: `Right X+` = (byte − 128)/127 (los
+/// negativos se recortan a 0), `L2` = byte/255, `L3`/`R3` bits del byte 36.
+/// X del punto medio = byte alto (7 bits, mitad positiva de Right X) y bajo
+/// (L2) sobre 32767; Y igual con Right Y y R2.
+const IR_MX: &str = "(`Right X+`*32512 + `L2`*255)/32767";
+const IR_MY: &str = "(`Right Y+`*32512 + `R2`*255)/32767";
+/// Separación del par (fracción del ancho de cámara) por nivel L3 + 2·R3:
+/// 0,13 / 0,20 / 0,31 / 0,47 = LEDs a 0,2 m vistos con 42° de campo a
+/// 2,0 / 1,3 / 0,85 / 0,55 m (lo que Dolphin sintetiza a 2 m es 0,130).
+const IR_SEP: &str = "(0.13 + `L3`*0.07 + `R3`*0.18 + `L3`*`R3`*0.09)";
+/// Tamaño del punto 1..4 (de 15) según el nivel, como el ajuste de Dolphin
+/// a esas distancias; Right X = 0 (`Right X-` = 1) es el centinela «fuera de
+/// pantalla»: tamaño 0 = no hay punto.
+const IR_SIZE: &str = "if(`Right X-` > 0.999, 0, (1 + `L3` + `R3`*2)/15)";
+/// Roll del mando en Left X (byte 128..255 = −90°..+90°, en radianes).
+const IR_ROLL: &str = "((`Left X+` - 0.5)*3.14159)";
+
+/// Bloque `IRPassthrough/...` del perfil. `roll`: el par gira con Left X;
+/// sin él (Nunchuk en el mismo pad: Left X es su stick) va horizontal. La Y
+/// del giro lleva ×1,3333 (1023/767: la cámara es 4:3 y las fracciones son
+/// por eje). Objetos 3 y 4 sin ligar: no existen.
+fn ir_passthrough(roll: bool) -> String {
+    let (dx, dy) = if roll {
+        (format!("{IR_SEP}/2*cos({IR_ROLL})"), format!("{IR_SEP}/2*sin({IR_ROLL})*1.3333"))
+    } else {
+        (format!("{IR_SEP}/2"), "0".to_owned())
+    };
+    format!(
+        "IRPassthrough/Enabled = True\n\
+         IRPassthrough/Object 1 X = {IR_MX} - {dx}\n\
+         IRPassthrough/Object 1 Y = {IR_MY} - {dy}\n\
+         IRPassthrough/Object 1 Size = {IR_SIZE}\n\
+         IRPassthrough/Object 2 X = {IR_MX} + {dx}\n\
+         IRPassthrough/Object 2 Y = {IR_MY} + {dy}\n\
+         IRPassthrough/Object 2 Size = {IR_SIZE}\n"
+    )
+}
+
+/// Nunchuk emulado alimentado por un pad DSU ({NDEV} = su slot: el del OTRO
+/// móvil, o el mismo pad del mando si el Nunchuk va en el mismo móvil):
+/// stick, C/Z (L1/R1 de ese pad) y su acelerómetro real (Dolphin lo usa tal
+/// cual para agitar/inclinar). Ver protocol/DSU.md.
+const NUNCHUK_MAPPING: &str = "Extension = Nunchuk
+Nunchuk/Buttons/C = `DSUClient/{NDEV}/PepoMote:L1`
+Nunchuk/Buttons/Z = `DSUClient/{NDEV}/PepoMote:R1`
+Nunchuk/Stick/Up = `DSUClient/{NDEV}/PepoMote:Left Y+`
+Nunchuk/Stick/Down = `DSUClient/{NDEV}/PepoMote:Left Y-`
+Nunchuk/Stick/Left = `DSUClient/{NDEV}/PepoMote:Left X-`
+Nunchuk/Stick/Right = `DSUClient/{NDEV}/PepoMote:Left X+`
+Nunchuk/IMUAccelerometer/Up = `DSUClient/{NDEV}/PepoMote:Accel Up`
+Nunchuk/IMUAccelerometer/Down = `DSUClient/{NDEV}/PepoMote:Accel Down`
+Nunchuk/IMUAccelerometer/Left = `DSUClient/{NDEV}/PepoMote:Accel Left`
+Nunchuk/IMUAccelerometer/Right = `DSUClient/{NDEV}/PepoMote:Accel Right`
+Nunchuk/IMUAccelerometer/Forward = `DSUClient/{NDEV}/PepoMote:Accel Forward`
+Nunchuk/IMUAccelerometer/Backward = `DSUClient/{NDEV}/PepoMote:Accel Backward`
+";
+
+/// Jugadores a configurar: (slot DSU del Wiimote, slot DSU de su Nunchuk).
+pub type Layout = [(u8, Option<u8>)];
+
+const DSU_ENTRY: &str = "PepoMote:127.0.0.1:26760";
+
+// ---------------------------------------------------------------------------
+// Dónde guarda Dolphin su configuración (la misma lógica que Dolphin)
+// ---------------------------------------------------------------------------
+//
+// Dolphin (UICommon::SetUserDirectory) elige su carpeta de usuario así:
+//  Windows: `portable.txt` junto al exe → `<exe>\User`; registro
+//    HKCU\Software\Dolphin Emulator: `LocalUserConfig` = 1 → `<exe>\User`,
+//    `UserConfigPath` → esa ruta; `Documentos\Dolphin Emulator` si existe
+//    (instalaciones antiguas); si no, `AppData\Roaming\Dolphin Emulator`.
+//  Linux: `portable.txt` junto al binario → `<dir>/User`; `$DOLPHIN_EMU_USERPATH`;
+//    `~/.dolphin-emu` si existe (antiguo); si no, `$XDG_CONFIG_HOME/dolphin-emu`.
+//    Flatpak: `~/.var/app/org.DolphinEmu.dolphin-emu/config/dolphin-emu`.
+// Antes solo se miraban Documentos y AppData, y solo si ya existían: un
+// Dolphin portable (RetroBat, LaunchBox, una carpeta suelta) se quedaba sin
+// configurar mientras el receptor decía «configurado» (escribía en una
+// carpeta vieja), y Dolphin enseñaba el mando desconectado.
+
+/// Lo que se sabe del sistema para decidir las carpetas (inyectable en tests).
+pub struct Env {
+    /// Carpetas con el ejecutable de Dolphin (en marcha, aprendida, buscadas).
+    pub exe_dirs: Vec<PathBuf>,
+    /// Windows: HKCU\Software\Dolphin Emulator\LocalUserConfig = 1.
+    pub reg_local_user_config: bool,
+    /// Windows: HKCU\Software\Dolphin Emulator\UserConfigPath.
+    pub reg_user_config_path: Option<PathBuf>,
+    /// Windows: Documentos\Dolphin Emulator (solo si existe).
+    pub documents_legacy: Option<PathBuf>,
+    /// Windows: AppData\Roaming\Dolphin Emulator (exista o no).
+    pub appdata: Option<PathBuf>,
+    /// Linux: $DOLPHIN_EMU_USERPATH.
+    pub userpath_env: Option<PathBuf>,
+    /// Linux: ~/.dolphin-emu (solo si existe).
+    pub legacy_home: Option<PathBuf>,
+    /// Linux: $XDG_CONFIG_HOME/dolphin-emu (exista o no).
+    pub xdg_config: Option<PathBuf>,
+    /// Linux: carpeta de config del Flatpak (solo si existe).
+    pub flatpak: Option<PathBuf>,
+    /// macOS: ~/Library/Application Support/Dolphin (exista o no).
+    pub mac_app_support: Option<PathBuf>,
+}
+
+/// Una carpeta `Config` de Dolphin y de dónde sale.
+#[derive(Clone, Debug, PartialEq)]
+pub struct UserDir {
+    pub config: PathBuf,
+    pub why: &'static str,
+}
+
+/// Carpetas `Config` donde escribir, por prioridad y sin repetir. Las que
+/// dependen del ejecutable van primero (son las que usa ESE Dolphin). Solo
+/// se devuelven carpetas que existen o que Dolphin crearía tal cual (AppData /
+/// XDG) cuando hay rastro de Dolphin.
+pub fn resolve_user_dirs(env: &Env) -> Vec<UserDir> {
+    let mut out: Vec<UserDir> = Vec::new();
+    let mut push = |config: PathBuf, why: &'static str| {
+        if !out.iter().any(|d| d.config == config) {
+            out.push(UserDir { config, why });
+        }
+    };
+    for exe in &env.exe_dirs {
+        if exe.join("portable.txt").is_file() {
+            push(exe.join("User").join("Config"), tr!("dolphin.why_portable"));
+        } else if env.reg_local_user_config {
+            push(exe.join("User").join("Config"), tr!("dolphin.why_local"));
+        }
+    }
+    if let Some(p) = &env.reg_user_config_path {
+        push(p.join("Config"), tr!("dolphin.why_registry"));
+    }
+    if let Some(p) = &env.userpath_env {
+        push(p.join("Config"), "DOLPHIN_EMU_USERPATH");
+    }
+    if let Some(p) = &env.mac_app_support {
+        push(p.join("Config"), "~/Library/Application Support/Dolphin");
+    }
+    if let Some(p) = &env.flatpak {
+        push(p.clone(), "Flatpak");
+    }
+    if let Some(p) = &env.legacy_home {
+        push(p.join("Config"), "~/.dolphin-emu");
+    } else if let Some(p) = &env.xdg_config {
+        push(p.clone(), "~/.config/dolphin-emu");
+    }
+    if let Some(p) = &env.documents_legacy {
+        push(p.join("Config"), tr!("dolphin.why_documents"));
+    } else if let Some(p) = &env.appdata {
+        push(p.join("Config"), "AppData\\Dolphin Emulator");
+    }
+    out
+}
+
+/// Lo que hay en esta máquina.
+fn env_from_system(cfg_dolphin_dir: &str) -> Env {
+    let mut exe_dirs: Vec<PathBuf> = Vec::new();
+    let mut push_exe = |d: PathBuf| {
+        if !exe_dirs.contains(&d) {
+            exe_dirs.push(d);
+        }
+    };
+    if let (_, Some(d)) = running_exe() {
+        push_exe(d);
+    }
+    if !cfg_dolphin_dir.is_empty() {
+        let d = PathBuf::from(cfg_dolphin_dir);
+        if has_exe(&d) {
+            push_exe(d);
+        }
+    }
+    for d in find_exe_dirs() {
+        push_exe(d);
+    }
+    #[cfg(windows)]
+    {
+        let (reg_local, reg_path) = registry_user_config();
+        let documents = directories::UserDirs::new()
+            .and_then(|u| u.document_dir().map(|d| d.join("Dolphin Emulator")))
+            .filter(|d| d.is_dir());
+        let appdata = std::env::var_os("APPDATA").map(|a| PathBuf::from(a).join("Dolphin Emulator"));
+        Env {
+            exe_dirs,
+            reg_local_user_config: reg_local,
+            reg_user_config_path: reg_path,
+            documents_legacy: documents,
+            appdata,
+            userpath_env: None,
+            legacy_home: None,
+            xdg_config: None,
+            flatpak: None,
+            mac_app_support: None,
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let home = directories::BaseDirs::new().map(|b| b.home_dir().to_path_buf());
+        let xdg = match std::env::var_os("XDG_CONFIG_HOME") {
+            Some(x) if !x.is_empty() => Some(PathBuf::from(x).join("dolphin-emu")),
+            _ => home.as_ref().map(|h| h.join(".config").join("dolphin-emu")),
+        };
+        Env {
+            exe_dirs,
+            reg_local_user_config: false,
+            reg_user_config_path: None,
+            documents_legacy: None,
+            appdata: None,
+            userpath_env: std::env::var_os("DOLPHIN_EMU_USERPATH").map(PathBuf::from),
+            legacy_home: home.as_ref().map(|h| h.join(".dolphin-emu")).filter(|d| d.is_dir()),
+            xdg_config: xdg,
+            flatpak: home
+                .as_ref()
+                .map(|h| h.join(".var/app/org.DolphinEmu.dolphin-emu/config/dolphin-emu"))
+                .filter(|d| d.is_dir()),
+            mac_app_support: if cfg!(target_os = "macos") {
+                home.as_ref().map(|h| h.join("Library/Application Support/Dolphin"))
+            } else {
+                None
+            },
+        }
+    }
+}
+
+#[cfg(windows)]
+fn registry_user_config() -> (bool, Option<PathBuf>) {
+    use windows::core::w;
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RRF_RT_REG_SZ};
+    unsafe {
+        let mut local: u32 = 0;
+        let mut len = std::mem::size_of::<u32>() as u32;
+        let local_ok = RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!("Software\\Dolphin Emulator"),
+            w!("LocalUserConfig"),
+            RRF_RT_REG_DWORD,
+            None,
+            Some(&mut local as *mut u32 as *mut core::ffi::c_void),
+            Some(&mut len),
+        )
+        .is_ok()
+            && local != 0;
+        let mut buf = [0u16; 1024];
+        let mut blen = (buf.len() * 2) as u32;
+        let path = RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!("Software\\Dolphin Emulator"),
+            w!("UserConfigPath"),
+            RRF_RT_REG_SZ,
+            None,
+            Some(buf.as_mut_ptr() as *mut core::ffi::c_void),
+            Some(&mut blen),
+        )
+        .is_ok()
+        .then(|| {
+            let n = (blen as usize / 2).min(buf.len());
+            let s = String::from_utf16_lossy(&buf[..n]);
+            PathBuf::from(s.trim_end_matches('\0').trim())
+        })
+        .filter(|p| !p.as_os_str().is_empty());
+        (local_ok, path)
+    }
+}
+
+/// ¿Este directorio contiene el ejecutable de Dolphin?
+#[cfg(windows)]
+fn has_exe(dir: &Path) -> bool {
+    ["Dolphin.exe", "DolphinQt.exe", "Dolphin-x64.exe", "DolphinQt2.exe"].iter().any(|n| dir.join(n).is_file())
+}
+
+#[cfg(not(windows))]
+fn has_exe(dir: &Path) -> bool {
+    let Ok(rd) = std::fs::read_dir(dir) else { return false };
+    rd.flatten().any(|e| {
+        let n = e.file_name().to_string_lossy().to_lowercase();
+        // dolphin-emu (Linux), Dolphin (macOS: Dolphin.app/Contents/MacOS)
+        e.path().is_file()
+            && (n == "dolphin-emu" || n == "dolphin-emu-nogui" || n == "dolphin" || (n.contains("dolphin") && n.ends_with(".appimage")))
+    })
+}
+
+/// macOS: `Dolphin.app` → `Dolphin.app/Contents/MacOS` si ahí está el ejecutable.
+fn app_bundle_exe_dir(p: &Path) -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        if p.extension().is_some_and(|e| e == "app") {
+            return crate::procs::bundle_exe_dir(p, has_exe);
+        }
+    }
+    let _ = p;
+    None
+}
+
+fn name_has_dolphin(p: &Path) -> bool {
+    p.file_name().map(|n| n.to_string_lossy().to_lowercase().contains("dolphin")).unwrap_or(false)
+}
+
+fn name_is_emulators(p: &Path) -> bool {
+    p.file_name()
+        .map(|n| {
+            let n = n.to_string_lossy().to_lowercase();
+            n.starts_with("emulator") || n.starts_with("emulador") || n == "emus" || n == "emu"
+        })
+        .unwrap_or(false)
+}
+
+/// Sitios habituales de un Dolphin suelto o de un frontend (RetroBat,
+/// LaunchBox, EmuDeck…): dos niveles bajo las carpetas del usuario, uno
+/// bajo las del sistema, y `emulators\dolphin*` en cualquiera de ellos.
+fn search_roots() -> Vec<(PathBuf, u8)> {
+    let mut roots: Vec<(PathBuf, u8)> = Vec::new();
+    if let Some(u) = directories::UserDirs::new() {
+        for d in [u.desktop_dir(), u.download_dir(), u.document_dir()].into_iter().flatten() {
+            roots.push((d.to_path_buf(), 2));
+        }
+        roots.push((u.home_dir().to_path_buf(), 1));
+        #[cfg(not(windows))]
+        {
+            roots.push((u.home_dir().join("Applications"), 1));
+            roots.push((u.home_dir().join(".local/bin"), 1));
+            roots.push((u.home_dir().join("Descargas"), 2));
+            roots.push((u.home_dir().join("Downloads"), 2));
+        }
+    }
+    #[cfg(windows)]
+    {
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            roots.push((PathBuf::from(local).join("Programs"), 1));
+        }
+        for d in ["C:\\", "C:\\Games", "C:\\Program Files", "C:\\Program Files (x86)", "D:\\", "D:\\Games"] {
+            roots.push((PathBuf::from(d), 2));
+        }
+    }
+    #[cfg(target_os = "macos")]
+    roots.push((PathBuf::from("/Applications"), 1));
+    #[cfg(not(windows))]
+    {
+        roots.push((PathBuf::from("/opt"), 1));
+        if let Some(path) = std::env::var_os("PATH") {
+            for d in std::env::split_paths(&path) {
+                roots.push((d, 0));
+            }
+        }
+    }
+    roots
+}
+
+/// Directorios que contienen a Dolphin, encontrados por búsqueda superficial.
+pub fn find_exe_dirs() -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut push = |d: PathBuf| {
+        if !found.contains(&d) {
+            found.push(d);
+        }
+    };
+    for (root, depth) in search_roots() {
+        if has_exe(&root) {
+            push(root.clone());
+        }
+        if depth == 0 {
+            continue;
+        }
+        let Ok(rd) = std::fs::read_dir(&root) else { continue };
+        for e in rd.flatten().take(400) {
+            let p = e.path();
+            if !p.is_dir() {
+                continue;
+            }
+            if has_exe(&p) {
+                push(p.clone());
+            } else if let Some(inner) = app_bundle_exe_dir(&p) {
+                push(inner);
+            } else if depth >= 2 && (name_has_dolphin(&p) || name_is_emulators(&p)) {
+                if let Ok(rd2) = std::fs::read_dir(&p) {
+                    for e2 in rd2.flatten().take(100) {
+                        let p2 = e2.path();
+                        if p2.is_dir() && has_exe(&p2) {
+                            push(p2);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    found
+}
+
+/// Carpetas `Config` de Dolphin donde escribir (todas las instalaciones a la
+/// vista). Solo para los e2e, `PEPOMOTE_DOLPHIN_DIR` las sustituye.
+pub fn config_dirs_with(cfg_dolphin_dir: &str) -> Vec<UserDir> {
+    if let Some(d) = std::env::var_os("PEPOMOTE_DOLPHIN_DIR") {
+        let d = PathBuf::from(d);
+        let _ = std::fs::create_dir_all(&d);
+        return vec![UserDir { config: d, why: "PEPOMOTE_DOLPHIN_DIR" }];
+    }
+    let env = env_from_system(cfg_dolphin_dir);
+    let evidence = !env.exe_dirs.is_empty();
+    resolve_user_dirs(&env)
+        .into_iter()
+        .filter(|d| {
+            // las carpetas que Dolphin crearía él mismo (AppData, XDG) solo
+            // se crean aquí si hay rastro de Dolphin (ejecutable a la vista)
+            if d.config.is_dir() {
+                return true;
+            }
+            let creatable = d.why.starts_with("AppData")
+                || d.why.starts_with("~/.config")
+                || d.why.starts_with("~/Library")
+                || d.why.starts_with("portable")
+                || d.why.contains("registro")
+                || d.why == "DOLPHIN_EMU_USERPATH";
+            creatable && evidence && std::fs::create_dir_all(&d.config).is_ok()
+        })
+        .collect()
+}
+
+/// `PepoMote --dolphin-dirs`: qué carpetas de Dolphin ve este equipo (para
+/// diagnosticar un Dolphin que no se deja configurar). Devuelve true si el
+/// argumento estaba (el receptor no arranca).
+pub fn print_dirs_from_args() -> bool {
+    if !std::env::args().any(|a| a == "--dolphin-dirs") {
+        return false;
+    }
+    let cfg_dir = crate::state::Config::load().dolphin_dir;
+    let (running, exe) = running_exe();
+    println!("Dolphin abierto: {}{}", if running { "sí" } else { "no" }, exe.map(|e| format!(" ({})", e.display())).unwrap_or_default());
+    println!("Carpeta de Dolphin en Ajustes: {}", if cfg_dir.is_empty() { "(automática)" } else { &cfg_dir });
+    for d in find_exe_dirs() {
+        println!("Ejecutable encontrado en: {}", d.display());
+    }
+    let dirs = config_dirs_with(&cfg_dir);
+    if dirs.is_empty() {
+        println!("Carpetas de configuración: ninguna (Dolphin no se ha abierto nunca aquí, o está en un sitio raro)");
+    }
+    for d in dirs {
+        let src = std::fs::read_to_string(d.config.join("WiimoteNew.ini")).unwrap_or_default();
+        let wm1 = src
+            .split("[Wiimote1]")
+            .nth(1)
+            .and_then(|b| b.lines().find(|l| l.trim_start().starts_with("Source")))
+            .map(|l| l.trim().to_owned())
+            .unwrap_or_else(|| "sin Wiimote1".to_owned());
+        println!("Config: {} ({}) · Wiimote1: {} · existe: {}", d.config.display(), d.why, wm1, d.config.is_dir());
+    }
+    true
+}
+
+#[cfg(windows)]
+pub fn running_exe() -> (bool, Option<PathBuf>) {
+    use windows::core::PWSTR;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+    };
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    unsafe {
+        let Ok(snap) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else {
+            return (false, None);
+        };
+        let mut entry = PROCESSENTRY32W { dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
+        let mut running = false;
+        let mut dir = None;
+        if Process32FirstW(snap, &mut entry).is_ok() {
+            loop {
+                let name: String = String::from_utf16_lossy(
+                    &entry.szExeFile[..entry.szExeFile.iter().position(|c| *c == 0).unwrap_or(entry.szExeFile.len())],
+                )
+                .to_lowercase();
+                // Dolphin.exe, DolphinQt.exe, Dolphin-x64.exe… según el build
+                if name.starts_with("dolphin") && name.ends_with(".exe") {
+                    running = true;
+                    if dir.is_none() {
+                        if let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, entry.th32ProcessID) {
+                            let mut buf = [0u16; 1024];
+                            let mut len = buf.len() as u32;
+                            if QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len).is_ok() {
+                                let exe = PathBuf::from(String::from_utf16_lossy(&buf[..len as usize]));
+                                dir = exe.parent().map(|p| p.to_path_buf());
+                            }
+                            let _ = CloseHandle(h);
+                        }
+                    }
+                }
+                if Process32NextW(snap, &mut entry).is_err() {
+                    break;
+                }
+            }
+        }
+        let _ = CloseHandle(snap);
+        (running, dir)
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn running_exe() -> (bool, Option<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return (false, None);
+    };
+    let mut running = false;
+    let mut dir = None;
+    for e in entries.flatten() {
+        let Ok(comm) = std::fs::read_to_string(e.path().join("comm")) else { continue };
+        if !comm.trim().starts_with("dolphin-emu") {
+            continue;
+        }
+        running = true;
+        if dir.is_none() {
+            if let Ok(exe) = std::fs::read_link(e.path().join("exe")) {
+                dir = exe.parent().map(|p| p.to_path_buf());
+            }
+        }
+    }
+    (running, dir)
+}
+
+/// macOS: `Dolphin.app/Contents/MacOS/Dolphin` (por libproc, sin bifurcar `ps`).
+#[cfg(target_os = "macos")]
+pub fn running_exe() -> (bool, Option<PathBuf>) {
+    crate::procs::running_with_prefix("dolphin")
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+pub fn running_exe() -> (bool, Option<PathBuf>) {
+    (false, None)
+}
+
+use crate::ini::{parse_ini, serialize_ini, set_section, ini_key, write_if_changed, set_ini_key};
+
+/// Dolphin.ini: [BluetoothPassthrough] Enabled = False, es decir, "Emular el
+/// adaptador Bluetooth de la Wii" en el diálogo de mandos. Con "Acceder
+/// directamente a un adaptador de Bluetooth" marcado, Dolphin busca un
+/// adaptador USB real, deshabilita los Wiimotes emulados y el juego se cierra
+/// nada más arrancar. El resto de la sección (VID, PID, LinkKeys) y del
+/// archivo se conservan.
+pub fn ensure_emulated_adapter(cfg_dir: &Path) -> Result<(), String> {
+    set_ini_key(&cfg_dir.join("Dolphin.ini"), "BluetoothPassthrough", "Enabled", "False")
+}
+
+/// Dolphin.ini: [Input] BackgroundInput = True. Sin él, Dolphin ignora el
+/// mando (el DSU del móvil incluido) en cuanto su ventana pierde el foco: con
+/// la ventana de PepoMote (o cualquier otra) seleccionada, «deja de
+/// funcionar». Con la ventana de Dolphin en primer plano no cambia nada.
+pub fn ensure_background_input(cfg_dir: &Path) -> Result<(), String> {
+    set_ini_key(&cfg_dir.join("Dolphin.ini"), "Input", "BackgroundInput", "True")
+}
+
+/// [Wiimote1..n] con nuestro mapeo (Source=1) y [Wiimote n+1..4] con
+/// Source=0 (Ninguno): exactamente un mando por móvil. En los slots que se
+/// apagan solo se toca la clave Source; el resto de sus líneas (un mapeo
+/// manual, por ejemplo) se conserva. Las demás secciones, intactas.
+pub fn write_wiimotes(cfg_dir: &Path, layout: &Layout) -> Result<(), String> {
+    write_wiimotes_with(cfg_dir, layout, crate::rumble::motor_expression)
+}
+
+/// `motor`: la expresión `Rumble/Motor` del mando virtual del slot, o `None`
+/// si ese jugador no tiene mando virtual (sin driver, o aún sin hueco de
+/// XInput): entonces no se escribe la clave. Separado para probar las dos
+/// ramas sin mando de verdad.
+pub fn write_wiimotes_with(cfg_dir: &Path, layout: &Layout, motor: impl Fn(u8) -> Option<String>) -> Result<(), String> {
+    let path = cfg_dir.join("WiimoteNew.ini");
+    let original = std::fs::read_to_string(&path).unwrap_or_default();
+    let mut ini = parse_ini(&original);
+    let n = layout.len().min(crate::net::MAX_PLAYERS);
+    for (i, (wslot, nslot)) in layout.iter().take(n).enumerate() {
+        let mut body: Vec<String> = MAPPING
+            .replace("{DEV}", &wslot.to_string())
+            .lines()
+            .map(|l| l.to_owned())
+            .collect();
+        // Puntero IR por passthrough: con roll salvo que el Nunchuk vaya en
+        // este mismo pad (entonces Left X es su stick)
+        let roll = *nslot != Some(*wslot);
+        body.extend(ir_passthrough(roll).lines().map(|l| l.to_owned()));
+        // Vibración: el motor del mando virtual de ese jugador (rumble/),
+        // solo si el mando existe ya y se sabe cuál es
+        if let Some(expr) = motor(*wslot) {
+            body.push(format!("Rumble/Motor = {expr}"));
+        }
+        match nslot {
+            Some(ns) => body.extend(NUNCHUK_MAPPING.replace("{NDEV}", &ns.to_string()).lines().map(|l| l.to_owned())),
+            None => body.push("Extension = None".to_owned()),
+        }
+        set_section(&mut ini, &format!("Wiimote{}", i + 1), body);
+    }
+    for slot in n..crate::net::MAX_PLAYERS {
+        let name = format!("Wiimote{}", slot + 1);
+        let mut body: Vec<String> = ini
+            .sections
+            .iter()
+            .find(|(s, _)| *s == name)
+            .map(|(_, b)| b.clone())
+            .unwrap_or_default();
+        let mut found = false;
+        for l in body.iter_mut() {
+            if ini_key(l) == Some("Source") {
+                *l = "Source = 0".to_owned();
+                found = true;
+            }
+        }
+        if !found {
+            body.insert(0, "Source = 0".to_owned());
+        }
+        set_section(&mut ini, &name, body);
+    }
+    write_if_changed(&path, &original, serialize_ini(&ini))
+}
+
+/// DSUClient.ini: [Server] Enabled=True + nuestra entrada, preservando las
+/// demás entradas y cualquier otra clave de la sección.
+pub fn ensure_dsu_server(cfg_dir: &Path) -> Result<(), String> {
+    let path = cfg_dir.join("DSUClient.ini");
+    let original = std::fs::read_to_string(&path).unwrap_or_default();
+    let mut ini = parse_ini(&original);
+
+    let mut entries = String::new();
+    let mut others: Vec<String> = Vec::new();
+    if let Some((_, body)) = ini.sections.iter().find(|(n, _)| n == "Server") {
+        for l in body {
+            match ini_key(l) {
+                Some("Entries") => {
+                    entries = l.split_once('=').map(|(_, v)| v.trim()).unwrap_or("").to_owned();
+                }
+                Some("Enabled") => {}
+                _ => others.push(l.clone()),
+            }
+        }
+    }
+    if !entries.contains(DSU_ENTRY) {
+        if !entries.is_empty() && !entries.ends_with(';') {
+            entries.push(';');
+        }
+        entries.push_str(DSU_ENTRY);
+        entries.push(';');
+    }
+    let mut body = vec![
+        "Enabled = True".to_owned(),
+        format!("Entries = {entries}"),
+    ];
+    body.extend(others);
+    set_section(&mut ini, "Server", body);
+    write_if_changed(&path, &original, serialize_ini(&ini))
+}
+
+/// Perfiles manuales PepoMote-P1..P4 (fallback si alguien mapea a mano).
+fn write_profiles(cfg_dir: &Path, n_players: usize) {
+    write_profiles_with(cfg_dir, n_players, crate::rumble::motor_expression)
+}
+
+fn write_profiles_with(cfg_dir: &Path, n_players: usize, motor: impl Fn(u8) -> Option<String>) {
+    let dir = cfg_dir.join("Profiles").join("Wiimote");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    for slot in 0..n_players.min(crate::net::MAX_PLAYERS) {
+        let body: String = MAPPING
+            .replace("{DEV}", &slot.to_string())
+            .lines()
+            .filter(|l| !l.starts_with("Source"))
+            .chain(motor(slot as u8).map(|e| format!("Rumble/Motor = {e}")).as_deref())
+            .fold(String::from("[Profile]\n"), |mut acc, l| {
+                acc.push_str(l);
+                acc.push('\n');
+                acc
+            });
+        let name = if slot == 0 {
+            "PepoMote.ini".to_owned()
+        } else {
+            format!("PepoMote-P{}.ini", slot + 1)
+        };
+        let _ = std::fs::write(dir.join(name), body);
+    }
+}
+
+/// Carpetas tocadas, para el estado: «carpeta: portable (…)» o «en 2
+/// carpetas: AppData\Dolphin Emulator, portable (…)».
+fn describe_dirs(dirs: &[UserDir]) -> String {
+    if dirs.len() == 1 {
+        tr!("dolphin.dirs_one", dirs[0].why)
+    } else {
+        tr!("dolphin.dirs_many", dirs.len(), dirs.iter().map(|d| d.why).collect::<Vec<_>>().join(", "))
+    }
+}
+
+/// Configura todos los Dolphin encontrados: adaptador Bluetooth emulado,
+/// servidor DSU y un mando emulado por móvil conectado (Jugador N = móvil N
+/// por orden de conexión); los slots restantes quedan en Ninguno.
+pub fn configure(cfg_dolphin_dir: &str, layout: &Layout) -> Result<String, String> {
+    let dirs = config_dirs_with(cfg_dolphin_dir);
+    if dirs.is_empty() {
+        return Err(tr!("dolphin.not_found").to_owned());
+    }
+    let n = layout.len().clamp(1, crate::net::MAX_PLAYERS);
+    let nunchuks = layout.iter().filter(|(_, n)| n.is_some()).count();
+    for dir in &dirs {
+        ensure_emulated_adapter(&dir.config)?;
+        ensure_background_input(&dir.config)?;
+        ensure_dsu_server(&dir.config)?;
+        write_wiimotes(&dir.config, layout)?;
+        write_profiles(&dir.config, crate::net::MAX_PLAYERS);
+    }
+    Ok(tr!(
+        "dolphin.details",
+        n,
+        if nunchuks > 0 { tr!("dolphin.and_nunchuks", nunchuks) } else { String::new() },
+        describe_dirs(&dirs)
+    ))
+}
+
+/// Al ver a Dolphin abierto se aprende su carpeta (para configurarlo cerrado
+/// aunque sea portable o viva en un sitio raro).
+pub(crate) fn learn_dir(shared: &SharedState, dir: Option<PathBuf>) {
+    let Some(dir) = dir else { return };
+    let dir_s = dir.to_string_lossy().to_string();
+    let mut s = shared.lock_tolerant();
+    if s.config.dolphin_dir != dir_s {
+        s.config.dolphin_dir = dir_s;
+        s.config.save();
+    }
+}
+
+/// Escribe (o deja pendiente si Dolphin está abierto). `after_close`: viene
+/// del vigilante, Dolphin se acaba de cerrar.
+fn run_configure(shared: &SharedState, layout: &Layout, after_close: bool) {
+    let _serial = CONFIGURE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    // Solo para los e2e en el propio equipo: escribir aunque el emulador esté abierto
+    let assume_closed = std::env::var_os("PEPOMOTE_ASSUME_EMULATOR_CLOSED").is_some();
+    let (running, exe_dir) = if assume_closed { (false, None) } else { running_exe() };
+    learn_dir(shared, exe_dir);
+    // `msg` para la ventana (con detalle); `phone` para los móviles: una
+    // línea corta, que el banner tapa los chips del mando
+    let (ok, msg, phone) = if running {
+        // Dolphin sobreescribe su configuración al salir: se escribe en
+        // cuanto se cierre (vigilante), sin que nadie tenga que pulsar nada
+        shared.lock_tolerant().dolphin_pending = true;
+        let nunchuk = layout.iter().any(|(_, n)| n.is_some());
+        let text = if nunchuk { tr!("dolphin.open_nunchuk") } else { tr!("dolphin.open") };
+        let phone = if nunchuk { tr!("dolphin.phone_open_nunchuk") } else { tr!("dolphin.phone_open") };
+        (false, text.to_owned(), phone.to_owned())
+    } else {
+        shared.lock_tolerant().dolphin_pending = false;
+        let cfg_dir = shared.lock_tolerant().config.dolphin_dir.clone();
+        match configure(&cfg_dir, layout) {
+            Ok(details) => {
+                let prefix = if after_close { tr!("dolphin.configured_after_close") } else { tr!("dolphin.configured") };
+                (true, format!("{prefix} {details}"), tr!("dolphin.phone_configured").to_owned())
+            }
+            Err(e) => {
+                let text = tr!("dolphin.error", e);
+                (false, text.clone(), text)
+            }
+        }
+    };
+    shared.lock_tolerant().dolphin_cfg_status = Some(CfgStatus { ok, text: msg });
+    // Los móviles lo ven también (banner): hasta ahora un Nunchuk que
+    // entraba con Dolphin abierto fallaba en silencio
+    crate::net::notify_all(&phone);
+}
+
+/// Disparo automático (conexión/desconexión/cambio a modo Dolphin).
+pub fn maybe_auto_configure(shared: &SharedState) {
+    let shared = shared.clone();
+    let _ = crate::threads::spawn_once("emu-configure", move || {
+        let (auto, mode, layout) = {
+            let s = shared.lock_tolerant();
+            (s.config.auto_dolphin, s.mode, crate::state::player_layout(&s.players))
+        };
+        // al menos un mando: un Nunchuk solo no tiene a quién acompañar
+        if auto && mode == Mode::Dolphin && !layout.is_empty() {
+            run_configure(&shared, &layout, false);
+        }
+    });
+}
+
+/// Botón manual de la ventana.
+pub fn configure_now(shared: &SharedState) {
+    let shared = shared.clone();
+    let _ = crate::threads::spawn_once("emu-configure", move || {
+        let mut layout = crate::state::player_layout(&shared.lock_tolerant().players);
+        if layout.is_empty() {
+            layout.push((0, None));
+        }
+        run_configure(&shared, &layout, false);
+    });
+}
+
+/// Botón «Detectar» de Ajustes: busca Dolphin y guarda su carpeta.
+pub fn detect_now(shared: &SharedState) {
+    let shared = shared.clone();
+    let _ = crate::threads::spawn_once("emu-detect", move || {
+        let (_, dir) = running_exe();
+        let found = dir.into_iter().chain(find_exe_dirs()).next();
+        let mut s = shared.lock_tolerant();
+        match found {
+            Some(d) => {
+                s.config.dolphin_dir = d.to_string_lossy().to_string();
+                s.config.save();
+                let dirs = config_dirs_with(&s.config.dolphin_dir);
+                s.dolphin_cfg_status = Some(CfgStatus::ok(tr!("dolphin.found", d.display(), describe_dirs(&dirs))));
+            }
+            None => {
+                s.dolphin_cfg_status = Some(CfgStatus::warn(tr!("dolphin.not_found_manual").to_owned()));
+            }
+        }
+    });
+}
+
+/// Lo pendiente (Dolphin estaba abierto) se aplica cuando ya está cerrado:
+/// lo llama el vigilante de `auto_mode` al ver a Dolphin cerrado. Así nadie
+/// tiene que acordarse de pulsar «Configurar».
+pub fn apply_pending(shared: &SharedState) {
+    let (auto, mode, layout) = {
+        let s = shared.lock_tolerant();
+        (s.config.auto_dolphin, s.mode, crate::state::player_layout(&s.players))
+    };
+    if auto && mode == Mode::Dolphin && !layout.is_empty() {
+        run_configure(shared, &layout, true);
+    } else {
+        shared.lock_tolerant().dolphin_pending = false;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// n mandos sin Nunchuk en los slots 0..n.
+    fn wm(n: usize) -> Vec<(u8, Option<u8>)> {
+        (0..n as u8).map(|s| (s, None)).collect()
+    }
+
+    fn tmp_dir(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("pepomote-test-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    fn env_empty() -> Env {
+        Env {
+            exe_dirs: vec![],
+            reg_local_user_config: false,
+            reg_user_config_path: None,
+            documents_legacy: None,
+            appdata: None,
+            userpath_env: None,
+            legacy_home: None,
+            xdg_config: None,
+            flatpak: None,
+            mac_app_support: None,
+        }
+    }
+
+    /// Cuerpo de la sección `[name]` del INI (hasta la siguiente cabecera).
+    fn section(ini: &str, name: &str) -> String {
+        let start = ini.find(&format!("[{name}]")).expect(name);
+        let rest = &ini[start + name.len() + 2..];
+        let end = rest.find("\n[").unwrap_or(rest.len());
+        rest[..end].to_owned()
+    }
+
+    /// Sin mando virtual (sin driver, o aún sin hueco de XInput) el perfil
+    /// de Dolphin no lleva `Rumble/Motor`: como en 1.11. La línea que
+    /// apuntaba a un `XInput/0/Gamepad` que no era nuestro (o no existía)
+    /// era lo único que Dolphin veía distinto con 1.12 en un PC sin driver.
+    #[test]
+    fn sin_mando_virtual_no_se_escribe_rumble() {
+        let dir = tmp_dir("rumble-sin");
+        write_wiimotes_with(&dir, &wm(2), |_| None).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert!(!out.contains("Rumble/Motor"), "{out}");
+        assert!(out.contains("[Wiimote1]\nDevice = DSUClient/0/PepoMote"), "{out}");
+        write_profiles_with(&dir, 4, |_| None);
+        for name in ["PepoMote.ini", "PepoMote-P2.ini", "PepoMote-P3.ini", "PepoMote-P4.ini"] {
+            let p = std::fs::read_to_string(dir.join("Profiles").join("Wiimote").join(name)).unwrap();
+            assert!(!p.contains("Rumble/Motor"), "{name}: {p}");
+        }
+    }
+
+    /// Con mando virtual, cada jugador lleva SU motor (el hueco de XInput
+    /// real, no el número de jugador), y el que aún no tiene mando, nada.
+    #[test]
+    fn con_mando_virtual_conocido_cada_jugador_lleva_su_motor() {
+        let dir = tmp_dir("rumble-con");
+        // el Jugador 1 cayó en el XInput 2 (dos mandos de verdad delante); el 2 aún no tiene mando
+        let motor = |slot: u8| (slot == 0).then(|| "`XInput/2/Gamepad:Motor L`|`XInput/2/Gamepad:Motor R`".to_owned());
+        write_wiimotes_with(&dir, &wm(2), motor).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        let w1 = section(&out, "Wiimote1");
+        let w2 = section(&out, "Wiimote2");
+        assert!(w1.contains("Rumble/Motor = `XInput/2/Gamepad:Motor L`|`XInput/2/Gamepad:Motor R`"), "{w1}");
+        assert!(!w2.contains("Rumble/Motor"), "{w2}");
+        assert_eq!(out.matches("Rumble/Motor").count(), 1);
+        write_profiles_with(&dir, 2, motor);
+        let p1 = std::fs::read_to_string(dir.join("Profiles").join("Wiimote").join("PepoMote.ini")).unwrap();
+        let p2 = std::fs::read_to_string(dir.join("Profiles").join("Wiimote").join("PepoMote-P2.ini")).unwrap();
+        assert!(p1.contains("Rumble/Motor = `XInput/2/Gamepad:Motor L`"), "{p1}");
+        assert!(!p2.contains("Rumble/Motor"), "{p2}");
+    }
+
+    /// El mando virtual se va (driver desinstalado, móvil que se va y
+    /// vuelve sin hueco): la línea desaparece y el resto del mando sigue.
+    #[test]
+    fn el_rumble_desaparece_al_irse_el_mando() {
+        let dir = tmp_dir("rumble-va");
+        let con = |_: u8| Some("`XInput/0/Gamepad:Motor L`|`XInput/0/Gamepad:Motor R`".to_owned());
+        write_wiimotes_with(&dir, &wm(1), con).unwrap();
+        let antes = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert!(antes.contains("Rumble/Motor"));
+        write_wiimotes_with(&dir, &wm(1), |_| None).unwrap();
+        let despues = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert!(!despues.contains("Rumble/Motor"), "{despues}");
+        assert!(despues.contains("IRPassthrough/Enabled = True") && despues.contains("Extension = None"), "{despues}");
+        assert!(despues.contains("[Wiimote2]\nSource = 0"), "{despues}");
+    }
+
+    #[test]
+    fn mac_app_support_va_tras_userpath_y_es_creable() {
+        let base = tmp_dir("mac");
+        let mut env = env_empty();
+        env.mac_app_support = Some(base.join("Library").join("Application Support").join("Dolphin"));
+        let dirs = resolve_user_dirs(&env);
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].config, base.join("Library").join("Application Support").join("Dolphin").join("Config"));
+        assert!(dirs[0].why.starts_with("~/Library"));
+        // DOLPHIN_EMU_USERPATH manda sobre Application Support
+        env.userpath_env = Some(base.join("Mio"));
+        let dirs = resolve_user_dirs(&env);
+        assert_eq!(dirs[0].config, base.join("Mio").join("Config"));
+        assert_eq!(dirs.len(), 2);
+    }
+
+    #[test]
+    fn carpeta_de_usuario_como_la_elige_dolphin() {
+        let base = tmp_dir("dirs");
+        let exe = base.join("DolphinPortable");
+        std::fs::create_dir_all(&exe).unwrap();
+        // Windows moderno sin nada especial: AppData (aunque no exista aún)
+        let mut env = env_empty();
+        env.appdata = Some(base.join("AppData").join("Dolphin Emulator"));
+        let dirs = resolve_user_dirs(&env);
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].config, base.join("AppData").join("Dolphin Emulator").join("Config"));
+        // instalación antigua: Documentos manda sobre AppData
+        env.documents_legacy = Some(base.join("Documents").join("Dolphin Emulator"));
+        let dirs = resolve_user_dirs(&env);
+        assert_eq!(dirs.len(), 1);
+        assert!(dirs[0].config.starts_with(base.join("Documents")), "{dirs:?}");
+        // portable.txt junto al exe: esa es la que usa ESE Dolphin, y va primero
+        std::fs::write(exe.join("portable.txt"), "").unwrap();
+        env.exe_dirs = vec![exe.clone()];
+        let dirs = resolve_user_dirs(&env);
+        assert_eq!(dirs[0].config, exe.join("User").join("Config"));
+        assert!(dirs[0].why.starts_with("portable"));
+        assert_eq!(dirs.len(), 2, "y además la de Documentos: {dirs:?}");
+        // registro: UserConfigPath a una carpeta cualquiera
+        std::fs::remove_file(exe.join("portable.txt")).unwrap();
+        env.reg_user_config_path = Some(base.join("MiDolphin"));
+        let dirs = resolve_user_dirs(&env);
+        assert_eq!(dirs[0].config, base.join("MiDolphin").join("Config"));
+        // registro: LocalUserConfig → junto al exe
+        env.reg_user_config_path = None;
+        env.reg_local_user_config = true;
+        let dirs = resolve_user_dirs(&env);
+        assert_eq!(dirs[0].config, exe.join("User").join("Config"));
+        // Linux: ~/.dolphin-emu antiguo manda sobre XDG; Flatpak aparte; la variable de entorno primero
+        let mut lx = env_empty();
+        lx.xdg_config = Some(base.join(".config").join("dolphin-emu"));
+        assert_eq!(resolve_user_dirs(&lx)[0].config, base.join(".config").join("dolphin-emu"));
+        lx.legacy_home = Some(base.join(".dolphin-emu"));
+        assert_eq!(resolve_user_dirs(&lx)[0].config, base.join(".dolphin-emu").join("Config"));
+        lx.flatpak = Some(base.join("flatpak-cfg"));
+        lx.userpath_env = Some(base.join("userpath"));
+        let dirs = resolve_user_dirs(&lx);
+        assert_eq!(dirs[0].config, base.join("userpath").join("Config"));
+        assert!(dirs.iter().any(|d| d.why == "Flatpak"));
+        assert_eq!(dirs.len(), 3, "{dirs:?}");
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn wiimotes_escribe_slots_y_preserva_lo_ajeno() {
+        let dir = tmp_dir("wiimote");
+        std::fs::write(
+            dir.join("WiimoteNew.ini"),
+            "[Wiimote1]\nDevice = DInput/0/Keyboard Mouse\nSource = 0\n[Wiimote3]\nDevice = Real/Cosa\nSource = 2\n[BalanceBoard]\nSource = 0\n",
+        )
+        .unwrap();
+
+        write_wiimotes(&dir, &wm(2)).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+
+        assert!(out.contains("[Wiimote1]"));
+        assert!(out.contains("Device = DSUClient/0/PepoMote"));
+        assert!(out.contains("[Wiimote2]"));
+        assert!(out.contains("Device = DSUClient/1/PepoMote"));
+        // slots sin móvil: Source = 0 (ningún mando de más en pantalla),
+        // conservando las demás líneas; lo ajeno, intacto
+        assert!(out.contains("[Wiimote3]
+Device = Real/Cosa
+Source = 0
+"), "{out}");
+        assert!(out.contains("[Wiimote4]
+Source = 0
+"), "{out}");
+        assert!(out.contains("[BalanceBoard]
+Source = 0
+"));
+        // backup creado
+        assert!(dir.join("WiimoteNew.ini.pepomote.bak").exists());
+
+        // idempotente
+        write_wiimotes(&dir, &wm(2)).unwrap();
+        let out2 = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert_eq!(out, out2);
+    }
+
+    #[test]
+    fn backup_es_el_original_y_no_se_pisa() {
+        let dir = tmp_dir("bak");
+        let original = "[Wiimote1]\nDevice = Bluetooth/0/Wii Remote\nSource = 2\n";
+        std::fs::write(dir.join("WiimoteNew.ini"), original).unwrap();
+        let bak = dir.join("WiimoteNew.ini.pepomote.bak");
+
+        write_wiimotes(&dir, &wm(1)).unwrap();
+        assert_eq!(std::fs::read_to_string(&bak).unwrap(), original);
+
+        // segunda pasada con más jugadores: el backup sigue siendo el ORIGINAL
+        write_wiimotes(&dir, &wm(3)).unwrap();
+        assert_eq!(std::fs::read_to_string(&bak).unwrap(), original);
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert!(out.contains("Device = DSUClient/2/PepoMote"));
+    }
+
+    #[test]
+    fn sin_cambios_no_se_reescribe() {
+        let dir = tmp_dir("nochange");
+        write_wiimotes(&dir, &wm(2)).unwrap();
+        let path = dir.join("WiimoteNew.ini");
+        let m1 = std::fs::metadata(&path).unwrap().modified().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        write_wiimotes(&dir, &wm(2)).unwrap();
+        let m2 = std::fs::metadata(&path).unwrap().modified().unwrap();
+        assert_eq!(m1, m2, "un INI idéntico no debe tocar el disco");
+    }
+
+    #[test]
+    fn un_mando_por_movil_y_los_demas_apagados() {
+        let dir = tmp_dir("uno-por-movil");
+        // dos móviles: Wiimote1 y 2 emulados, 3 y 4 en Ninguno
+        write_wiimotes(&dir, &wm(2)).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert!(out.contains("[Wiimote1]
+Device = DSUClient/0/PepoMote
+Source = 1
+"));
+        assert!(out.contains("[Wiimote2]
+Device = DSUClient/1/PepoMote
+Source = 1
+"));
+        assert!(out.contains("[Wiimote3]
+Source = 0
+"), "{out}");
+        assert!(out.contains("[Wiimote4]
+Source = 0
+"), "{out}");
+        // se va el segundo móvil: su mando se apaga (el mapeo queda para la próxima)
+        write_wiimotes(&dir, &wm(1)).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert!(out.contains("[Wiimote1]
+Device = DSUClient/0/PepoMote
+Source = 1
+"));
+        assert!(out.contains("[Wiimote2]
+Device = DSUClient/1/PepoMote
+Source = 0
+"), "{out}");
+        assert_eq!(out.matches("Source = 1").count(), 1);
+        // vuelve: se reactiva
+        write_wiimotes(&dir, &wm(2)).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert_eq!(out.matches("Source = 1").count(), 2);
+    }
+
+    #[test]
+    fn nunchuk_del_jugador_lee_del_pad_del_otro_movil() {
+        let dir = tmp_dir("nunchuk");
+        // J1 = mando en slot 0 con Nunchuk en slot 3
+        write_wiimotes(&dir, &[(0, Some(3))]).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert!(out.contains("[Wiimote1]
+Device = DSUClient/0/PepoMote
+Source = 1
+"), "{out}");
+        assert!(out.contains("Extension = Nunchuk
+"), "{out}");
+        assert!(out.contains("Nunchuk/Buttons/C = `DSUClient/3/PepoMote:L1`
+"));
+        assert!(out.contains("Nunchuk/Stick/Up = `DSUClient/3/PepoMote:Left Y+`
+"));
+        assert!(out.contains("Nunchuk/IMUAccelerometer/Forward = `DSUClient/3/PepoMote:Accel Forward`
+"));
+        assert!(!out.contains("Extension = None"));
+        assert!(out.contains("[Wiimote2]
+Source = 0
+") && out.contains("[Wiimote4]
+Source = 0
+"), "{out}");
+        // se va el Nunchuk: el mando vuelve a Extension = None sin restos
+        write_wiimotes(&dir, &[(0, None)]).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert!(out.contains("Extension = None
+"));
+        assert!(!out.contains("Nunchuk/"), "{out}");
+        // dos jugadores con Nunchuk cada uno: slots 0/3 y 1/2
+        write_wiimotes(&dir, &[(0, Some(3)), (1, Some(2))]).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert!(out.contains("[Wiimote2]
+Device = DSUClient/1/PepoMote
+Source = 1
+"), "{out}");
+        assert!(out.contains("Nunchuk/Buttons/Z = `DSUClient/2/PepoMote:R1`
+"));
+        assert_eq!(out.matches("Extension = Nunchuk").count(), 2);
+    }
+
+    #[test]
+    fn nunchuk_en_el_mismo_movil_lee_de_su_propio_pad() {
+        let dir = tmp_dir("nunchuk-propio");
+        // J1 = mando en slot 0 con el Nunchuk en su mismo pad
+        write_wiimotes(&dir, &[(0, Some(0))]).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        assert!(out.contains("[Wiimote1]
+Device = DSUClient/0/PepoMote
+Source = 1
+"), "{out}");
+        assert!(out.contains("Extension = Nunchuk
+"), "{out}");
+        assert!(out.contains("Nunchuk/Buttons/C = `DSUClient/0/PepoMote:L1`
+"));
+        assert!(out.contains("Nunchuk/Buttons/Z = `DSUClient/0/PepoMote:R1`
+"));
+        assert!(out.contains("Nunchuk/Stick/Left = `DSUClient/0/PepoMote:Left X-`
+"));
+        assert!(out.contains("Nunchuk/IMUAccelerometer/Up = `DSUClient/0/PepoMote:Accel Up`
+"));
+        assert_eq!(out.matches("Extension = Nunchuk").count(), 1);
+        assert!(!out.contains("Extension = None"));
+        // Nunchuk en el mismo pad: Left X es su stick, el par IR va sin roll
+        assert!(out.contains("IRPassthrough/Object 1 X = (`Right X+`*32512 + `L2`*255)/32767 - (0.13 + `L3`*0.07 + `R3`*0.18 + `L3`*`R3`*0.09)/2
+"), "{out}");
+        assert!(out.contains("IRPassthrough/Object 2 Y = (`Right Y+`*32512 + `R2`*255)/32767 + 0
+"), "{out}");
+        assert!(!out.contains("cos("), "{out}");
+    }
+
+    #[test]
+    fn puntero_ir_por_passthrough_y_grupo_imuir() {
+        let dir = tmp_dir("ir");
+        write_wiimotes(&dir, &[(0, None), (1, Some(3))]).unwrap();
+        let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
+        // el puntero IMU de Dolphin es el grupo IMUIR (IMUPointer no existe)
+        assert!(out.contains("IMUIR/Enabled = True
+"), "{out}");
+        assert!(out.contains("IMUIR/Recenter = `Touch Button`
+"));
+        assert!(out.contains("IMUIR/Total Yaw = 25.000000000000000
+"));
+        assert!(!out.contains("IMUPointer"), "{out}");
+        // passthrough: X = byte alto (Right X, mitad positiva) + bajo (L2); el
+        // par se separa por nivel (L3/R3) y gira con el roll de Left X
+        assert!(out.contains("IRPassthrough/Enabled = True
+"), "{out}");
+        assert!(out.contains("IRPassthrough/Object 1 X = (`Right X+`*32512 + `L2`*255)/32767 - (0.13 + `L3`*0.07 + `R3`*0.18 + `L3`*`R3`*0.09)/2*cos(((`Left X+` - 0.5)*3.14159))
+"), "{out}");
+        assert!(out.contains("IRPassthrough/Object 2 Y = (`Right Y+`*32512 + `R2`*255)/32767 + (0.13 + `L3`*0.07 + `R3`*0.18 + `L3`*`R3`*0.09)/2*sin(((`Left X+` - 0.5)*3.14159))*1.3333
+"), "{out}");
+        assert!(out.contains("IRPassthrough/Object 1 Size = if(`Right X-` > 0.999, 0, (1 + `L3` + `R3`*2)/15)
+"), "{out}");
+        assert_eq!(out.matches("IRPassthrough/Enabled = True").count(), 2, "uno por mando");
+        assert_eq!(out.matches("cos(").count(), 4, "los dos mandos giran (Nunchuk en OTRO pad)");
+        assert!(!out.contains("Object 3"));
+    }
+
+    #[test]
+    fn adaptador_emulado_se_fuerza_y_lo_demas_se_conserva() {
+        let dir = tmp_dir("bt");
+        std::fs::write(
+            dir.join("Dolphin.ini"),
+            "[Core]
+WiimoteContinuousScanning = False
+[BluetoothPassthrough]
+Enabled = True
+VID = -1
+PID = -1
+LinkKeys = 
+[Interface]
+Language = 0
+",
+        )
+        .unwrap();
+        ensure_emulated_adapter(&dir).unwrap();
+        let out = std::fs::read_to_string(dir.join("Dolphin.ini")).unwrap();
+        assert!(out.contains("[BluetoothPassthrough]
+Enabled = False
+VID = -1
+PID = -1
+"), "{out}");
+        assert!(!out.contains("Enabled = True"));
+        assert!(out.contains("[Core]
+WiimoteContinuousScanning = False
+"));
+        assert!(out.contains("[Interface]
+Language = 0
+"));
+        assert!(dir.join("Dolphin.ini.pepomote.bak").exists());
+        // idempotente
+        ensure_emulated_adapter(&dir).unwrap();
+        assert_eq!(out, std::fs::read_to_string(dir.join("Dolphin.ini")).unwrap());
+    }
+
+    #[test]
+    fn adaptador_emulado_sin_seccion_ni_archivo() {
+        let dir = tmp_dir("bt-nuevo");
+        ensure_emulated_adapter(&dir).unwrap();
+        let out = std::fs::read_to_string(dir.join("Dolphin.ini")).unwrap();
+        assert_eq!(out, "[BluetoothPassthrough]
+Enabled = False
+");
+        // sección presente pero sin la clave: se añade sin tocar el resto
+        std::fs::write(dir.join("Dolphin.ini"), "[BluetoothPassthrough]
+VID = 1234
+").unwrap();
+        ensure_emulated_adapter(&dir).unwrap();
+        let out = std::fs::read_to_string(dir.join("Dolphin.ini")).unwrap();
+        assert_eq!(out, "[BluetoothPassthrough]
+Enabled = False
+VID = 1234
+");
+    }
+
+    #[test]
+    fn background_input_se_activa_y_lo_demas_se_conserva() {
+        let dir = tmp_dir("bg");
+        std::fs::write(
+            dir.join("Dolphin.ini"),
+            "[Core]\nWiimoteContinuousScanning = False\n[Input]\nBackgroundInput = False\nOther = 1\n",
+        )
+        .unwrap();
+        ensure_background_input(&dir).unwrap();
+        let out = std::fs::read_to_string(dir.join("Dolphin.ini")).unwrap();
+        assert!(out.contains("[Input]\nBackgroundInput = True\nOther = 1\n"), "{out}");
+        assert!(!out.contains("BackgroundInput = False"));
+        assert!(out.contains("[Core]\nWiimoteContinuousScanning = False\n"));
+        // idempotente
+        ensure_background_input(&dir).unwrap();
+        assert_eq!(out, std::fs::read_to_string(dir.join("Dolphin.ini")).unwrap());
+        // sin sección ni archivo: se crea con la clave
+        let dir = tmp_dir("bg-nuevo");
+        ensure_background_input(&dir).unwrap();
+        assert_eq!(std::fs::read_to_string(dir.join("Dolphin.ini")).unwrap(), "[Input]\nBackgroundInput = True\n");
+        // las dos claves conviven en el mismo archivo
+        ensure_emulated_adapter(&dir).unwrap();
+        let out = std::fs::read_to_string(dir.join("Dolphin.ini")).unwrap();
+        assert!(out.contains("[Input]\nBackgroundInput = True\n") && out.contains("[BluetoothPassthrough]\nEnabled = False\n"), "{out}");
+    }
+
+    #[test]
+    fn dsu_server_agrega_sin_duplicar_ni_borrar() {
+        let dir = tmp_dir("dsu");
+        std::fs::write(
+            dir.join("DSUClient.ini"),
+            "[Server]\nEnabled = False\nIPAddress = 127.0.0.1\nPort = 26760\nEntries = Otro:1.2.3.4:26760;\n",
+        )
+        .unwrap();
+
+        ensure_dsu_server(&dir).unwrap();
+        let out = std::fs::read_to_string(dir.join("DSUClient.ini")).unwrap();
+        assert!(out.contains("Enabled = True"));
+        assert!(!out.contains("Enabled = False"));
+        assert!(out.contains("Otro:1.2.3.4:26760"));
+        assert!(out.contains("PepoMote:127.0.0.1:26760"));
+        // las claves ajenas de [Server] sobreviven
+        assert!(out.contains("IPAddress = 127.0.0.1"));
+        assert!(out.contains("Port = 26760"));
+
+        ensure_dsu_server(&dir).unwrap();
+        let out2 = std::fs::read_to_string(dir.join("DSUClient.ini")).unwrap();
+        assert_eq!(out2.matches("PepoMote:127.0.0.1:26760").count(), 1);
+        assert_eq!(out2.matches("Entries").count(), 1);
+        assert_eq!(out, out2);
+    }
+}

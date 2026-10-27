@@ -1,0 +1,203 @@
+name: desktop
+
+on:
+  push:
+    branches: [main, next]
+    paths: ["desktop/**", "pmp/**", "protocol/**", "packaging/linux/**", "packaging/macos/**", ".github/workflows/desktop.yml"]
+  pull_request:
+    paths: ["desktop/**", "pmp/**", "protocol/**", "packaging/linux/**", "packaging/macos/**", ".github/workflows/desktop.yml"]
+  workflow_call:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test pmp (códec compartido)
+        working-directory: pmp
+        run: cargo test --release
+      - name: Build (release)
+        working-directory: desktop
+        run: cargo build --release
+      - name: Test
+        working-directory: desktop
+        run: cargo test --release
+      - name: Actualización y recuperación con el instalador real (archivos aislados)
+        shell: pwsh
+        run: ./desktop/tests/update-handoff.ps1 -Receiver desktop/target/release/PepoMote.exe
+      # Sin el driver del mando virtual en el runner: el Windows Server de GitHub
+      # no trae xusb22 (el driver de clase del mando de Xbox 360), así que un
+      # mando de ViGEm nunca está listo allí y el receptor se queda terminando
+      # (medido: e2e colgado media hora). El e2e del mando universal (XInput
+      # real) se ejecuta en un PC con el driver; aquí se salta solo, con 0.
+      # Receptor real aislado + RetroArch falso por sockets (desktop/e2e/README.md):
+      # retroarch.cfg, un datagrama por fotograma, teclas rápidas, resincronización
+      - name: e2e de todos los mandos (receptor aislado)
+        # Con tope: un receptor que no muere (hilo atascado en el driver) no
+        # puede tener el runner colgado media hora sin subir los logs
+        timeout-minutes: 12
+        env:
+          PEPOMOTE_E2E_SUITES: e2e_retroarch,e2e_eden,e2e_cemu,e2e_nunchuk,e2e_dolphin_ir,e2e_gamepad,e2e_rumble
+        run: python desktop/e2e/run_switch_preview.py desktop/target/release/PepoMote.exe dist/e2e
+      # La ventana de verdad: el e2e de arriba arranca el receptor con
+      # --minimized y nunca la crea. El runner no tiene GPU: su OpenGL es el
+      # 1.1 de Microsoft, como un PC sin driver de la gráfica, y la ventana
+      # tiene que pintar con Direct3D 12 por WARP (desktop/src/gpu.rs). El
+      # caso «colgada» necesita un OpenGL que funcione: solo en un PC.
+      - name: Humo de la ventana (Windows sin GPU)
+        timeout-minutes: 10
+        continue-on-error: true
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python desktop/e2e/e2e_window_windows.py desktop/target/release/PepoMote.exe dist/e2e-window --cases normal,sin_opengl,sonda_colgada,reintento,marca,nada,carpeta,carpeta_min,aviso
+      - name: Procesos del receptor que se quedaron terminando
+        if: always()
+        shell: pwsh
+        run: Get-Process PepoMote -ErrorAction SilentlyContinue | Format-Table Id, StartTime, HasExited, Responding
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-windows-logs
+          path: |
+            dist/e2e/**/checks.log
+            dist/e2e/**/receiver.out
+            dist/e2e/**/receptor.log
+            dist/e2e-window/**/receptor.log
+          if-no-files-found: warn
+      - name: Diagnóstico de cierre de Windows
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-10)} -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match 'PepoMote' } |
+            Format-List TimeCreated, Id, ProviderName, Message
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PepoMote-windows
+          path: desktop/target/release/PepoMote.exe
+
+  # Apple Silicon nativo (los runners macos-14/15 son arm64): compila, pasa los
+  # tests, empaqueta el .app firmado y el DMG (packaging/macos/bundle.sh) y
+  # arranca el binario del .app con --diag. Sin dispositivo: la CI es el único Mac.
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test pmp (códec compartido)
+        working-directory: pmp
+        run: cargo test --release
+      - name: Build (release)
+        working-directory: desktop
+        run: cargo build --release
+      - name: Test
+        working-directory: desktop
+        run: cargo test --release
+      - name: Identidad de firma (secret) o ad hoc
+        env:
+          MACOS_SIGN_P12_B64: ${{ secrets.MACOS_SIGN_P12_B64 }}
+          MACOS_SIGN_P12_PASSWORD: ${{ secrets.MACOS_SIGN_P12_PASSWORD }}
+        run: bash packaging/macos/import-identity.sh
+      - name: .app + DMG
+        run: bash packaging/macos/bundle.sh
+      - name: Smoke --diag (desde el .app)
+        run: |
+          out="$(dist/PepoMote.app/Contents/MacOS/PepoMote --diag)"
+          echo "$out" | head -30
+          echo "$out" | grep -q "diagnóstico"
+          echo "$out" | grep -q "^macOS: bundle: .*PepoMote.app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PepoMote-macos
+          path: dist/PepoMote-macOS.dmg
+
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: System deps (egui/eframe + AppImage)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libxcb-render0-dev libxcb-shape0-dev \
+            libxcb-xfixes0-dev libxkbcommon-dev libssl-dev libasound2-dev libudev-dev file
+      - name: Build (release)
+        working-directory: desktop
+        run: cargo build --release
+      - name: Test
+        working-directory: desktop
+        run: cargo test --release
+      - name: AppImage
+        run: bash packaging/linux/appimage.sh
+      - name: Tarball (binario + lanzador + install.sh)
+        run: bash packaging/linux/tarball.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PepoMote-linux
+          path: |
+            dist/PepoMote-x86_64.AppImage
+            dist/PepoMote-linux-x86_64.tar.gz
+      # Solo glibc y libasound pueden ser dependencias duras: cualquier otra
+      # (GTK, udev, ssl…) haría que el AppImage no arrancase en una distro
+      # que no la tenga
+      - name: Dependencias dinámicas del binario
+        run: |
+          objdump -p desktop/target/release/PepoMote | grep NEEDED
+          extra=$(objdump -p desktop/target/release/PepoMote | awk '/NEEDED/ {print $2}' \
+            | grep -Ev '^(libasound\.so\.2|libgcc_s\.so\.1|libm\.so\.6|libc\.so\.6|libpthread\.so\.0|libdl\.so\.2|librt\.so\.1|ld-linux-x86-64\.so\.2)$' || true)
+          [ -z "$extra" ] || { echo "dependencia dinámica nueva: $extra"; exit 1; }
+      # La VENTANA de verdad, bajo sway (Wayland) y Xvfb (X11), con el binario
+      # y con el AppImage, y el relanzamiento con render por software cuando el
+      # primer intento falla (desktop/e2e/smoke_gui.sh). Antes el AppImage se
+      # publicaba sin haberse abierto nunca. Y con el driver del mando virtual
+      # colgado a propósito (hang): la ventana tiene que pintar igual.
+      - name: Humo de la ventana (sway, Xvfb, AppImage, relanzamiento, driver colgado)
+        run: |
+          sudo apt-get install -y --no-install-recommends sway xvfb x11-utils libegl1 libgl1 libgl1-mesa-dri libgles2 libwayland-egl1 libxkbcommon-x11-0 libnotify-bin
+          bash desktop/e2e/smoke_gui.sh wayland
+          bash desktop/e2e/smoke_gui.sh x11
+          PEPOMOTE_BIN=dist/PepoMote-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh wayland
+          PEPOMOTE_BIN=dist/PepoMote-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh x11
+          bash desktop/e2e/smoke_gui.sh wayland fallback
+          PEPOMOTE_BIN=dist/PepoMote-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh x11 fallback
+          bash desktop/e2e/smoke_gui.sh x11 hang
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-gui-logs
+          path: /tmp/pepomote-smoke/**
+          if-no-files-found: warn
+      # Compositor wlroots de verdad, sin GPU: el receptor tiene que elegir el
+      # puntero virtual de Wayland y mover el cursor, hacer clic, ir atrás y
+      # adelante con la cruceta, girar la rueda y teclear en wev —incluidos ñ,
+      # un emoji y el euro, que van por teclas de repuesto— (desktop/e2e/README.md)
+      - name: e2e Wayland (sway sin cabeza + wev)
+        run: |
+          sudo apt-get install -y --no-install-recommends sway wev xkb-data
+          bash desktop/e2e/e2e_wayland.sh
+      # El analizador de la salida de wev, contra las dos grabaciones guardadas
+      - name: e2e Wayland (solo el analizador)
+        run: |
+          python3 desktop/e2e/e2e_wayland.py --parse-only desktop/e2e/fixtures/wev_ok.log
+          python3 desktop/e2e/e2e_wayland.py --parse-only desktop/e2e/fixtures/wev_unicode.log --expect-text "abñ😀€ab"
+      # Receptor real aislado + RetroArch falso por sockets (desktop/e2e/README.md)
+      - name: e2e RetroArch (receptor aislado)
+        env:
+          PEPOMOTE_E2E_SUITES: e2e_retroarch
+        run: python3 desktop/e2e/run_switch_preview.py desktop/target/release/PepoMote
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-wayland-logs
+          path: |
+            /tmp/pepomote-e2e/wev.log
+            /tmp/pepomote-e2e/config/receptor.log
+            /tmp/pepomote-e2e/sway.log
+            /tmp/pepomote-e2e/receptor.out
+            /tmp/pepomote-e2e/outputs.json
+          if-no-files-found: warn

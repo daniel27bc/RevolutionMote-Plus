@@ -1,0 +1,252 @@
+# SETUP-CEMU — jugar a la Wii U con PepoMote
+
+Modo **Wii U**: el móvil apaisado es un **Wii U GamePad** para el emulador
+[Cemu](https://cemu.info/) (2.0 o más reciente, Windows y Linux): dos sticks,
+A/B/X/Y, L/R/ZL/ZR, cruceta, −/+/Home, giroscopio, pantalla táctil, soplar al
+micrófono y el botón TV↔Pad de Cemu. Cemu se configura solo.
+
+## Se configura solo
+
+1. En el móvil, tarjeta **Wii U** del menú principal (o el chip **Wii U** dentro
+   del mando): se abre directamente el GamePad apaisado. La ventana del PC pasa
+   a «Modo Wii U (Cemu)» y deja de mover el cursor: todo va al servidor DSU
+   (`127.0.0.1:26760`).
+2. Con **Cemu cerrado**, PepoMote escribe en la carpeta de configuración de Cemu
+   un perfil de mando por móvil conectado:
+   `controllerProfiles/controller0.xml` = Jugador 1 (**Wii U GamePad**, con
+   movimiento y táctil), `controller1.xml` = Jugador 2 (**Pro Controller**), y
+   así hasta cuatro. Cada perfil lee del pad DSU de su móvil (API
+   `DSUController`, `127.0.0.1:26760`), así que en Cemu no hay que tocar nada.
+   El mando 1 de Cemu es **siempre un Wii U GamePad** (Cemu lo necesita para
+   arrancar el juego y leer los demás mandos): si el Jugador 1 elige Mando de
+   Wii, ahí queda un GamePad manejado por el teclado del PC (o tu mando real,
+   si lo tenías) y los móviles pasan a los mandos 2 en adelante.
+3. Abre Cemu y juega. Si conectas el móvil después de abrir Cemu también vale:
+   Cemu reintenta la conexión DSU solo.
+
+Si Cemu estaba abierto cuando el móvil entró, la ventana de PepoMote (y el
+móvil, en un aviso) te lo dice: cierra Cemu y pulsa **Configurar Cemu** (o
+simplemente vuelve a abrirlo cuando el aviso desaparezca). Si en un índice
+había ya un mando tuyo (un gamepad USB, por ejemplo), queda a salvo en
+`controllerN.xml.pepomote.bak` y vuelve solo cuando ese jugador se va. El
+automatismo se apaga en Ajustes («Configurar Cemu automáticamente»).
+
+Dónde busca PepoMote la configuración (las mismas reglas que Cemu):
+
+| Instalación | Carpeta |
+|---|---|
+| Normal (Windows, Cemu 2.0-89 o más nuevo) | `%APPDATA%\Cemu` (se crea si Cemu aún no se ha abierto nunca) |
+| Portable (carpeta `portable\` junto a `Cemu.exe` / al AppImage) | esa carpeta `portable\` |
+| Antigua (Windows, `settings.xml` junto a `Cemu.exe`) | la carpeta de `Cemu.exe` |
+| Linux | `~/.config/Cemu` (o `$XDG_CONFIG_HOME/Cemu`) |
+| Linux Flatpak | `~/.var/app/info.cemu.Cemu/config/Cemu` |
+
+Para saber si tienes una instalación portable, PepoMote busca `Cemu.exe` (o el
+AppImage) en los sitios habituales (Escritorio, Descargas, Documentos,
+`C:\Cemu`, Archivos de programa…), y si Cemu está abierto, aprende su carpeta
+y la guarda. Si vive en un sitio raro, escríbela en **Ajustes → Carpeta de
+Cemu** o pulsa **Detectar**. Sin rastro de Cemu no se escribe nada.
+
+## La cabecera del GamePad
+
+En **Android** y en **iPhone/iPad**, arriba, en el centro, hay una **pastilla
+con el modo** («Wii U») y, pegado a ella, el botón **Teclado**, que se queda
+siempre a la vista para tenerlo a un toque mientras juegas. Toca la pastilla y
+baja una tarjeta con el nombre del PC, el jugador y el pad (con los ms y, si
+la tienes, los fps de la pantalla), los chips de modo y **Salir**; se pliega
+sola a los 4 segundos, y mientras la estés usando no se pliega. Al entrar sale
+desplegada, y también si se cae la conexión. Los botones del mando no se
+mueven: la tarjeta se dibuja encima y tocar su fondo no pulsa lo que tapa.
+
+En **Linux móvil** la cabecera sigue como estaba: los chips **Salir**, el
+giro, **Teclado** y el modo, arriba a la derecha y siempre a la vista.
+
+## Mando Wii dentro de Cemu
+
+Juegos de Wii U que se juegan con el mando de Wii (Wii Sports Club, Wii Party
+U, Mario Party 10, Nintendo Land…): en el móvil, dentro del modo Wii U, el
+selector **«En Cemu soy: GamePad / Mando de Wii»** (está en la pantalla del
+GamePad, bajo la pastilla de la cabecera). Con **Mando de Wii** ese móvil pasa
+al layout de Wii de siempre y en Cemu su perfil es un **Wiimote** emulado con MotionPlus; el
+puntero se apunta como en modo puntero (recentra con la diana, también de
+lado) y llega a Cemu por el táctil DSU. Un segundo móvil en modo **Nunchuk**
+se le acopla igual que en Dolphin (stick, C, Z). El mismo selector, marcando
+**GamePad**, vuelve al GamePad / Pro Controller. La elección se recuerda para
+la próxima vez que entres en Wii U.
+
+**Varios Mandos de Wii a la vez** (Mario Party 10, Wii Party U… con dos, tres
+o cuatro móviles): cada móvil elige Mando de Wii en su selector y cada uno es
+un Wiimote emulado con su propio pad DSU y su propio puntero. Cemu exige un
+**Wii U GamePad en el mando 1, con un dispositivo detrás**, aunque nadie
+juegue con él (un GamePad sin dispositivo cuenta como desconectado: el juego
+no arranca ni lee los Mandos Wii). Si todos los móviles son Mando de Wii,
+PepoMote deja en `controller0.xml` un GamePad manejado por **el teclado del
+PC** (o conserva tu GamePad real si tenías uno ahí, y si lo había sustituido
+por un móvil, te lo devuelve) y los Mandos Wii van a `controller1.xml`,
+`controller2.xml`… La ventana del PC lo dice: «mando 1 GamePad por teclado
+del PC (Cemu lo necesita; todos sois Mando Wii), J1 Mando Wii, J2 Mando Wii».
+Si un juego pide algo al GamePad (o necesita a alguien detrás, como Bowser
+Party en Mario Party 10), o bien deja un móvil como GamePad, o bien úsalo
+desde el teclado del PC con estas teclas (las asigna Cemu por código de tecla
+de Windows; en Linux/macOS pueden no coincidir):
+
+| GamePad | Tecla | GamePad | Tecla |
+|---|---|---|---|
+| A / B | Intro / Retroceso | X / Y | X / Y |
+| L / R | Q / E | ZL / ZR | Z / C |
+| + / − | P / M | Home | H |
+| Cruceta | Flechas | Click stick izq / dcho | F / G |
+| Stick izquierdo | W A S D | Stick derecho | I J K L |
+| Soplar al micro | N | Mostrar pantalla del GamePad | T |
+
+Como el perfil de Cemu es global (no por juego), cambia de tipo con Cemu
+cerrado, antes de arrancar el juego.
+
+**Mario Party 10 dice «añade los mandos como se indica en rojo» y no avanza**:
+es un fallo conocido de Cemu con los Wiimotes emulados ([bug 353 de
+Cemu](https://bugs.cemu.info/issues/353), «Emulated Wiimotes not paired»): el
+juego no da por emparejado un Mando de Wii hasta que pulsas **Home** en él.
+Pulsa Home en cada móvil (en el mando vertical está entre 1 y 2; de lado,
+junto a A) y su recuadro pasa a «OK»; con todos en OK el juego sigue a la
+elección de personaje, cada móvil con su puntero. Vale para cualquier otro
+juego que «añada» mandos con ese diálogo.
+
+## Doble pantalla: la pantalla del GamePad en el móvil
+
+Como en el Wii U de verdad, el móvil GamePad enseña la segunda pantalla del
+juego (mapa, inventario, «Tap the screen!», off-TV play…) en su zona central,
+y tocarla es tocar la pantalla del GamePad. Funciona así:
+
+1. PepoMote deja `open_pad = true` en el `settings.xml` de Cemu al configurarlo:
+   Cemu abre su ventana **GamePad View** (la segunda pantalla) al arrancar. Si
+   la cierras, se vuelve a abrir en *Options → Separate GamePad view* (o al
+   reconfigurar con Cemu cerrado).
+   **En el PC no la verás**: mientras haya un móvil en modo Wii U, PepoMote la
+   mantiene escondida detrás de la ventana de Cemu (dentro de su rectángulo,
+   justo debajo en el orden de ventanas, sin botón en la barra de tareas ni
+   en Alt+Tab), porque la captura necesita que la ventana exista y esté en
+   pantalla, no que se vea: tapada se captura entera; fuera de la pantalla,
+   transparente o minimizada no. Si la minimizas, la vuelve a abrir al fondo
+   sin robarte el foco. Cuando el móvil se va, vuelve a la barra de tareas
+   (sigue detrás de Cemu: muévela si la quieres ver).
+2. El receptor captura esa ventana solo mientras el móvil GamePad la pide
+   (hasta 30 fps, JPEG, la resolución nativa del GamePad como máximo) con
+   Windows.Graphics.Capture (lo mismo que usa OBS para las ventanas con GPU;
+   en Windows 10 y en Windows 11 anteriores a 24H2, `PrintWindow`) y la
+   ventana del PC dice «Pantalla del GamePad: N fps».
+3. En el móvil, la zona táctil pasa a ser la pantalla. Si no hay imagen, el
+   propio hueco dice por qué («Cemu no está abierto», «Abre la vista del
+   GamePad en Cemu…», «Cemu está abierto como administrador…»).
+
+**Abre Cemu normal, sin administrador.** Con Cemu elevado y PepoMote no,
+Windows no deja a PepoMote esconder la GamePad View ni escribirle, y en
+Windows 10 y en Windows 11 anteriores a 24H2 tampoco capturarla: el móvil y
+el PC lo dicen. Si Cemu tiene marcado «Ejecutar este programa como
+administrador» (Propiedades de `Cemu.exe`, pestaña Compatibilidad),
+desmárcalo.
+
+Si prefieres botones más grandes a la pantalla, en Ajustes de la app está
+«**GamePad sin pantalla táctil**»: quita la pantalla del GamePad (y la doble
+pantalla) y sticks, cruceta y A/B/X/Y crecen para llenar el hueco.
+
+## Mando de verdad en el PC y el móvil como pantalla del GamePad
+
+Desde 1.6, en Ajustes de la app está «**Pantalla del GamePad a pantalla
+completa**» (apagada de serie; excluyente con «GamePad sin pantalla táctil»):
+con ella, al entrar en Wii U como GamePad el móvil enseña **solo** la pantalla
+del GamePad de Cemu, ajustada a su proporción real sobre fondo negro, y
+responde al tacto igual que la pantalla de la Wii U. Sin sticks ni botones:
+está pensada para jugar con un **mando de verdad conectado al PC** (XInput,
+DualShock, Pro Controller…) y el móvil delante como pantalla táctil. La
+subopción «**Botón de teclado**» (encendida de serie) deja un botón pequeño
+arriba a la derecha para escribir en el teclado en pantalla de Cemu. Esta
+pantalla no lleva cabecera ni pastilla: para salir, Atrás en Android y la ✕
+pequeña arriba a la izquierda en iPhone y en Linux móvil (en el GamePad
+normal, «Salir» está dentro de la tarjeta de la pastilla). Los avisos del PC
+siguen saliendo arriba.
+
+Lo que hace el receptor: el móvil se anuncia como «solo pantalla» y PepoMote,
+en vez de sustituir tu `controllerProfiles/controller0.xml`, lo **fusiona**:
+conserva tu mando tal cual (con sus botones) y añade el DSU del móvil como
+segundo mando del GamePad emulado, sin movimiento ni botones (`PepoMote J1
+pantalla`); el táctil llega por ese DSU. Deja copia `.pepomote.bak` de tu
+perfil, que vuelve cuando el móvil se va o apagas la opción. Si no tienes
+ningún perfil en Controller 1, escribe el perfil completo de siempre (táctil
+y movimiento del móvil). Cemu tiene que estar cerrado para aplicarlo (como
+cualquier cambio de perfil; si está abierto queda pendiente hasta cerrarlo).
+Si tu Controller 1 no es un «Wii U GamePad» (un Pro Controller, por
+ejemplo), la fusión se hace igual pero el táctil no se aplica: el móvil te
+avisa. El movimiento (giroscopio) lo pone tu mando, si lo tiene. La ventana
+del PC lista al móvil como «J1 · pantalla del GamePad». Con un receptor
+anterior a 1.6 la pantalla completa se ve igual, pero el perfil de Cemu se
+escribe como siempre (con el móvil como mando): el móvil te lo avisa.
+
+Linux: la captura es de X11, que vale también para XWayland. Con Cemu nativo
+en Wayland no hay ventana X que capturar: lanza Cemu con `GDK_BACKEND=x11`.
+
+## Teclado: escribir el nombre del jugador y demás
+
+Cuando un juego pide texto (el nombre en *Zelda: The Wind Waker HD*, un
+mensaje en Miiverse…), Cemu enseña su teclado en pantalla, y ese teclado
+**no reacciona a la pantalla táctil**: en Cemu solo se maneja con el teclado
+del PC. Por eso el móvil tiene, en modo Wii U (GamePad, Pro o Mando de Wii),
+un botón **Teclado** que abre un cuadro de texto (en el GamePad y el Pro está
+al lado de la pastilla, siempre a la vista; en el Mando de Wii de lado, dentro
+de la tarjeta de la cabecera, y en vertical arriba como siempre): escribe con
+el teclado del móvil y pulsa **Aceptar** (escribe y confirma), **Escribir**
+(escribe sin confirmar) o **Borrar** (borra un carácter en Cemu). El receptor manda las
+teclas a la ventana de Cemu; en Linux las escribe con el teclado virtual de
+PepoMote, así que Cemu debe tener el foco.
+
+## Movimiento apaisado
+
+Sostén el móvil como un GamePad: horizontal, con el borde superior del móvil a
+la izquierda (la app Android lo detecta sola por la rotación de la pantalla; en
+un móvil Linux se elige con el ajuste **Giro** de la pantalla del GamePad). Los
+sensores se remapean para que Cemu reciba exactamente lo que enviaría un mando
+tumbado: girar el móvil = girar el GamePad (Splatoon, Zelda, Mario Kart 8…).
+
+## Manual (si prefieres mapear a mano)
+
+Cemu → Opciones → **Configuración de mandos** → Controller 1 → emulated
+controller **Wii U GamePad** → Controller API **DSUController** (IP `127.0.0.1`,
+puerto `26760`) → Controller 1. Mapeo PepoMote: A = Cross, B = Circle, X =
+Square, Y = Triangle, L = L, R = R, ZL = X-Trigger+, ZR = Y-Trigger+, + =
+Options, − = Share, cruceta = Up/Down/Left/Right, click de sticks = Stick L /
+Stick R, stick izquierdo = X/Y-Axis, stick derecho = X/Y-Rotation, Home =
+Touch, soplar = ZL (bit L2), pantalla = ZR (bit R2). Marca **Use motion**.
+`assets/cemu/controller0.xml` es exactamente ese perfil, por si quieres
+copiarlo a `controllerProfiles/`.
+
+## Problemas típicos
+
+- **Controller 1 aparece desconectado en Cemu**: ¿modo Wii U activo en el
+  móvil? ¿«Cemu (Wii U): 1 cliente(s) DSU» en la ventana del PC? El móvil tiene
+  que estar conectado (Cemu reintenta solo, sin reiniciar). Si el PC dice
+  «0 cliente(s) DSU» con Cemu abierto, PepoMote se reinició después de abrir
+  Cemu: cierra Cemu y vuelve a abrirlo.
+- **«Cemu está abierto: ciérralo…»**: PepoMote no escribe con Cemu abierto
+  (al salir, Cemu sobreescribiría la configuración). Ciérralo, pulsa
+  **Configurar Cemu** y vuelve a abrirlo.
+- **«No encuentro Cemu en este equipo»**: pon la carpeta de `Cemu.exe` en
+  Ajustes → Carpeta de Cemu, o abre Cemu una vez (se aprende sola).
+- **El giroscopio va al revés (móvil Linux)**: cambia el ajuste **Giro** de la
+  pantalla del GamePad (izquierda ↔ derecha).
+- **El juego no ve el mando tras cambiar GamePad ↔ Mando Wii**: el cambio se
+  aplica con Cemu cerrado; reinicia Cemu.
+- **Mario Party 10 pide «añadir mandos» y no da por emparejado el Mando de
+  Wii**: pulsa **Home** en cada móvil (fallo de Cemu con los Wiimotes
+  emulados; ver «Varios Mandos de Wii a la vez»).
+- **En el móvil no aparece la pantalla del GamePad**: el hueco central dice el
+  motivo. Comprueba que Cemu tiene abierta la ventana GamePad View (Options →
+  Separate GamePad view; escondida detrás de Cemu es lo normal); minimizada,
+  PepoMote la restaura al fondo él solo; en Wayland, `GDK_BACKEND=x11`.
+- **«Cemu está abierto como administrador…»** (en la pantalla del GamePad o
+  al escribir): ciérralo y ábrelo normal, sin administrador. Windows no deja
+  a PepoMote esconder las ventanas de un Cemu elevado ni escribirles, ni
+  capturarlas antes de Windows 11 24H2.
+- **El teclado en pantalla de Cemu no hace caso a los toques**: es así en Cemu
+  (solo teclas). Usa el botón **Teclado** del móvil.
+- **No encuentro la ventana GamePad View en el PC**: está detrás de la de Cemu
+  mientras juegas con el móvil, a propósito. Al desconectar el móvil vuelve
+  a la barra de tareas.
