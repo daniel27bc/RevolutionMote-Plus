@@ -35,10 +35,15 @@ object Haptics {
     @Volatile
     private var primitives: Boolean? = null
 
+    /** Clics emitidos (por cualquier camino): para los tests. */
+    @Volatile
+    internal var emitted = 0
+
     fun tap(view: View?, constant: Int) {
         if (GameRumble.isOn || view == null) return
         val level = AppPrefs.hapticLevel(view.context)
         if (level == OFF) return
+        emitted++
         val tick = constant == HapticFeedbackConstants.CLOCK_TICK
         if (!play(view.context, level, if (tick) Kind.TICK else Kind.CLICK)) {
             view.performHapticFeedback(constant)

@@ -152,18 +152,13 @@ class GameRumbleTest {
     @Test
     fun losHapticosDeLosBotonesSeSaltanConElJuegoVibrando() {
         attach(amplitude = true)
-        var taps = 0
-        val view = object : View(context) {
-            override fun performHapticFeedback(feedbackConstant: Int): Boolean {
-                taps++
-                return true
-            }
-        }
+        val view = View(context)
+        val before = Haptics.emitted
         Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
-        assertEquals(1, taps)
+        assertEquals(before + 1, Haptics.emitted)
         GameRumble.set(1f)
         Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
-        assertEquals("con el juego vibrando, ninguno", 1, taps)
+        assertEquals("con el juego vibrando, ninguno", before + 1, Haptics.emitted)
         Haptics.tap(null, HapticFeedbackConstants.KEYBOARD_TAP)
     }
 }
