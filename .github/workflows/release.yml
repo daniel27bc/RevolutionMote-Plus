@@ -1,12 +1,13 @@
 name: release
 
-# Al subir una etiqueta vX.Y.Z se compila el APK y se publica la release con
-# él. Si el repo tiene los secretos de firma (KEYSTORE_B64, KEYSTORE_PASSWORD,
+# Al subir una etiqueta vX.Y.Z, o al subir a la rama `release` (la etiqueta
+# sale entonces de versionName), se compila el APK y se publica la release. Si el repo tiene los secretos de firma (KEYSTORE_B64, KEYSTORE_PASSWORD,
 # KEY_ALIAS, KEY_PASSWORD) sale el APK release firmado con tu clave; si no, el
 # de depuración.
 on:
   push:
     tags: ["v*"]
+    branches: [release]
   workflow_dispatch:
 
 jobs:
@@ -24,6 +25,11 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
           log-accepted-android-sdk-licenses: false
+      - name: Versión
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then TAG="${GITHUB_REF_NAME}"; else
+            TAG="v$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts)"; fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
       - name: Compilar
         working-directory: android
         env:
@@ -37,17 +43,17 @@ jobs:
             echo "$KEYSTORE_B64" | base64 -d > release.keystore
             export KEYSTORE_PATH=release.keystore
             ./gradlew assembleRelease --no-daemon
-            cp app/build/outputs/apk/release/app-release.apk ../RevolutionMote-Plus-${GITHUB_REF_NAME}.apk
+            cp app/build/outputs/apk/release/app-release.apk ../RevolutionMote-Plus-${TAG}.apk
           else
             ./gradlew assembleDebug --no-daemon
-            cp app/build/outputs/apk/debug/app-debug.apk ../RevolutionMote-Plus-${GITHUB_REF_NAME}.apk
+            cp app/build/outputs/apk/debug/app-debug.apk ../RevolutionMote-Plus-${TAG}.apk
           fi
       - name: Publicar release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          NOTES=docs/releases/${GITHUB_REF_NAME}.md
+          NOTES=docs/releases/${TAG}.md
           [ -f "$NOTES" ] || NOTES=/dev/null
-          gh release create "$GITHUB_REF_NAME" "RevolutionMote-Plus-${GITHUB_REF_NAME}.apk" \
-            --title "RevolutionMote+ ${GITHUB_REF_NAME}" --notes-file "$NOTES" \
-            || gh release upload "$GITHUB_REF_NAME" "RevolutionMote-Plus-${GITHUB_REF_NAME}.apk" --clobber
+          gh release create "$TAG" "RevolutionMote-Plus-${TAG}.apk" --target "$GITHUB_SHA" \
+            --title "RevolutionMote+ ${TAG}" --notes-file "$NOTES" \
+            || gh release upload "$TAG" "RevolutionMote-Plus-${TAG}.apk" --clobber
