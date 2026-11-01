@@ -26,6 +26,7 @@ import dev.pepotech.pepomote.ui.screens.CustomPadCanvas
 import dev.pepotech.pepomote.ui.screens.ElementSettingsDialog
 import dev.pepotech.pepomote.ui.screens.GamePadScreen
 import dev.pepotech.pepomote.ui.screens.LocalInlineDialogs
+import dev.pepotech.pepomote.ui.screens.PadMenuDialog
 import dev.pepotech.pepomote.ui.screens.PadSettingsDialog
 import dev.pepotech.pepomote.ui.screens.SettingsScreen
 import dev.pepotech.pepomote.ui.theme.PepoColors
@@ -125,4 +126,11 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "es-rES-w420dp-h4200dp-port-xhdpi")
     fun ajustes() = shot("08_ajustes") { SettingsScreen(onNewPairing = {}, onBack = {}) }
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h900dp-port-xhdpi")
+    fun menuDelMando() = shot("09_menu_mando") {
+        Column(Modifier.fillMaxWidth().padding(8.dp)) {
+            PadMenuDialog("Shooter", locked = true, gyroOn = true, {}, {}, {}, {}, {}, {})
+        }
+    }
 }

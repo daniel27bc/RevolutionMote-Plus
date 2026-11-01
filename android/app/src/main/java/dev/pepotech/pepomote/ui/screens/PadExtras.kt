@@ -7,6 +7,8 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -149,6 +151,16 @@ internal fun GyroButton(size: Dp, gyro: GyroConfig) {
     }
 }
 
+/** Chips que saltan de línea cuando no caben (nunca se cortan). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ChipFlow(content: @Composable () -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) { content() }
+}
+
 /** Título de apartado dentro de los diálogos. */
 @Composable
 internal fun SectionTitle(text: String, sub: String? = null) {
@@ -183,7 +195,7 @@ internal fun SwitchRow(title: String, checked: Boolean, sub: String? = null, onC
 @Composable
 internal fun LookSettingsSection(look: LookConfig, onChange: (LookConfig) -> Unit) {
     SectionTitle(stringResource(R.string.look_title), stringResource(R.string.look_sub))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    ChipFlow {
         for ((label, zone) in listOf(
             R.string.look_off to LookZone.OFF,
             R.string.look_right to LookZone.RIGHT,
@@ -195,7 +207,7 @@ internal fun LookSettingsSection(look: LookConfig, onChange: (LookConfig) -> Uni
     if (look.zone != LookZone.OFF) {
         Spacer(Modifier.height(6.dp))
         LabeledSlider(
-            stringResource(R.string.sensitivity_title), look.sensitivity, 0.2f..3f,
+            stringResource(R.string.ed_sensitivity), look.sensitivity, 0.2f..3f,
             "%.1fx".format(look.sensitivity)
         ) { onChange(look.copy(sensitivity = it)) }
         LabeledSlider(
@@ -221,13 +233,9 @@ internal fun GyroSettingsSection(gyro: GyroConfig, onChange: (GyroConfig) -> Uni
         R.string.gyro_hold_btn to GyroActivation.HOLD_BUTTON,
         R.string.gyro_toggle_btn to GyroActivation.TOGGLE_BUTTON
     )
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (row in acts.chunked(2)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((label, act) in row) {
-                    ModeChip(stringResource(label), selected = gyro.activation == act) { onChange(gyro.copy(activation = act)) }
-                }
-            }
+    ChipFlow {
+        for ((label, act) in acts) {
+            ModeChip(stringResource(label), selected = gyro.activation == act) { onChange(gyro.copy(activation = act)) }
         }
     }
     if (gyro.needsButton) {

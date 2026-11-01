@@ -45,6 +45,7 @@ import androidx.compose.material3.TextButton
 import dev.pepotech.pepomote.control.AddOption
 import dev.pepotech.pepomote.control.ElementKind
 import dev.pepotech.pepomote.control.GyroAim
+import dev.pepotech.pepomote.control.OrientationLock
 import dev.pepotech.pepomote.control.GyroConfig
 import dev.pepotech.pepomote.control.LookConfig
 import dev.pepotech.pepomote.control.PadProfile
@@ -275,6 +276,8 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     val lookCfg = shownProfile?.look ?: globalLook
     val gyroCfg = shownProfile?.gyro ?: globalGyro
     var showPadSettings by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    val orientationLock by OrientationLock.state.collectAsState()
     fun setLook(l: LookConfig) {
         val d = draft
         if (editing && d != null) draft = d.copy(look = l)
@@ -769,23 +772,6 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     .padding(top = if (fullScreen) 8.dp else headerH + selectorH + gap * 2)
             )
 
-            if (!editing && !fullScreen) {
-                if (customAllowed) {
-                    ProfileBar(
-                        activeName = activeName,
-                        gyroOn = if (xboxPad) gyroCfg.enabled else null,
-                        onGyroToggle = { setGyro(gyroCfg.copy(enabled = !gyroCfg.enabled)) },
-                        onPadSettings = { showPadSettings = true },
-                        onProfiles = { showProfiles = true },
-                        onEdit = { startEditing(null) },
-                        lock = { OrientationLockButton() },
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
-                } else {
-                    OrientationLockButton(Modifier.align(Alignment.BottomCenter))
-                }
-            }
-
             if (keyboardOpen && Route.showsKeyboard(link)) {
                 KeyboardDialog(
                     onSend = { LinkState.sendText?.invoke(it) },
@@ -813,6 +799,31 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .onSizeChanged { headerBox = with(density) { it.height.toDp() } }
+                )
+            }
+
+            // «☰ Mando», encima de la cabecera: arriba a la derecha no hay controles
+            if (!editing && !fullScreen) {
+                if (customAllowed) {
+                    PadMenuButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 8.dp)
+                    )
+                } else {
+                    OrientationLockButton(Modifier.align(Alignment.TopEnd).padding(end = 4.dp))
+                }
+            }
+            if (showMenu) {
+                PadMenuDialog(
+                    activeName = activeName,
+                    locked = orientationLock != AppPrefs.ORIENTATION_FREE,
+                    gyroOn = if (xboxPad) gyroCfg.enabled else null,
+                    onLock = { OrientationLock.toggle(context, rotation) },
+                    onProfiles = { showMenu = false; showProfiles = true },
+                    onGyroToggle = { setGyro(gyroCfg.copy(enabled = !gyroCfg.enabled)) },
+                    onPadSettings = { showMenu = false; showPadSettings = true },
+                    onEdit = { showMenu = false; startEditing(null) },
+                    onDismiss = { showMenu = false }
                 )
             }
 

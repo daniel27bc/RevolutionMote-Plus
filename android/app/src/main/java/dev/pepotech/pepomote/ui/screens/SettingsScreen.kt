@@ -298,7 +298,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                 Text(stringResource(R.string.haptic_title), style = MaterialTheme.typography.titleMedium)
                 Text(stringResource(R.string.haptic_sub), style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ChipFlow {
                     for ((label, lvl) in listOf(
                         R.string.haptic_off to Haptics.OFF,
                         R.string.haptic_subtle to Haptics.SUBTLE,
@@ -430,16 +430,18 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                     Spacer(Modifier.height(14.dp))
                     Text(stringResource(R.string.vol_up_label), style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
+                    ChipFlow {
                         for ((label, act) in listOf(
                             "ZR / RT" to "ZR",
-                            "A" to "A",
-                            "X" to "X",
+                            "ZL / LT" to "ZL",
                             "R / RB" to "R",
-                            "R3" to "STICK_R"
+                            "L / LB" to "L",
+                            "A" to "A",
+                            "B" to "B",
+                            "X" to "X",
+                            "Y" to "Y",
+                            "R3" to "STICK_R",
+                            "L3" to "STICK_L"
                         )) {
                             ModeChip(label, selected = volUpAction == act) {
                                 volUpAction = act
@@ -451,15 +453,17 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
                     Text(stringResource(R.string.vol_down_label), style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
+                    ChipFlow {
                         for ((label, act) in listOf(
+                            "ZR / RT" to "ZR",
                             "ZL / LT" to "ZL",
-                            "B" to "B",
-                            "Y" to "Y",
+                            "R / RB" to "R",
                             "L / LB" to "L",
+                            "A" to "A",
+                            "B" to "B",
+                            "X" to "X",
+                            "Y" to "Y",
+                            "R3" to "STICK_R",
                             "L3" to "STICK_L"
                         )) {
                             ModeChip(label, selected = volDownAction == act) {
@@ -483,7 +487,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                 Text(stringResource(R.string.right_stick_title), style = MaterialTheme.typography.titleMedium)
                 Text(stringResource(R.string.right_stick_sub), style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipFlow {
                     ModeChip(
                         stringResource(R.string.mode_stick),
                         selected = rightStickMode == AppPrefs.RIGHT_STICK_MODE_ANALOG
@@ -522,7 +526,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                     AppPrefs.setRightStickAntiDeadzone(context, it)
                 }
                 LabeledSlider(
-                    stringResource(R.string.sensitivity_title),
+                    stringResource(R.string.ed_sensitivity),
                     trackpadSens, 0.2f..3f,
                     "%.1fx".format(trackpadSens)
                 ) {

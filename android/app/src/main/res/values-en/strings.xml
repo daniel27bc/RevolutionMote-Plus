@@ -75,8 +75,8 @@
     <string name="current">current</string>
 
     <!-- settings -->
-    <string name="vol_title">Volume buttons = A / B</string>
-    <string name="vol_sub">With the controller open: volume up = A, volume down = B trigger. Play with your phone’s physical buttons</string>
+    <string name="vol_title">Volume keys as pad buttons</string>
+    <string name="vol_sub">With the pad open, the physical volume keys press the button you choose (for example, the triggers for shooters)</string>
     <string name="sounds_title">Sounds</string>
     <string name="sounds_sub">Button beeps and the connect/disconnect melody (vibration stays)</string>
     <string name="slide_press_title">Slide to press</string>
@@ -568,4 +568,12 @@
     <string name="haptic_system_title">Compatibility mode</string>
     <string name="haptic_system_sub">Uses the system touch vibration. Turn it on if you feel nothing with the app\'s click</string>
     <string name="haptic_test">Test</string>
+    <string name="ed_sensitivity">Sensitivity</string>
+    <string name="pad_menu">Pad</string>
+    <string name="pad_menu_title">Pad menu</string>
+    <string name="orientation_title">Screen orientation</string>
+    <string name="orientation_locked">Locked</string>
+    <string name="orientation_free">Free</string>
+    <string name="state_on">On</string>
+    <string name="state_off">Off</string>
 </resources>
