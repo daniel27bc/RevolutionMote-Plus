@@ -21,11 +21,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.pepotech.pepomote"
+        applicationId = "dev.daniel27bc.revolutionmote"
         minSdk = 26
         targetSdk = 36
         versionCode = 30
-        versionName = "1.13.3"
+        versionName = "1.13.3-rm2"
     }
 
     val releaseSigning = signingValue("storeFile", "KEYSTORE_PATH")?.let { store ->

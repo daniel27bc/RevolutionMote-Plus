@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Español: el idioma por defecto (también para cualquier sistema que no sea inglés) -->
 <resources>
-    <string name="app_name">PepoMote</string>
+    <string name="app_name">RevolutionMote+</string>
 
     <!-- inicio -->
     <string name="home_subtitle">Tu móvil, mando de tu PC u otro Android</string>

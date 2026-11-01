@@ -1,3 +1,16 @@
+> ## RevolutionMote+ — fork comunitario de PepoMote
+>
+> **RevolutionMote+** es un fork de [PepoMote](https://github.com/PepoTechYT/PepoMote), la herramienta creada por **PepoTech**. Todo el mérito del núcleo (protocolo, receptor de PC, modos de Wii, Wii U, Switch y RetroArch) es de PepoTech. Este fork añade mejoras comunitarias en la app de Android:
+>
+> - **Editor de diseño completo**: perfiles con nombre; arrastrar y pellizcar cada control; un ⚙ por control con tamaño, zona muerta, anti-zona muerta, sensibilidad, modo stick/trackpad, función, forma y turbo; quitar y añadir controles; opacidad.
+> - **Modo trackpad** en los sticks (como un ratón, sin deriva) con ajustes por sliders.
+> - **Mando físico o telescópico** (USB, Bluetooth, Kishi, Backbone, GameSir…) reenviado al PC a través de la app, junto con el giroscopio del móvil.
+> - **Gyro aiming**: el giro apunta solo mientras mantienes ZL / LT, con sensibilidad ajustable.
+> - **Háptica de clic nítido** con cuatro niveles, y **candado de orientación** en el mando.
+> - Botones de volumen asignables a cualquier botón, gatillos incluidos.
+>
+> Licencia GPLv3, igual que el original. Se instala como app aparte (`dev.daniel27bc.revolutionmote`) y puede convivir con la PepoMote oficial.
+
 <p align="center"><img src="assets/brand/logo.png" width="96" alt="PepoMote"></p>
 
 <h1 align="center">PepoMote</h1>

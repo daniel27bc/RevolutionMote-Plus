@@ -9,7 +9,7 @@
         android:shortcutLongLabel="@string/shortcut_pointer_long">
         <intent
             android:action="dev.pepotech.pepomote.action.POINTER"
-            android:targetPackage="dev.pepotech.pepomote"
+            android:targetPackage="dev.daniel27bc.revolutionmote"
             android:targetClass="dev.pepotech.pepomote.MainActivity" />
     </shortcut>
     <shortcut
@@ -20,7 +20,7 @@
         android:shortcutLongLabel="@string/shortcut_dolphin_long">
         <intent
             android:action="dev.pepotech.pepomote.action.DOLPHIN"
-            android:targetPackage="dev.pepotech.pepomote"
+            android:targetPackage="dev.daniel27bc.revolutionmote"
             android:targetClass="dev.pepotech.pepomote.MainActivity" />
     </shortcut>
     <shortcut
@@ -31,7 +31,7 @@
         android:shortcutLongLabel="@string/shortcut_wiiu_long">
         <intent
             android:action="dev.pepotech.pepomote.action.WIIU"
-            android:targetPackage="dev.pepotech.pepomote"
+            android:targetPackage="dev.daniel27bc.revolutionmote"
             android:targetClass="dev.pepotech.pepomote.MainActivity" />
     </shortcut>
     <shortcut
@@ -42,7 +42,7 @@
         android:shortcutLongLabel="@string/shortcut_switch_long">
         <intent
             android:action="dev.pepotech.pepomote.action.SWITCH"
-            android:targetPackage="dev.pepotech.pepomote"
+            android:targetPackage="dev.daniel27bc.revolutionmote"
             android:targetClass="dev.pepotech.pepomote.MainActivity" />
     </shortcut>
     <shortcut
@@ -53,7 +53,7 @@
         android:shortcutLongLabel="@string/shortcut_retroarch_long">
         <intent
             android:action="dev.pepotech.pepomote.action.RETROARCH"
-            android:targetPackage="dev.pepotech.pepomote"
+            android:targetPackage="dev.daniel27bc.revolutionmote"
             android:targetClass="dev.pepotech.pepomote.MainActivity" />
     </shortcut>
     <shortcut
@@ -64,7 +64,7 @@
         android:shortcutLongLabel="@string/shortcut_nunchuk_long">
         <intent
             android:action="dev.pepotech.pepomote.action.NUNCHUK"
-            android:targetPackage="dev.pepotech.pepomote"
+            android:targetPackage="dev.daniel27bc.revolutionmote"
             android:targetClass="dev.pepotech.pepomote.MainActivity" />
     </shortcut>
 </shortcuts>

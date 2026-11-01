@@ -426,7 +426,7 @@ object AppPrefs {
     /** Consultar versiones y novedades en GitHub al inicio y cada hora de uso (Ajustes). */
     fun updateCheckEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean("updateCheck", true)
+            .getBoolean("updateCheck", false) // RevolutionMote+: las versiones de PepoMote son otra app
 
     fun setUpdateCheckEnabled(context: Context, value: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
