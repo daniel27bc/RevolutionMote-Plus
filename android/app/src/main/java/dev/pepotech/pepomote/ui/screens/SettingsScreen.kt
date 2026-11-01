@@ -35,7 +35,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.pepotech.pepomote.control.AppPrefs
-import dev.pepotech.pepomote.control.CustomLayoutPrefs
+import dev.pepotech.pepomote.control.Haptics
+import dev.pepotech.pepomote.control.PadProfileStore
+import dev.pepotech.pepomote.control.PhysicalPad
+import kotlin.math.roundToInt
 import dev.pepotech.pepomote.control.GameRumble
 import dev.pepotech.pepomote.control.RumblePref
 import dev.pepotech.pepomote.service.GamePadSide
@@ -208,6 +211,12 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
     var rightStickMode by remember { mutableStateOf(AppPrefs.rightStickMode(context)) }
     var antiDeadzone by remember { mutableStateOf(AppPrefs.rightStickAntiDeadzone(context)) }
     var trackpadSens by remember { mutableStateOf(AppPrefs.trackpadSensitivity(context)) }
+    var rightDeadzone by remember { mutableStateOf(AppPrefs.rightStickDeadzone(context)) }
+    var hapticLevel by remember { mutableStateOf(AppPrefs.hapticLevel(context)) }
+    var physicalPad by remember { mutableStateOf(AppPrefs.physicalPad(context)) }
+    var padAimHold by remember { mutableStateOf(AppPrefs.padAimHold(context)) }
+    var padAimScale by remember { mutableStateOf(AppPrefs.padAimScale(context)) }
+    val padNames = remember { PhysicalPad.connectedNames(context) }
     var sounds by remember { mutableStateOf(AppPrefs.soundsEnabled(context)) }
     var slidePress by remember { mutableStateOf(AppPrefs.slidePress(context)) }
     var stickyPress by remember { mutableStateOf(AppPrefs.stickyPress(context)) }
@@ -275,6 +284,95 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                         AppPrefs.setPadAim(context, it)
                     },
                     colors = SwitchDefaults.colors(checkedTrackColor = PepoColors.Blue)
+                )
+            }
+            if (padAim) {
+                Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.pad_aim_hold_title), style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(R.string.pad_aim_hold_sub), style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(
+                            checked = padAimHold,
+                            onCheckedChange = {
+                                padAimHold = it
+                                AppPrefs.setPadAimHold(context, it)
+                            },
+                            colors = SwitchDefaults.colors(checkedTrackColor = PepoColors.Blue)
+                        )
+                    }
+                    LabeledSlider(
+                        stringResource(R.string.pad_aim_scale_title),
+                        padAimScale, 0.25f..3f,
+                        "%.2fx".format(padAimScale)
+                    ) {
+                        padAimScale = it
+                        AppPrefs.setPadAimScale(context, it)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        // Vibración de los botones: clic nítido tipo microswitch, con su fuerza
+        Card(
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
+            border = BorderStroke(1.5.dp, PepoColors.CardBorder),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                Text(stringResource(R.string.haptic_title), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.haptic_sub), style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for ((label, lvl) in listOf(
+                        R.string.haptic_off to Haptics.OFF,
+                        R.string.haptic_subtle to Haptics.SUBTLE,
+                        R.string.haptic_crisp to Haptics.CRISP,
+                        R.string.haptic_strong to Haptics.STRONG
+                    )) {
+                        ModeChip(stringResource(label), selected = hapticLevel == lvl, dense = true) {
+                            hapticLevel = lvl
+                            AppPrefs.setHapticLevel(context, lvl)
+                            Haptics.preview(context, lvl)
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        // Mando físico / telescópico: sus botones van al PC por la app
+        Card(
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
+            border = BorderStroke(1.5.dp, PepoColors.CardBorder),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.physical_pad_title), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.physical_pad_sub), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Switch(
+                        checked = physicalPad,
+                        onCheckedChange = {
+                            physicalPad = it
+                            AppPrefs.setPhysicalPad(context, it)
+                            if (!it) PhysicalPad.releaseAll()
+                        },
+                        colors = SwitchDefaults.colors(checkedTrackColor = PepoColors.Blue)
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (padNames.isEmpty()) stringResource(R.string.physical_pad_none)
+                    else stringResource(R.string.physical_pad_found, padNames.joinToString(", ")),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (padNames.isEmpty()) PepoColors.TextDim else PepoColors.Ok
                 )
             }
         }
@@ -414,43 +512,36 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                     }
                 }
 
-                Spacer(Modifier.height(14.dp))
-                Text(stringResource(R.string.anti_deadzone_title), style = MaterialTheme.typography.titleSmall)
-                Text(stringResource(R.string.anti_deadzone_sub), style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for ((label, value) in listOf(
-                        "0%" to 0.0f,
-                        "10%" to 0.10f,
-                        "15%" to 0.15f,
-                        "20%" to 0.20f,
-                        "25%" to 0.25f
-                    )) {
-                        ModeChip(label, selected = kotlin.math.abs(antiDeadzone - value) < 0.02f) {
-                            antiDeadzone = value
-                            AppPrefs.setRightStickAntiDeadzone(context, value)
-                        }
+                Spacer(Modifier.height(10.dp))
+                if (rightStickMode != AppPrefs.RIGHT_STICK_MODE_TRACKPAD) {
+                    LabeledSlider(
+                        stringResource(R.string.ed_deadzone),
+                        rightDeadzone, 0f..0.5f,
+                        "${(rightDeadzone * 100).roundToInt()}%",
+                        stringResource(R.string.ed_deadzone_sub)
+                    ) {
+                        rightDeadzone = it
+                        AppPrefs.setRightStickDeadzone(context, it)
                     }
                 }
-
-                if (rightStickMode == AppPrefs.RIGHT_STICK_MODE_TRACKPAD) {
-                    Spacer(Modifier.height(14.dp))
-                    Text(stringResource(R.string.sensitivity_title), style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for ((label, sVal) in listOf(
-                            "0.7x" to 0.7f,
-                            "1.0x" to 1.0f,
-                            "1.4x" to 1.4f,
-                            "2.0x" to 2.0f
-                        )) {
-                            ModeChip(label, selected = kotlin.math.abs(trackpadSens - sVal) < 0.1f) {
-                                trackpadSens = sVal
-                                AppPrefs.setTrackpadSensitivity(context, sVal)
-                            }
-                        }
-                    }
+                LabeledSlider(
+                    stringResource(R.string.anti_deadzone_title),
+                    antiDeadzone, 0f..0.6f,
+                    "${(antiDeadzone * 100).roundToInt()}%",
+                    stringResource(R.string.anti_deadzone_sub)
+                ) {
+                    antiDeadzone = it
+                    AppPrefs.setRightStickAntiDeadzone(context, it)
                 }
+                LabeledSlider(
+                    stringResource(R.string.sensitivity_title),
+                    trackpadSens, 0.2f..3f,
+                    "%.1fx".format(trackpadSens)
+                ) {
+                    trackpadSens = it
+                    AppPrefs.setTrackpadSensitivity(context, it)
+                }
+                Text(stringResource(R.string.right_stick_profiles_note), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
             }
         }
 
@@ -466,7 +557,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 TextButton(
                     onClick = {
-                        CustomLayoutPrefs.resetAll(context)
+                        PadProfileStore.deleteAll(context)
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {

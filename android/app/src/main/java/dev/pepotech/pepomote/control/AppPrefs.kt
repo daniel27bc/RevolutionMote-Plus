@@ -122,6 +122,69 @@ object AppPrefs {
             .edit().putFloat("rightStickAntiDeadzone", value).apply()
     }
 
+    /** Zona muerta del stick derecho del diseño original (los perfiles llevan la suya). */
+    fun rightStickDeadzone(context: Context): Float =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getFloat("rightStickDeadzone", StickMap.DEAD_ZONE)
+
+    fun setRightStickDeadzone(context: Context, value: Float) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putFloat("rightStickDeadzone", value).apply()
+    }
+
+    /** Fuerza del clic háptico: [Haptics.OFF]..[Haptics.STRONG]; de serie, nítido. */
+    fun hapticLevel(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("hapticLevel", Haptics.CRISP).coerceIn(Haptics.OFF, Haptics.STRONG)
+
+    fun setHapticLevel(context: Context, value: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putInt("hapticLevel", value.coerceIn(Haptics.OFF, Haptics.STRONG)).apply()
+    }
+
+    /** Mando físico (USB, Bluetooth, telescópico): sus botones van al PC. Encendido de serie. */
+    fun physicalPad(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("physicalPad", true)
+
+    fun setPhysicalPad(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean("physicalPad", value).apply()
+    }
+
+    /** Mando universal: el giro solo apunta mientras se mantiene ZL / LT (gyro aiming). */
+    fun padAimHold(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("padAimHold", false)
+
+    fun setPadAimHold(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean("padAimHold", value).apply()
+    }
+
+    /** Mando universal: cuánto mueve el giro (0.25..3; 1 = lo de siempre). */
+    fun padAimScale(context: Context): Float =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getFloat("padAimScale", 1f).coerceIn(0.25f, 3f)
+
+    fun setPadAimScale(context: Context, value: Float) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putFloat("padAimScale", value.coerceIn(0.25f, 3f)).apply()
+    }
+
+    /** Sin bloqueo de orientación en el mando. */
+    const val ORIENTATION_FREE = Int.MIN_VALUE
+
+    /** Orientación fijada con el candado del mando (`ActivityInfo.SCREEN_ORIENTATION_*`), o [ORIENTATION_FREE]. */
+    fun orientationLock(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("orientationLock", ORIENTATION_FREE)
+
+    fun setOrientationLock(context: Context, value: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putInt("orientationLock", value).apply()
+    }
+
     /**
      * Nunchuk en el mismo móvil (modo Dolphin): el mando lleva su propio
      * Nunchuk y en apaisado sale el trazado con stick, C y Z. Apagado de

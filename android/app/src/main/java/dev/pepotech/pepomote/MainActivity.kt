@@ -13,6 +13,7 @@ import android.view.WindowManager
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,7 +28,14 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import dev.pepotech.pepomote.ui.components.OrientationLockButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +55,9 @@ import dev.pepotech.pepomote.control.AppPrefs
 import dev.pepotech.pepomote.control.ButtonState
 import dev.pepotech.pepomote.control.Haptics
 import dev.pepotech.pepomote.control.LocaleHelper
+import dev.pepotech.pepomote.control.OrientationLock
+import dev.pepotech.pepomote.control.PadProfileStore
+import dev.pepotech.pepomote.control.PhysicalPad
 import dev.pepotech.pepomote.control.PressMode
 import dev.pepotech.pepomote.control.GameRumble
 import dev.pepotech.pepomote.control.UiSounds
@@ -271,6 +282,8 @@ class MainActivity : ComponentActivity() {
         PressMode.init(this)
         NunchukSide.load(this)
         GamePadSide.load(this)
+        PadProfileStore.load(this)
+        OrientationLock.load(this)
         UpdateNotice.refresh(this)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -360,6 +373,7 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         foreground = false
         RotationSuggester.stop()
+        PhysicalPad.releaseAll()
         super.onPause()
     }
 
@@ -444,6 +458,9 @@ class MainActivity : ComponentActivity() {
     // Activity's public key hook is inherited through AndroidX Core's restricted override.
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Mando físico (USB / Bluetooth / telescópico) con un mando abierto:
+        // sus botones van al PC como los del táctil
+        if (currentScreen == Screen.Controller && PhysicalPad.onKey(this, event)) return true
         val bit = when (event.keyCode) {
             KeyEvent.KEYCODE_VOLUME_UP -> AppPrefs.volUpBit(this)
             KeyEvent.KEYCODE_VOLUME_DOWN -> AppPrefs.volDownBit(this)
@@ -470,6 +487,12 @@ class MainActivity : ComponentActivity() {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    /** Sticks, cruceta de ejes y gatillos analógicos del mando físico. */
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (currentScreen == Screen.Controller && PhysicalPad.onMotion(this, event)) return true
+        return super.dispatchGenericMotionEvent(event)
     }
 }
 
@@ -542,8 +565,18 @@ private fun Root(activity: MainActivity) {
         RotationSuggester.active = freeOrientation
     }
     val acceptedOrientation by RotationSuggester.accepted.collectAsState()
-    LaunchedEffect(wantLandscape, landscapeSide, acceptedOrientation) {
+    // Candado de orientación del mando: manda sobre todo lo demás mientras
+    // haya un mando abierto (en los apaisados fijos, solo entre los dos
+    // apaisados: un mando apaisado no se pone en vertical)
+    val orientationLock by OrientationLock.state.collectAsState()
+    val inController = activity.currentScreen == Screen.Controller
+    LaunchedEffect(wantLandscape, landscapeSide, acceptedOrientation, orientationLock, inController) {
+        val locked = orientationLock.takeIf {
+            inController && it != AppPrefs.ORIENTATION_FREE &&
+                (!wantLandscape || OrientationLock.isLandscape(it))
+        }
         activity.requestedOrientation = when {
+            locked != null -> locked
             !wantLandscape -> acceptedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             else -> when (landscapeSide.orientation) {
                 LandscapeOrientation.Landscape -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
@@ -689,7 +722,12 @@ private fun ControllerRoute(activity: MainActivity, link: UiLink) {
 
         PadScreen.Nunchuk -> NunchukScreen(link = link, onDisconnect = onDisconnect)
 
-        PadScreen.Wii -> {
+        PadScreen.Wii -> Box(Modifier.fillMaxSize()) {
+            // Mando físico como mando de Wii (+ Nunchuk) mientras esté abierto
+            DisposableEffect(Unit) {
+                PhysicalPad.target = PhysicalPad.Target.WIIMOTE
+                onDispose { PhysicalPad.target = PhysicalPad.Target.NONE }
+            }
             val landscape =
                 LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
             // Selector Puntero/Dolphin/Wii U: entrando por Conectar/Mando/Wii U
@@ -707,6 +745,12 @@ private fun ControllerRoute(activity: MainActivity, link: UiLink) {
             } else {
                 ControllerScreen(link = link, showChips = showChips, onDisconnect = onDisconnect)
             }
+            // Candado de orientación: que el mando no gire solo al inclinarlo
+            OrientationLockButton(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding()
+            )
         }
     }
 }

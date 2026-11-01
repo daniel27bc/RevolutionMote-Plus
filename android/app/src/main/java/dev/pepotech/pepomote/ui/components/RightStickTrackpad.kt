@@ -1,5 +1,6 @@
 package dev.pepotech.pepomote.ui.components
 
+import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -14,15 +15,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -32,9 +37,11 @@ import dev.pepotech.pepomote.ui.theme.PepoColors
 import kotlin.math.roundToInt
 
 /**
- * Superficie táctil que emula el Stick Derecho como si fuera un Trackpad / Ratón
- * ("Mouse-Joystick"), traduciendo el desplazamiento y velocidad del dedo directamente
- * en deflexión suave de stick analógico.
+ * Superficie táctil que emula un stick como si fuera un trackpad / ratón
+ * ("Mouse-Joystick"): la velocidad del dedo es la deflexión del stick. La
+ * velocidad se suaviza un poco (media exponencial) para que no tiemble y,
+ * si el dedo se queda quieto sin levantarse, se apaga en unas decenas de
+ * milisegundos: la cámara para, no sigue girando sola.
  */
 @Composable
 fun RightStickTrackpad(
@@ -46,35 +53,61 @@ fun RightStickTrackpad(
     val shape = RoundedCornerShape(20.dp)
     var active by remember { mutableStateOf(false) }
     var touchPos by remember { mutableStateOf(Offset.Zero) }
+    val emit by rememberUpdatedState(onStick)
+    val sens by rememberUpdatedState(sensitivity)
+    val adz by rememberUpdatedState(antiDeadzone)
+    // Velocidad suavizada (dp/ms) y la hora del último movimiento
+    val motion = remember { TrackpadMotion() }
+
+    // Mientras hay dedo: cada fotograma se apaga la velocidad si el dedo no
+    // se mueve, y se manda lo que toque (también el 0 al quedarse quieto)
+    LaunchedEffect(active) {
+        if (!active) return@LaunchedEffect
+        var lastSent = 0 to 0
+        while (true) {
+            withFrameMillis { }
+            val idle = SystemClock.uptimeMillis() - motion.lastMoveMs
+            if (idle > IDLE_MS) {
+                motion.vx *= DECAY
+                motion.vy *= DECAY
+            }
+            val out = TrackpadEngine.fromVelocity(motion.vx, motion.vy, sens, adz)
+            if (out != lastSent) {
+                lastSent = out
+                emit(out.first, out.second)
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
             .size(sizeDp)
             .background(PepoColors.Card, shape)
             .border(1.5.dp, if (active) PepoColors.Glow else PepoColors.CardBorder, shape)
-            .pointerInput(sizeDp, sensitivity, antiDeadzone) {
+            .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     down.consume()
-                    active = true
-                    var last = down.position
+                    motion.reset()
                     touchPos = down.position
-                    drag(down.id) { change ->
-                        change.consume()
-                        val curr = change.position
-                        val dx = curr.x - last.x
-                        val dy = curr.y - last.y
-                        last = curr
-                        touchPos = curr
-                        val (sx, sy) = TrackpadEngine.processDelta(
-                            dx, dy,
-                            sensitivity = sensitivity,
-                            antiDeadzone = antiDeadzone
-                        )
-                        onStick(sx, sy)
+                    active = true
+                    try {
+                        drag(down.id) { change ->
+                            change.consume()
+                            val d = change.positionChange()
+                            val dt = (change.uptimeMillis - change.previousUptimeMillis).coerceAtLeast(1L)
+                            val vx = d.x / density / dt
+                            val vy = d.y / density / dt
+                            motion.vx += (vx - motion.vx) * SMOOTH
+                            motion.vy += (vy - motion.vy) * SMOOTH
+                            motion.lastMoveMs = SystemClock.uptimeMillis()
+                            touchPos = change.position
+                        }
+                    } finally {
+                        active = false
+                        motion.reset()
+                        emit(0, 0)
                     }
-                    active = false
-                    onStick(0, 0)
                 }
             },
         contentAlignment = Alignment.Center
@@ -89,18 +122,13 @@ fun RightStickTrackpad(
                 color = if (active) PepoColors.Glow else PepoColors.Blue,
                 letterSpacing = 2.sp
             )
-            Text(
-                "Aim",
-                style = MaterialTheme.typography.bodySmall,
-                color = PepoColors.TextDim,
-                fontSize = 10.sp
-            )
         }
 
         // Indicador luminoso de toque
         if (active) {
             Box(
                 Modifier
+                    .align(Alignment.TopStart)
                     .offset {
                         IntOffset(
                             (touchPos.x - 12.dp.toPx()).roundToInt(),
@@ -113,3 +141,23 @@ fun RightStickTrackpad(
         }
     }
 }
+
+private class TrackpadMotion {
+    var vx = 0f
+    var vy = 0f
+    var lastMoveMs = 0L
+    fun reset() {
+        vx = 0f
+        vy = 0f
+        lastMoveMs = SystemClock.uptimeMillis()
+    }
+}
+
+/** Peso de cada muestra nueva en la media (más = más directo, menos = más suave). */
+private const val SMOOTH = 0.55f
+
+/** Sin movimiento durante esto (ms), la velocidad empieza a apagarse. */
+private const val IDLE_MS = 24L
+
+/** Por fotograma quieto: a los ~80 ms la deflexión ya es casi 0. */
+private const val DECAY = 0.45f

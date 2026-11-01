@@ -42,7 +42,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import dev.pepotech.pepomote.control.CustomLayoutPrefs
+import dev.pepotech.pepomote.control.PadProfile
+import dev.pepotech.pepomote.control.PadProfileStore
+import dev.pepotech.pepomote.control.PadProfiles
+import dev.pepotech.pepomote.control.PhysicalPad
+import dev.pepotech.pepomote.ui.components.OrientationLockButton
 import dev.pepotech.pepomote.ui.components.RightStickTrackpad
 import kotlin.math.roundToInt
 import androidx.compose.runtime.Composable
@@ -147,13 +151,21 @@ import dev.pepotech.pepomote.R
 fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     val view = LocalView.current
     val context = LocalContext.current
-    var editLayoutMode by remember { mutableStateOf(false) }
-    var leftStickOffset by remember { mutableStateOf(CustomLayoutPrefs.getOffset(context, CustomLayoutPrefs.KEY_LEFT_STICK)) }
-    var dpadOffset by remember { mutableStateOf(CustomLayoutPrefs.getOffset(context, CustomLayoutPrefs.KEY_DPAD)) }
-    var rightStickOffset by remember { mutableStateOf(CustomLayoutPrefs.getOffset(context, CustomLayoutPrefs.KEY_RIGHT_STICK)) }
-    var faceOffset by remember { mutableStateOf(CustomLayoutPrefs.getOffset(context, CustomLayoutPrefs.KEY_FACE_BUTTONS)) }
-    var leftShouldersOffset by remember { mutableStateOf(CustomLayoutPrefs.getOffset(context, CustomLayoutPrefs.KEY_LEFT_SHOULDERS)) }
-    var rightShouldersOffset by remember { mutableStateOf(CustomLayoutPrefs.getOffset(context, CustomLayoutPrefs.KEY_RIGHT_SHOULDERS)) }
+    // Diseño personalizado: perfil activo (o el original), y el borrador
+    // mientras se edita
+    val profiles by PadProfileStore.profiles.collectAsState()
+    val activeName by PadProfileStore.active.collectAsState()
+    var editing by remember { mutableStateOf(false) }
+    var draft by remember { mutableStateOf<PadProfile?>(null) }
+    var draftOldName by remember { mutableStateOf<String?>(null) }
+    var gearFor by remember { mutableStateOf<String?>(null) }
+    var showAdd by remember { mutableStateOf(false) }
+    var showProfiles by remember { mutableStateOf(false) }
+    // Atrás durante la edición: se cancela (no se sale del mando)
+    androidx.activity.compose.BackHandler(enabled = editing) {
+        editing = false
+        draft = null
+    }
     val connected = link as? UiLink.Connected
     val intent by LinkState.intent.collectAsState()
     val wantedMode = Route.displayMode(link, intent)
@@ -235,6 +247,67 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     SideEffect { engine?.padAim = !aimOff }
     // Al salir vuelve encendido, que es lo que esperan los demás modos
     DisposableEffect(engine) { onDispose { engine?.padAim = true } }
+    // Gyro aiming: con «solo al mantener ZL / LT» el giro apunta mientras se
+    // mantiene ese gatillo (táctil o mando físico); y su ganancia
+    val aimHold = remember { AppPrefs.padAimHold(context) }
+    val aimScale = remember { AppPrefs.padAimScale(context) }
+    SideEffect {
+        engine?.padAimGate = if (xboxPad && aimHold) {
+            { ButtonState.current() and ButtonState.ZL != 0 }
+        } else null
+        engine?.padAimScale = if (xboxPad) aimScale else 1f
+    }
+    DisposableEffect(engine) {
+        onDispose {
+            engine?.padAimGate = null
+            engine?.padAimScale = 1f
+        }
+    }
+
+    // Mando físico: con el modo confirmado sus botones van a este mando, cada
+    // uno al hueco del rombo que ocupa en la plantilla
+    DisposableEffect(operative, layout.id) {
+        PhysicalPad.setFace(layout.face.associate { it.slot to it.bit })
+        PhysicalPad.target = if (operative) PhysicalPad.Target.PAD else PhysicalPad.Target.NONE
+        onDispose { PhysicalPad.target = PhysicalPad.Target.NONE }
+    }
+
+    // Diseño personalizado: en los mandos sin pantalla táctil (universal,
+    // Pro, Switch, RetroArch). El GamePad de Cemu lleva su pantalla en medio.
+    val customAllowed = pro
+    val shownProfile: PadProfile? = when {
+        editing -> draft
+        customAllowed -> profiles.firstOrNull { it.name == activeName }
+        else -> null
+    }
+    val defaultName = stringResource(R.string.ed_default_name)
+    val copySuffix = stringResource(R.string.ed_copy_suffix)
+    fun profileNames(): List<String> = PadProfileStore.profiles.value.map { it.name }
+    fun factoryProfile(name: String): PadProfile {
+        val sh = layout.shoulders
+        return PadProfiles.factory(
+            name = name,
+            hasLeftStick = layout.leftStick,
+            hasRightStick = layout.rightStick == RightStick.ANALOG,
+            stickClicks = layout.stickClicks,
+            shoulderBits = listOfNotNull(
+                ButtonState.L.takeIf { !(retroPad || xboxPad) || sh.l != null },
+                ButtonState.ZL.takeIf { !(retroPad || xboxPad) || sh.l2 != null },
+                ButtonState.R.takeIf { !(retroPad || xboxPad) || sh.r != null },
+                ButtonState.ZR.takeIf { !(retroPad || xboxPad) || sh.r2 != null }
+            ),
+            centerBits = layout.center.map { it.bit },
+            hasCapture = switchPad || retroPad
+        )
+    }
+    // Editar: el perfil activo, o uno nuevo con el diseño de fábrica
+    fun startEditing(from: PadProfile?) {
+        val base = from ?: PadProfileStore.activeProfile()
+        draft = base ?: factoryProfile(PadProfiles.uniqueName(defaultName, profileNames()))
+        draftOldName = base?.name
+        gearFor = null
+        editing = true
+    }
     // Doble pantalla: solo el GamePad (no un Pro Controller, que no tiene),
     // con el modo confirmado y sin el ajuste «GamePad sin pantalla»
     // El mando universal NO es Cemu: pedir ahí la doble pantalla dejaba el
@@ -264,7 +337,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
 
     // Sin el modo confirmado (controles inertes) o a pantalla completa (no
     // hay botones) la capa no pulsa nada
-    SideEffect { press.enabled = operative && !fullScreen }
+    SideEffect { press.enabled = operative && !fullScreen && !editing }
 
     // La cabecera plegable avisa de si está desplegada (la pregunta del lado
     // ocupa el mismo sitio) y de cuánto mide, para poner la pregunta justo
@@ -355,6 +428,19 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         .fillMaxWidth()
                         .height(bodyH)
                 ) {
+                    val shown = shownProfile
+                    if (shown != null) {
+                        key(layout.id) {
+                            CustomPadCanvas(
+                                profile = shown,
+                                layout = layout,
+                                editing = editing,
+                                onElementChange = { old, new -> draft = draft?.replace(old, new) },
+                                onGear = { gearFor = it.id },
+                                modifier = Modifier.alpha(if (operative || editing) 1f else 0.4f)
+                            )
+                        }
+                    } else
                     // Cada plantilla es un trazado nuevo: ningún botón hereda el bit de otro
                     key(layout.id) { Row(
                         modifier = Modifier
@@ -382,69 +468,15 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                                     if (zlLabel != null) ShoulderButton(zlLabel, ButtonState.ZL, shoulderW, shoulderH, textSize = (16 * k).roundToInt())
                                 }
                             }
-                            val shouldersBox: @Composable () -> Unit = {
-                                Box(
-                                    modifier = Modifier
-                                        .offset { IntOffset(leftShouldersOffset.x.roundToInt(), leftShouldersOffset.y.roundToInt()) }
-                                        .then(
-                                            if (editLayoutMode) {
-                                                Modifier
-                                                    .border(1.5.dp, PepoColors.Glow, RoundedCornerShape(8.dp))
-                                                    .pointerInput("l_shoulders") {
-                                                        detectDragGestures { change, dragAmount ->
-                                                            change.consume()
-                                                            leftShouldersOffset += dragAmount
-                                                            CustomLayoutPrefs.setOffset(context, CustomLayoutPrefs.KEY_LEFT_SHOULDERS, leftShouldersOffset)
-                                                        }
-                                                    }
-                                            } else Modifier
-                                        )
-                                ) { shoulders() }
-                            }
+                            val shouldersBox: @Composable () -> Unit = { shoulders() }
                             val click: @Composable () -> Unit = {
                                 if (layout.stickClicks) RoundButton("L3", clickSize, ButtonState.STICK_L, textSize = (12 * k).roundToInt())
                             }
                             val stick: @Composable () -> Unit = {
                                 if (layout.leftStick) AnalogStick(padSize) { x, y -> ButtonState.setStick(x, y) }
                             }
-                            val stickBox: @Composable () -> Unit = {
-                                Box(
-                                    modifier = Modifier
-                                        .offset { IntOffset(leftStickOffset.x.roundToInt(), leftStickOffset.y.roundToInt()) }
-                                        .then(
-                                            if (editLayoutMode) {
-                                                Modifier
-                                                    .border(1.5.dp, PepoColors.Glow, CircleShape)
-                                                    .pointerInput("l_stick") {
-                                                        detectDragGestures { change, dragAmount ->
-                                                            change.consume()
-                                                            leftStickOffset += dragAmount
-                                                            CustomLayoutPrefs.setOffset(context, CustomLayoutPrefs.KEY_LEFT_STICK, leftStickOffset)
-                                                        }
-                                                    }
-                                            } else Modifier
-                                        )
-                                ) { stick() }
-                            }
-                            val dpadBox: @Composable () -> Unit = {
-                                Box(
-                                    modifier = Modifier
-                                        .offset { IntOffset(dpadOffset.x.roundToInt(), dpadOffset.y.roundToInt()) }
-                                        .then(
-                                            if (editLayoutMode) {
-                                                Modifier
-                                                    .border(1.5.dp, PepoColors.Glow, RoundedCornerShape(8.dp))
-                                                    .pointerInput("dpad") {
-                                                        detectDragGestures { change, dragAmount ->
-                                                            change.consume()
-                                                            dpadOffset += dragAmount
-                                                            CustomLayoutPrefs.setOffset(context, CustomLayoutPrefs.KEY_DPAD, dpadOffset)
-                                                        }
-                                                    }
-                                            } else Modifier
-                                        )
-                                ) { PadCross(sizeDp = dpadSize) }
-                            }
+                            val stickBox: @Composable () -> Unit = { stick() }
+                            val dpadBox: @Composable () -> Unit = { PadCross(sizeDp = dpadSize) }
                             if (m.row) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -570,25 +602,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                                     if (zrLabel != null) ShoulderButton(zrLabel, ButtonState.ZR, shoulderW, shoulderH, textSize = (16 * k).roundToInt())
                                 }
                             }
-                            val shouldersBox: @Composable () -> Unit = {
-                                Box(
-                                    modifier = Modifier
-                                        .offset { IntOffset(rightShouldersOffset.x.roundToInt(), rightShouldersOffset.y.roundToInt()) }
-                                        .then(
-                                            if (editLayoutMode) {
-                                                Modifier
-                                                    .border(1.5.dp, PepoColors.Glow, RoundedCornerShape(8.dp))
-                                                    .pointerInput("r_shoulders") {
-                                                        detectDragGestures { change, dragAmount ->
-                                                            change.consume()
-                                                            rightShouldersOffset += dragAmount
-                                                            CustomLayoutPrefs.setOffset(context, CustomLayoutPrefs.KEY_RIGHT_SHOULDERS, rightShouldersOffset)
-                                                        }
-                                                    }
-                                            } else Modifier
-                                        )
-                                ) { shoulders() }
-                            }
+                            val shouldersBox: @Composable () -> Unit = { shoulders() }
                             val click: @Composable () -> Unit = {
                                 if (layout.stickClicks) RoundButton("R3", clickSize, ButtonState.STICK_R, textSize = (12 * k).roundToInt())
                             }
@@ -603,51 +617,20 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                                                 antiDeadzone = AppPrefs.rightStickAntiDeadzone(context)
                                             ) { x, y -> ButtonState.setStick2(x, y) }
                                         } else {
-                                            AnalogStick(padSize) { x, y -> ButtonState.setStick2(x, y) }
+                                            AnalogStick(
+                                                padSize,
+                                                deadzone = AppPrefs.rightStickDeadzone(context),
+                                                antiDeadzone = AppPrefs.rightStickAntiDeadzone(context),
+                                                sensitivity = AppPrefs.trackpadSensitivity(context)
+                                            ) { x, y -> ButtonState.setStick2(x, y) }
                                         }
                                     }
                                     RightStick.CBUTTONS -> CButtons(padSize) { x, y -> ButtonState.setStick2(x, y) }
                                     RightStick.NONE -> Unit
                                 }
                             }
-                            val stickBox: @Composable () -> Unit = {
-                                Box(
-                                    modifier = Modifier
-                                        .offset { IntOffset(rightStickOffset.x.roundToInt(), rightStickOffset.y.roundToInt()) }
-                                        .then(
-                                            if (editLayoutMode) {
-                                                Modifier
-                                                    .border(1.5.dp, PepoColors.Glow, RoundedCornerShape(14.dp))
-                                                    .pointerInput("r_stick") {
-                                                        detectDragGestures { change, dragAmount ->
-                                                            change.consume()
-                                                            rightStickOffset += dragAmount
-                                                            CustomLayoutPrefs.setOffset(context, CustomLayoutPrefs.KEY_RIGHT_STICK, rightStickOffset)
-                                                        }
-                                                    }
-                                            } else Modifier
-                                        )
-                                ) { stick() }
-                            }
-                            val faceClusterBox: @Composable () -> Unit = {
-                                Box(
-                                    modifier = Modifier
-                                        .offset { IntOffset(faceOffset.x.roundToInt(), faceOffset.y.roundToInt()) }
-                                        .then(
-                                            if (editLayoutMode) {
-                                                Modifier
-                                                    .border(1.5.dp, PepoColors.Glow, RoundedCornerShape(12.dp))
-                                                    .pointerInput("face") {
-                                                        detectDragGestures { change, dragAmount ->
-                                                            change.consume()
-                                                            faceOffset += dragAmount
-                                                            CustomLayoutPrefs.setOffset(context, CustomLayoutPrefs.KEY_FACE_BUTTONS, faceOffset)
-                                                        }
-                                                    }
-                                            } else Modifier
-                                        )
-                                ) { FaceCluster(layout, faceBox, faceBox) }
-                            }
+                            val stickBox: @Composable () -> Unit = { stick() }
+                            val faceClusterBox: @Composable () -> Unit = { FaceCluster(layout, faceBox, faceBox) }
                             val hasRight = layout.rightStick != RightStick.NONE
                             if (m.row) {
                                 Row(
@@ -685,7 +668,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         }
                     } }
 
-                    if (!operative) {
+                    if (!operative && !editing) {
                         // Inerte hasta que el receptor confirme el modo: nada llega a los controles
                         Box(
                             Modifier
@@ -751,44 +734,17 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     .padding(top = if (fullScreen) 8.dp else headerH + selectorH + gap * 2)
             )
 
-            if (editLayoutMode) {
-                Card(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
-                    border = BorderStroke(1.5.dp, PepoColors.Glow)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(stringResource(R.string.layout_edit_banner), style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = {
-                            CustomLayoutPrefs.resetAll(context)
-                            leftStickOffset = Offset.Zero
-                            dpadOffset = Offset.Zero
-                            rightStickOffset = Offset.Zero
-                            faceOffset = Offset.Zero
-                            leftShouldersOffset = Offset.Zero
-                            rightShouldersOffset = Offset.Zero
-                        }) {
-                            Text(stringResource(R.string.layout_reset), color = PepoColors.Error)
-                        }
-                        TextButton(onClick = { editLayoutMode = false }) {
-                            Text(stringResource(R.string.layout_save), color = PepoColors.Glow)
-                        }
-                    }
-                }
-            } else if (xboxPad || pro) {
-                TextButton(
-                    onClick = { editLayoutMode = true },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 4.dp)
-                ) {
-                    Text("⚙ " + stringResource(R.string.layout_edit_btn), style = MaterialTheme.typography.labelSmall, color = PepoColors.Blue)
+            if (!editing && !fullScreen) {
+                if (customAllowed) {
+                    ProfileBar(
+                        activeName = activeName,
+                        onProfiles = { showProfiles = true },
+                        onEdit = { startEditing(null) },
+                        lock = { OrientationLockButton() },
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    )
+                } else {
+                    OrientationLockButton(Modifier.align(Alignment.BottomCenter))
                 }
             }
 
@@ -805,7 +761,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
             // Cabecera plegable, la última del Box: desplegada tapa al
             // selector, a los controles y a los avisos (y no al revés). A
             // pantalla completa no hay cabecera: manda el mando del PC
-            if (!fullScreen) {
+            if (!fullScreen && !editing) {
                 GamePadCollapsibleHeader(
                     link = link,
                     operative = operative,
@@ -819,6 +775,99 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .onSizeChanged { headerBox = with(density) { it.height.toDp() } }
+                )
+            }
+
+            val d = draft
+            if (editing && d != null) {
+                EditorToolbar(
+                    profile = d,
+                    onAdd = { showAdd = true },
+                    onProfiles = { showProfiles = true },
+                    onOpacity = { draft = d.copy(opacity = it) },
+                    onReset = { draft = factoryProfile(d.name) },
+                    onCancel = {
+                        editing = false
+                        draft = null
+                    },
+                    onSave = {
+                        PadProfileStore.save(context, d, draftOldName)
+                        editing = false
+                        draft = null
+                    },
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+                val target = d.elements.firstOrNull { it.id == gearFor }
+                if (target != null) {
+                    ElementSettingsDialog(
+                        element = target,
+                        profile = d,
+                        layout = layout,
+                        onChange = { new ->
+                            val fixed = PadProfiles.clampElement(new)
+                            draft = d.replace(target, fixed)
+                            gearFor = fixed.id
+                        },
+                        onRemove = {
+                            draft = d.remove(target)
+                            gearFor = null
+                        },
+                        onDismiss = { gearFor = null }
+                    )
+                }
+                if (showAdd) {
+                    AddControlDialog(
+                        options = PadProfiles.addable(d, layout.faceBits()),
+                        layout = layout,
+                        onPick = {
+                            draft = d.add(PadProfiles.newElement(it))
+                            showAdd = false
+                        },
+                        onDismiss = { showAdd = false }
+                    )
+                }
+            }
+            if (showProfiles) {
+                ProfilesDialog(
+                    profiles = profiles,
+                    current = if (editing) draft?.name else activeName,
+                    allowOriginal = !editing,
+                    onPick = { name ->
+                        if (editing) {
+                            profiles.firstOrNull { it.name == name }?.let {
+                                draft = it
+                                draftOldName = it.name
+                            }
+                        } else {
+                            PadProfileStore.activate(context, name)
+                        }
+                        showProfiles = false
+                    },
+                    onNew = {
+                        showProfiles = false
+                        draft = factoryProfile(PadProfiles.uniqueName(defaultName, profileNames()))
+                        draftOldName = null
+                        editing = true
+                    },
+                    onDuplicate = { p ->
+                        PadProfileStore.save(context, p.copy(name = PadProfiles.uniqueName(p.name + copySuffix, profileNames())))
+                    },
+                    onRename = { p, n ->
+                        if (n != p.name && n !in profileNames()) {
+                            PadProfileStore.save(context, p.copy(name = n), oldName = p.name)
+                            if (draft?.name == p.name) {
+                                draft = draft?.copy(name = n)
+                                draftOldName = n
+                            }
+                        } else if (draft != null && draftOldName == null && draft?.name == p.name) {
+                            draft = draft?.copy(name = n)
+                        }
+                    },
+                    onDelete = { p ->
+                        PadProfileStore.delete(context, p.name)
+                        if (draftOldName == p.name) draftOldName = null
+                    },
+                    onDismiss = { showProfiles = false }
                 )
             }
         }

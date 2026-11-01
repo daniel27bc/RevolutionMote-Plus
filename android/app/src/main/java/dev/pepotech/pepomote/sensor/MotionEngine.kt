@@ -98,6 +98,18 @@ class MotionEngine(
     @Volatile
     var padAim: Boolean = true
 
+    /**
+     * Gyro aiming: si hay puerta, el giro solo pasa mientras ella diga que sí
+     * (mantener ZL / LT, del táctil o del mando físico). null = sin puerta.
+     * Solo la pone la pantalla del mando universal.
+     */
+    @Volatile
+    var padAimGate: (() -> Boolean)? = null
+
+    /** Ganancia del giro en el mando universal (1 = lo de siempre). */
+    @Volatile
+    var padAimScale: Float = 1f
+
     private val sensorManager =
         context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val batteryManager =
@@ -380,7 +392,11 @@ class MotionEngine(
                 // Mando universal con el giro apagado: a cero solo en el
                 // paquete, que la media ponderada sigue viva y volver a
                 // encender no hereda ni un hueco ni una muestra vieja
-                if (!padAim) gyroOut.fill(0f)
+                if (!padAim || padAimGate?.invoke() == false) {
+                    gyroOut.fill(0f)
+                } else if (padAimScale != 1f) {
+                    for (i in gyroOut.indices) gyroOut[i] *= padAimScale
+                }
                 Frame.remapAccel(accel, rot, accelOut)
                 val touch = ButtonState.touch()
                 PmpCodec.encodeInput(
