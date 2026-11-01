@@ -80,6 +80,7 @@ class PressRegistry(private val view: View? = null) {
         if (!down.remove(bit)) return
         entries[bit]?.onDown?.invoke(false)
         ButtonState.set(bit, false)
+        Haptics.release(view)
     }
 
     /** Nada queda pulsado (se sale de la pantalla, se cancela el gesto). */
@@ -168,6 +169,7 @@ fun Modifier.pressBit(
                 } finally {
                     sink(false)
                     ButtonState.set(bit, false)
+                    Haptics.release(view)
                 }
             }
         } else {
@@ -178,6 +180,7 @@ fun Modifier.pressBit(
                 tryAwaitRelease()
                 sink(false)
                 ButtonState.set(bit, false)
+                Haptics.release(view)
             })
         }
     }

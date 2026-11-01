@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
@@ -41,8 +42,17 @@ import kotlin.math.roundToInt
  * pequeña (StickMap); tic háptico al salir del centro.
  */
 @Composable
-fun AnalogStick(sizeDp: Dp, onStick: (x: Int, y: Int) -> Unit) {
+fun AnalogStick(
+    sizeDp: Dp,
+    deadzone: Float = StickMap.DEAD_ZONE,
+    antiDeadzone: Float = 0f,
+    sensitivity: Float = 1f,
+    onStick: (x: Int, y: Int) -> Unit
+) {
     val view = LocalView.current
+    val dz by rememberUpdatedState(deadzone)
+    val adz by rememberUpdatedState(antiDeadzone)
+    val sens by rememberUpdatedState(sensitivity)
     val knobDp = sizeDp * 0.46f
     var active by remember { mutableStateOf(false) }
     var knob by remember { mutableStateOf(Offset.Zero) } // desplazamiento del pomo, px
@@ -68,7 +78,7 @@ fun AnalogStick(sizeDp: Dp, onStick: (x: Int, y: Int) -> Unit) {
                         val d = pos - center
                         val len = d.getDistance()
                         knob = if (len > travel) d * (travel / len) else d
-                        val (x, y) = StickMap.map(d.x, d.y, travel)
+                        val (x, y) = StickMap.map(d.x, d.y, travel, dz, adz, sens)
                         val atCenter = x == 0 && y == 0
                         if (centered && !atCenter) {
                             Haptics.tap(view, HapticFeedbackConstants.CLOCK_TICK)
