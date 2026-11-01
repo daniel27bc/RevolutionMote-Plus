@@ -440,7 +440,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                                 modifier = Modifier.alpha(if (operative || editing) 1f else 0.4f)
                             )
                         }
-                    } else
+                    } else {
                     // Cada plantilla es un trazado nuevo: ningún botón hereda el bit de otro
                     key(layout.id) { Row(
                         modifier = Modifier
@@ -667,6 +667,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                             }
                         }
                     } }
+                    }
 
                     if (!operative && !editing) {
                         // Inerte hasta que el receptor confirme el modo: nada llega a los controles
