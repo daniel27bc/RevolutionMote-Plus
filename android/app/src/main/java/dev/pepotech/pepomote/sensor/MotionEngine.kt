@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
 import android.view.Surface
+import dev.pepotech.pepomote.control.PointerTrackpad
 import dev.pepotech.pepomote.control.ButtonDelivery
 import dev.pepotech.pepomote.control.ButtonState
 import dev.pepotech.pepomote.net.PmpCodec
@@ -463,6 +464,10 @@ class MotionEngine(
                 Frame.remapQuat(quat, if (hasRotationVector) rot else Surface.ROTATION_0, quatOut)
                 Frame.remapGyro(gyro, rot, gyroOut)
                 Frame.remapAccel(accel, rot, accelOut)
+                // Trackpad de ratón: giro sintético del dedo y sin orientación
+                // absoluta (el PC pasa a mover el cursor en relativo)
+                val trackpad = PointerTrackpad.active
+                if (trackpad) PointerTrackpad.fill(gyroOut)
                 PmpCodec.encodeInput(
                     sessionId = sessionId,
                     seq = seq,
@@ -474,7 +479,7 @@ class MotionEngine(
                     recenterCount = ButtonState.recenterCount(),
                     batteryPct = battery(),
                     touchScrollDy = ButtonState.drainScroll(),
-                    flags = quatFlag
+                    flags = if (trackpad) quatFlag and PmpCodec.FLAG_QUAT_VALID.inv() and PmpCodec.FLAG_TILT.inv() else quatFlag
                 )
             }
         }

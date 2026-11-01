@@ -174,14 +174,17 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     }
     val connected = link as? UiLink.Connected
     val intent by LinkState.intent.collectAsState()
-    val wantedMode = Route.displayMode(link, intent)
+    // Modo ratón (mando universal): el receptor en modo puntero, esta pantalla sigue
+    val padMouse by LinkState.padMouse.collectAsState()
+    val mouseMode = padMouse && connected?.mode == LinkState.MODE_POINTER
+    val wantedMode = if (padMouse) LinkState.MODE_GAMEPAD else Route.displayMode(link, intent)
     val switchPad = wantedMode == LinkState.MODE_SWITCH
     // RetroArch: el mismo mando apaisado con etiquetas de RetroPad (L2/R2,
     // Select/Start, Menú y avance rápido); paquetes como los de Switch
     val retroPad = wantedMode == LinkState.MODE_RETROARCH
     // Mando universal: el mismo mando, con las letras de Xbox en su sitio
     val xboxPad = wantedMode == LinkState.MODE_GAMEPAD
-    val operative = Route.isGamePad(link) && connected?.mode == wantedMode
+    val operative = (Route.isGamePad(link) && connected?.mode == wantedMode) || mouseMode
     val pro = switchPad || retroPad || xboxPad || connected?.pad == LinkState.PAD_PRO
     // RetroArch: la plantilla de la consola del juego cargado (o la elegida a
     // mano); fuera de RetroArch, el RetroPad de siempre (nada cambia)
@@ -216,9 +219,10 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
 
     // Solo con el modo confirmado el motor emite como GamePad; si el modo se
     // va (eco de otro modo, Mando de Wii) o se sale, vuelve lo de antes.
-    DisposableEffect(engine, operative, wantedMode, connected?.pad) {
+    DisposableEffect(engine, operative, wantedMode, connected?.pad, mouseMode) {
         ButtonState.reset()
-        if (engine != null && operative) {
+        // En modo ratón los paquetes son los del puntero (los de siempre)
+        if (engine != null && operative && !mouseMode) {
             val prevKind = engine.kind
             val prevRotation = engine.rotation
             engine.rotation = rotation
@@ -249,7 +253,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     // apuntar con el giro se calcula aquí ([GyroAim]) y llega como stick
     // derecho. Solo con el modo confirmado: sin el eco los paquetes todavía
     // alimentan lo de antes (el puntero) y el giro a cero le congelaría el cursor
-    SideEffect { engine?.padAim = !(xboxPad && operative) }
+    SideEffect { engine?.padAim = !(xboxPad && operative && !mouseMode) }
     // Al salir vuelve encendido, que es lo que esperan los demás modos
     DisposableEffect(engine) { onDispose { engine?.padAim = true } }
 
@@ -307,7 +311,9 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
         }
     }
     // Apuntar con el giro: solo el mando universal confirmado y sin el teclado abierto
-    val gyroLive = xboxPad && operative && !keyboardOpen
+    val gyroLive = xboxPad && operative && !keyboardOpen && !mouseMode
+    // Modo ratón con el dedo: el trackpad de ratón en los huecos en vez de la cámara
+    var pointerPad by remember { mutableStateOf(AppPrefs.pointerTrackpad(context)) }
     SideEffect { GyroAim.config = gyroCfg }
     DisposableEffect(engine, gyroLive) {
         if (engine != null && gyroLive) {
@@ -346,7 +352,8 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         trackpad = trackpad,
                         deadzone = AppPrefs.rightStickDeadzone(context),
                         antiDeadzone = AppPrefs.rightStickAntiDeadzone(context),
-                        sensitivity = AppPrefs.trackpadSensitivity(context)
+                        sensitivity = AppPrefs.trackpadSensitivity(context),
+                        inertia = AppPrefs.trackpadInertia(context)
                     )
                 },
                 look = globalLook,
@@ -485,7 +492,9 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     val shown = shownProfile
                     if (shown != null) {
                         key(layout.id) {
+                            if (mouseMode && pointerPad) PointerTrackpadLayer(Modifier.matchParentSize())
                             CustomPadCanvas(
+                                lookEnabled = !(mouseMode && pointerPad),
                                 profile = shown,
                                 layout = layout,
                                 editing = editing,
@@ -496,7 +505,8 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         }
                     } else {
                     // Cámara en el espacio libre, debajo de los controles
-                    if (customAllowed) LookSurface(lookCfg, Modifier.matchParentSize())
+                    if (mouseMode && pointerPad) PointerTrackpadLayer(Modifier.matchParentSize())
+                    else if (customAllowed) LookSurface(lookCfg, Modifier.matchParentSize())
                     // Cada plantilla es un trazado nuevo: ningún botón hereda el bit de otro
                     key(layout.id) { Row(
                         modifier = Modifier
@@ -668,6 +678,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                                     RightStick.ANALOG -> {
                                         if (AppPrefs.rightStickMode(context) == AppPrefs.RIGHT_STICK_MODE_TRACKPAD) {
                                             RightStickTrackpad(
+                                                inertia = AppPrefs.trackpadInertia(context),
                                                 sizeDp = padSize,
                                                 sensitivity = AppPrefs.trackpadSensitivity(context),
                                                 antiDeadzone = AppPrefs.rightStickAntiDeadzone(context)
@@ -806,6 +817,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
             if (!editing && !fullScreen) {
                 if (customAllowed) {
                     PadMenuButton(
+                        mouse = mouseMode,
                         onClick = { showMenu = true },
                         modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 8.dp)
                     )
@@ -815,6 +827,13 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
             }
             if (showMenu) {
                 PadMenuDialog(
+                    mouseOn = if (xboxPad) padMouse else null,
+                    onMouseToggle = { LinkState.setPadMouse(!padMouse) },
+                    pointerPadOn = if (padMouse) pointerPad else null,
+                    onPointerPadToggle = {
+                        pointerPad = !pointerPad
+                        AppPrefs.setPointerTrackpad(context, pointerPad)
+                    },
                     activeName = activeName,
                     locked = orientationLock != AppPrefs.ORIENTATION_FREE,
                     gyroOn = if (xboxPad) gyroCfg.enabled else null,

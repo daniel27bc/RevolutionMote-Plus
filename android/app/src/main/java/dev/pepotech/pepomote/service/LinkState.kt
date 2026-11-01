@@ -114,6 +114,31 @@ object LinkState {
     private val _intent = MutableStateFlow(PadIntent.None)
     val intent: StateFlow<PadIntent> = _intent
 
+    private val _padMouse = MutableStateFlow(false)
+
+    /**
+     * Modo ratón del mando universal: el receptor pasa a modo puntero (el
+     * giro mueve el ratón, A = clic izquierdo, B = clic derecho) pero la
+     * pantalla sigue siendo la del mando, para volver con un toque.
+     */
+    val padMouse: StateFlow<Boolean> = _padMouse
+
+    fun setPadMouse(on: Boolean) {
+        if (_padMouse.value == on) return
+        ButtonState.reset()
+        if (on) {
+            _padMouse.value = true
+            sendMode?.invoke(MODE_POINTER)
+        } else {
+            _padMouse.value = false
+            requestMode(MODE_GAMEPAD)
+        }
+    }
+
+    /** La pantalla del mando sigue aunque el modo sea el puntero (modo ratón). */
+    fun mouseOverride(link: UiLink): Boolean =
+        _padMouse.value && (link as? UiLink.Connected)?.mode == MODE_POINTER
+
     /**
      * Rol del enlace vivo (o arrancando). Lo fija el servicio al arrancar; la
      * UI lo consulta para saber si hay que rehacer el enlace con otro rol.
@@ -246,7 +271,10 @@ object LinkState {
     internal fun publish(state: UiLink) {
         _flow.value = state
         // Sin enlace no hay intención que mantener
-        if (state is UiLink.Disconnected || state is UiLink.Failed) _intent.value = PadIntent.None
+        if (state is UiLink.Disconnected || state is UiLink.Failed) {
+            _intent.value = PadIntent.None
+            _padMouse.value = false
+        }
     }
 
     internal fun updateConnected(transform: (UiLink.Connected) -> UiLink.Connected) {

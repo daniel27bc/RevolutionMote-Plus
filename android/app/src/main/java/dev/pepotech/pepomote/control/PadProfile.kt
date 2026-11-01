@@ -17,7 +17,8 @@ data class LookConfig(
     val zone: LookZone = LookZone.ALL,
     val sensitivity: Float = 1f,
     val antiDeadzone: Float = 0.15f,
-    val invertY: Boolean = false
+    val invertY: Boolean = false,
+    val inertia: Float = 0f
 )
 
 /** Cuándo apunta el giroscopio (si está encendido). */
@@ -32,7 +33,10 @@ enum class GyroActivation {
     HOLD_BUTTON,
 
     /** Un toque al botón 🎯 lo enciende y otro lo apaga. */
-    TOGGLE_BUTTON
+    TOGGLE_BUTTON,
+
+    /** Cada pulsación de ZL / LT lo enciende o lo apaga. */
+    TOGGLE_LT
 }
 
 /**
@@ -42,12 +46,14 @@ enum class GyroActivation {
 data class GyroConfig(
     val enabled: Boolean = false,
     val activation: GyroActivation = GyroActivation.ALWAYS,
-    val sensX: Float = 1f,
-    val sensY: Float = 1f,
+    val sensX: Float = 2.1f,
+    val sensY: Float = 1.9f,
     val invertX: Boolean = false,
     val invertY: Boolean = false,
     val antiDeadzone: Float = 0.12f,
-    val smoothing: Float = 0.3f
+    val smoothing: Float = 0.9f,
+    /** Por si en algún móvil el giro horizontal y el vertical salen cruzados. */
+    val swapAxes: Boolean = false
 ) {
     val needsButton: Boolean
         get() = enabled && (activation == GyroActivation.HOLD_BUTTON || activation == GyroActivation.TOGGLE_BUTTON)
@@ -74,7 +80,9 @@ data class PadElement(
     val antiDeadzone: Float = 0f,
     val sensitivity: Float = 1f,
     val trackpad: Boolean = false,
-    val turbo: Boolean = false
+    val turbo: Boolean = false,
+    /** Trackpad: cuánto sigue girando al soltar (0 = sin inercia, 1 = casi sin frenar). */
+    val inertia: Float = 0f
 ) {
     /** Único dentro de un perfil: un tipo de control o un bit no se repiten. */
     val id: String get() = if (kind == ElementKind.BUTTON) "btn_$bit" else kind.name
@@ -109,6 +117,8 @@ object PadProfiles {
     const val MIN_SIZE = 0.06f
     const val MAX_SIZE = 0.8f
     const val MIN_OPACITY = 0.15f
+    const val MIN_SENS = 0.1f
+    const val MAX_SENS = 10f
 
     /** Botones sueltos que se pueden poner, en el orden de la lista «Añadir». */
     val BUTTON_BITS = listOf(
@@ -219,8 +229,9 @@ object PadProfiles {
         y = e.y.coerceIn(0f, 1f),
         size = e.size.coerceIn(MIN_SIZE, MAX_SIZE),
         deadzone = e.deadzone.coerceIn(0f, 0.5f),
-        antiDeadzone = e.antiDeadzone.coerceIn(0f, 0.6f),
-        sensitivity = e.sensitivity.coerceIn(0.2f, 3f)
+        antiDeadzone = e.antiDeadzone.coerceIn(0f, 0.9f),
+        sensitivity = e.sensitivity.coerceIn(MIN_SENS, MAX_SENS),
+        inertia = e.inertia.coerceIn(0f, 1f)
     )
 }
 
@@ -244,6 +255,7 @@ object PadProfileJson {
                 put("sens", e.sensitivity.toDouble())
                 put("trackpad", e.trackpad)
                 put("turbo", e.turbo)
+                put("inertia", e.inertia.toDouble())
             })
         })
     }
@@ -266,7 +278,8 @@ object PadProfileJson {
                     antiDeadzone = j.optDouble("adz", 0.0).toFloat(),
                     sensitivity = j.optDouble("sens", 1.0).toFloat(),
                     trackpad = j.optBoolean("trackpad", false),
-                    turbo = j.optBoolean("turbo", false)
+                    turbo = j.optBoolean("turbo", false),
+                    inertia = j.optDouble("inertia", 0.0).toFloat()
                 )
             )
         }
@@ -290,17 +303,19 @@ object PadProfileJson {
         put("iy", g.invertY)
         put("adz", g.antiDeadzone.toDouble())
         put("smooth", g.smoothing.toDouble())
+        put("swap", g.swapAxes)
     }
 
     fun gyroFromJson(j: JSONObject?): GyroConfig = if (j == null) GyroConfig() else GyroConfig(
         enabled = j.optBoolean("on", false),
         activation = runCatching { GyroActivation.valueOf(j.getString("act")) }.getOrDefault(GyroActivation.ALWAYS),
-        sensX = j.optDouble("sx", 1.0).toFloat().coerceIn(0.1f, 4f),
-        sensY = j.optDouble("sy", 1.0).toFloat().coerceIn(0.1f, 4f),
+        sensX = j.optDouble("sx", 2.1).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS),
+        sensY = j.optDouble("sy", 1.9).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS),
         invertX = j.optBoolean("ix", false),
         invertY = j.optBoolean("iy", false),
-        antiDeadzone = j.optDouble("adz", 0.12).toFloat().coerceIn(0f, 0.6f),
-        smoothing = j.optDouble("smooth", 0.3).toFloat().coerceIn(0f, 0.9f)
+        antiDeadzone = j.optDouble("adz", 0.12).toFloat().coerceIn(0f, 0.9f),
+        smoothing = j.optDouble("smooth", 0.9).toFloat().coerceIn(0f, 0.97f),
+        swapAxes = j.optBoolean("swap", false)
     )
 
     fun lookToJson(l: LookConfig): JSONObject = JSONObject().apply {
@@ -308,13 +323,15 @@ object PadProfileJson {
         put("sens", l.sensitivity.toDouble())
         put("adz", l.antiDeadzone.toDouble())
         put("invY", l.invertY)
+        put("inertia", l.inertia.toDouble())
     }
 
     fun lookFromJson(j: JSONObject?): LookConfig = if (j == null) LookConfig() else LookConfig(
         zone = runCatching { LookZone.valueOf(j.getString("zone")) }.getOrDefault(LookZone.ALL),
-        sensitivity = j.optDouble("sens", 1.0).toFloat().coerceIn(0.2f, 3f),
-        antiDeadzone = j.optDouble("adz", 0.15).toFloat().coerceIn(0f, 0.6f),
-        invertY = j.optBoolean("invY", false)
+        sensitivity = j.optDouble("sens", 1.0).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS),
+        antiDeadzone = j.optDouble("adz", 0.15).toFloat().coerceIn(0f, 0.9f),
+        invertY = j.optBoolean("invY", false),
+        inertia = j.optDouble("inertia", 0.0).toFloat().coerceIn(0f, 1f)
     )
 
     fun listToString(list: List<PadProfile>): String =

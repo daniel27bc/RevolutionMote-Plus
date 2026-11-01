@@ -149,14 +149,15 @@ internal fun CustomPadCanvas(
     editing: Boolean,
     onElementChange: (old: PadElement, new: PadElement) -> Unit,
     onGear: (PadElement) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    lookEnabled: Boolean = true
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val w = maxWidth
         val h = maxHeight
         // Cámara en el espacio libre: debajo de todo, así solo coge los
         // dedos que no caen en ningún control
-        if (!editing) LookSurface(profile.look, Modifier.matchParentSize())
+        if (!editing && lookEnabled) LookSurface(profile.look, Modifier.matchParentSize())
         for (e in profile.elements) key(e.id) {
             val (bw, bh) = elementBox(e, h)
             val ox = w * e.x - bw / 2
@@ -202,7 +203,7 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig,
             // Al quitar el stick o cambiar de tipo, nada se queda inclinado
             DisposableEffect(e.kind, e.trackpad) { onDispose { sink(0, 0) } }
             if (e.trackpad) {
-                RightStickTrackpad(bw, e.sensitivity, e.antiDeadzone, onStick = sink)
+                RightStickTrackpad(bw, e.sensitivity, e.antiDeadzone, inertia = e.inertia, onStick = sink)
             } else {
                 AnalogStick(bw, e.deadzone, e.antiDeadzone, e.sensitivity, sink)
             }
@@ -441,6 +442,7 @@ internal fun LabeledSlider(
     range: ClosedFloatingPointRange<Float>,
     shown: String,
     subtitle: String? = null,
+    log: Boolean = false,
     onChange: (Float) -> Unit
 ) {
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -449,7 +451,19 @@ internal fun LabeledSlider(
             Text(shown, style = MaterialTheme.typography.titleMedium, color = PepoColors.Blue, fontWeight = FontWeight.Bold)
         }
         if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = PepoColors.TextDim)
-        Slider(value = value.coerceIn(range), onValueChange = onChange, valueRange = range, colors = sliderColors())
+        if (log) {
+            // Escala logarítmica: 0,1x–1x ocupa tanto recorrido como 1x–10x
+            val lo = kotlin.math.ln(range.start)
+            val hi = kotlin.math.ln(range.endInclusive)
+            Slider(
+                value = kotlin.math.ln(value.coerceIn(range)),
+                onValueChange = { onChange((kotlin.math.exp(it) * 100f).roundToInt() / 100f) },
+                valueRange = lo..hi,
+                colors = sliderColors()
+            )
+        } else {
+            Slider(value = value.coerceIn(range), onValueChange = onChange, valueRange = range, colors = sliderColors())
+        }
     }
 }
 
@@ -500,15 +514,19 @@ internal fun ElementSettingsDialog(
             }
             LabeledSlider(
                 stringResource(R.string.anti_deadzone_title),
-                element.antiDeadzone, 0f..0.6f,
+                element.antiDeadzone, 0f..0.9f,
                 "${(element.antiDeadzone * 100).roundToInt()}%",
                 stringResource(R.string.anti_deadzone_sub)
             ) { onChange(element.copy(antiDeadzone = it)) }
             LabeledSlider(
                 stringResource(R.string.ed_sensitivity),
-                element.sensitivity, 0.2f..3f,
-                "%.1fx".format(element.sensitivity)
+                element.sensitivity, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
+                "%.2fx".format(element.sensitivity),
+                log = true
             ) { onChange(element.copy(sensitivity = it)) }
+            if (element.trackpad) {
+                InertiaControls(element.inertia) { onChange(element.copy(inertia = it)) }
+            }
         }
 
         if (element.kind == ElementKind.BUTTON) {
@@ -767,8 +785,14 @@ private fun BarChip(text: String, color: Color, onClick: () -> Unit) {
 
 /** El botón «☰ Mando», arriba a la derecha (en la franja de la cabecera, sin controles). */
 @Composable
-internal fun PadMenuButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier) { BarChip("☰ " + stringResource(R.string.pad_menu), PepoColors.Blue, onClick) }
+internal fun PadMenuButton(onClick: () -> Unit, modifier: Modifier = Modifier, mouse: Boolean = false) {
+    Box(modifier) {
+        BarChip(
+            if (mouse) "🖱 " + stringResource(R.string.mouse_mode_badge) else "☰ " + stringResource(R.string.pad_menu),
+            if (mouse) PepoColors.Ok else PepoColors.Blue,
+            onClick
+        )
+    }
 }
 
 /** Una fila grande del menú del mando. */
@@ -797,6 +821,10 @@ private fun MenuRow(icon: String, title: String, value: String? = null, valueCol
  */
 @Composable
 internal fun PadMenuDialog(
+    mouseOn: Boolean?,
+    onMouseToggle: () -> Unit,
+    pointerPadOn: Boolean?,
+    onPointerPadToggle: () -> Unit,
     activeName: String?,
     locked: Boolean,
     gyroOn: Boolean?,
@@ -824,6 +852,22 @@ internal fun PadMenuDialog(
                 stringResource(if (gyroOn) R.string.state_on else R.string.state_off),
                 if (gyroOn) PepoColors.Ok else PepoColors.TextDim,
                 onGyroToggle
+            )
+        }
+        if (mouseOn != null) {
+            MenuRow(
+                "🖱", stringResource(R.string.mouse_mode_title),
+                stringResource(if (mouseOn) R.string.state_on else R.string.state_off),
+                if (mouseOn) PepoColors.Ok else PepoColors.TextDim,
+                onMouseToggle
+            )
+        }
+        if (pointerPadOn != null) {
+            MenuRow(
+                "☝", stringResource(R.string.pointer_trackpad_enable),
+                stringResource(if (pointerPadOn) R.string.state_on else R.string.state_off),
+                if (pointerPadOn) PepoColors.Ok else PepoColors.TextDim,
+                onPointerPadToggle
             )
         }
         MenuRow("⚙", stringResource(R.string.ed_pad_settings), onClick = onPadSettings)

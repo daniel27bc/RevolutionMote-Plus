@@ -39,6 +39,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,13 +47,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pepotech.pepomote.R
+import dev.pepotech.pepomote.control.AppPrefs
 import dev.pepotech.pepomote.control.ButtonState
+import dev.pepotech.pepomote.control.PointerTrackpad
 import dev.pepotech.pepomote.control.GyroActivation
 import dev.pepotech.pepomote.control.GyroAim
 import dev.pepotech.pepomote.control.GyroConfig
 import dev.pepotech.pepomote.control.Haptics
 import dev.pepotech.pepomote.control.LookConfig
 import dev.pepotech.pepomote.control.LookZone
+import dev.pepotech.pepomote.control.PadProfiles
 import dev.pepotech.pepomote.control.PressHit
 import dev.pepotech.pepomote.control.PressMode
 import dev.pepotech.pepomote.control.UiSounds
@@ -89,12 +93,73 @@ internal fun LookSurface(look: LookConfig, modifier: Modifier = Modifier) {
                     sensitivity = look.sensitivity,
                     antiDeadzone = look.antiDeadzone,
                     invertY = look.invertY,
+                    inertia = look.inertia,
                     accept = { pos: Offset ->
                         !(PressMode.slide && registry != null &&
                             PressHit.resolve(registry.zones(), pos.x + origin[0], pos.y + origin[1]) != null)
                     }
                 ) { x, y -> ButtonState.setStick2From(ButtonState.SRC_LOOK, x, y) }
         )
+    }
+}
+
+/**
+ * Trackpad de ratón (modo puntero): una superficie invisible debajo de los
+ * controles; el dedo en un hueco mueve el cursor del PC ([PointerTrackpad]).
+ * Mientras está puesta, mover el móvil no mueve el cursor.
+ */
+@Composable
+internal fun PointerTrackpadLayer(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val inertia = remember { AppPrefs.pointerTrackpadInertia(context) }
+    DisposableEffect(Unit) {
+        PointerTrackpad.sensitivity = AppPrefs.pointerTrackpadSens(context)
+        PointerTrackpad.active = true
+        onDispose { PointerTrackpad.active = false }
+    }
+    Box(
+        modifier.trackpadInput(
+            sensitivity = 1f,
+            antiDeadzone = 0f,
+            inertia = inertia,
+            onVelocity = { vx, vy -> PointerTrackpad.setVelocity(vx, vy) }
+        ) { _, _ -> }
+    )
+}
+
+/** «🖱 Trackpad»: mover el ratón con el dedo, sí o no. */
+@Composable
+internal fun PointerTrackpadChip(on: Boolean, onChange: (Boolean) -> Unit) {
+    ModeChip("🖱 " + stringResource(R.string.pointer_trackpad_chip), selected = on, toggle = true, compact = true) {
+        onChange(!on)
+    }
+}
+
+/** Ajustes del ratón con el dedo: interruptor, sensibilidad e inercia. */
+@Composable
+internal fun PointerTrackpadSettings() {
+    val context = LocalContext.current
+    var on by remember { mutableStateOf(AppPrefs.pointerTrackpad(context)) }
+    var sens by remember { mutableStateOf(AppPrefs.pointerTrackpadSens(context)) }
+    var inertia by remember { mutableStateOf(AppPrefs.pointerTrackpadInertia(context)) }
+    SectionTitle(stringResource(R.string.pointer_trackpad_title), stringResource(R.string.pointer_trackpad_sub))
+    SwitchRow(stringResource(R.string.pointer_trackpad_enable), on) {
+        on = it
+        AppPrefs.setPointerTrackpad(context, it)
+    }
+    if (on) {
+        LabeledSlider(
+            stringResource(R.string.ed_sensitivity), sens, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
+            "%.2fx".format(sens), log = true
+        ) {
+            sens = it
+            AppPrefs.setPointerTrackpadSens(context, it)
+            PointerTrackpad.sensitivity = it
+        }
+        InertiaControls(inertia) {
+            inertia = it
+            AppPrefs.setPointerTrackpadInertia(context, it)
+        }
     }
 }
 
@@ -207,15 +272,16 @@ internal fun LookSettingsSection(look: LookConfig, onChange: (LookConfig) -> Uni
     if (look.zone != LookZone.OFF) {
         Spacer(Modifier.height(6.dp))
         LabeledSlider(
-            stringResource(R.string.ed_sensitivity), look.sensitivity, 0.2f..3f,
-            "%.1fx".format(look.sensitivity)
+            stringResource(R.string.ed_sensitivity), look.sensitivity, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
+            "%.2fx".format(look.sensitivity), log = true
         ) { onChange(look.copy(sensitivity = it)) }
         LabeledSlider(
-            stringResource(R.string.anti_deadzone_title), look.antiDeadzone, 0f..0.6f,
+            stringResource(R.string.anti_deadzone_title), look.antiDeadzone, 0f..0.9f,
             "${(look.antiDeadzone * 100).roundToInt()}%",
             stringResource(R.string.anti_deadzone_sub)
         ) { onChange(look.copy(antiDeadzone = it)) }
         SwitchRow(stringResource(R.string.invert_y), look.invertY) { onChange(look.copy(invertY = it)) }
+        InertiaControls(look.inertia) { onChange(look.copy(inertia = it)) }
     }
 }
 
@@ -231,7 +297,8 @@ internal fun GyroSettingsSection(gyro: GyroConfig, onChange: (GyroConfig) -> Uni
         R.string.gyro_always to GyroActivation.ALWAYS,
         R.string.gyro_hold_lt to GyroActivation.HOLD_LT,
         R.string.gyro_hold_btn to GyroActivation.HOLD_BUTTON,
-        R.string.gyro_toggle_btn to GyroActivation.TOGGLE_BUTTON
+        R.string.gyro_toggle_btn to GyroActivation.TOGGLE_BUTTON,
+        R.string.gyro_toggle_lt to GyroActivation.TOGGLE_LT
     )
     ChipFlow {
         for ((label, act) in acts) {
@@ -244,23 +311,42 @@ internal fun GyroSettingsSection(gyro: GyroConfig, onChange: (GyroConfig) -> Uni
     }
     Spacer(Modifier.height(6.dp))
     LabeledSlider(
-        stringResource(R.string.gyro_sens_x), gyro.sensX, 0.1f..4f, "%.1fx".format(gyro.sensX)
+        stringResource(R.string.gyro_sens_x), gyro.sensX, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
+        "%.2fx".format(gyro.sensX), log = true
     ) { onChange(gyro.copy(sensX = it)) }
     LabeledSlider(
-        stringResource(R.string.gyro_sens_y), gyro.sensY, 0.1f..4f, "%.1fx".format(gyro.sensY)
+        stringResource(R.string.gyro_sens_y), gyro.sensY, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
+        "%.2fx".format(gyro.sensY), log = true
     ) { onChange(gyro.copy(sensY = it)) }
     LabeledSlider(
-        stringResource(R.string.anti_deadzone_title), gyro.antiDeadzone, 0f..0.5f,
+        stringResource(R.string.anti_deadzone_title), gyro.antiDeadzone, 0f..0.9f,
         "${(gyro.antiDeadzone * 100).roundToInt()}%",
         stringResource(R.string.anti_deadzone_sub)
     ) { onChange(gyro.copy(antiDeadzone = it)) }
     LabeledSlider(
-        stringResource(R.string.gyro_smoothing), gyro.smoothing, 0f..0.9f,
+        stringResource(R.string.gyro_smoothing), gyro.smoothing, 0f..0.97f,
         "${(gyro.smoothing * 100).roundToInt()}%",
         stringResource(R.string.gyro_smoothing_sub)
     ) { onChange(gyro.copy(smoothing = it)) }
     SwitchRow(stringResource(R.string.invert_x), gyro.invertX) { onChange(gyro.copy(invertX = it)) }
     SwitchRow(stringResource(R.string.invert_y), gyro.invertY) { onChange(gyro.copy(invertY = it)) }
+    SwitchRow(stringResource(R.string.gyro_swap), gyro.swapAxes, stringResource(R.string.gyro_swap_sub)) {
+        onChange(gyro.copy(swapAxes = it))
+    }
+}
+
+/** Inercia de un trackpad: interruptor y, encendida, cuánto dura. */
+@Composable
+internal fun InertiaControls(inertia: Float, onChange: (Float) -> Unit) {
+    SwitchRow(stringResource(R.string.inertia_title), inertia > 0f, stringResource(R.string.inertia_sub)) {
+        onChange(if (it) 0.6f else 0f)
+    }
+    if (inertia > 0f) {
+        LabeledSlider(
+            stringResource(R.string.inertia_amount), inertia, 0.05f..1f,
+            "${(inertia * 100).roundToInt()}%"
+        ) { onChange(it) }
+    }
 }
 
 /** «Ajustes del mando»: cámara en el espacio libre y giroscopio, desde el propio mando. */

@@ -36,6 +36,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.pepotech.pepomote.ui.components.OrientationLockButton
+import dev.pepotech.pepomote.ui.screens.PointerTrackpadChip
+import dev.pepotech.pepomote.ui.screens.PointerTrackpadLayer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -554,7 +557,9 @@ private fun Root(activity: MainActivity) {
     val nunchukProvisional by NunchukSide.provisional.collectAsState()
     val gamePadSaved by GamePadSide.saved.collectAsState()
     val gamePadProvisional by GamePadSide.provisional.collectAsState()
-    val wantLandscape = activity.currentScreen == Screen.Controller && Route.forcesLandscape(link, padIntent)
+    val padMouse by LinkState.padMouse.collectAsState()
+    val wantLandscape = activity.currentScreen == Screen.Controller &&
+        (Route.forcesLandscape(link, padIntent) || (padMouse && LinkState.mouseOverride(link)))
     val landscapeSide = when {
         !wantLandscape -> LandscapeSide.Sensor
         Route.wiiLandscapeNunchuk(link) -> LandscapeSide.effective(nunchukSaved, nunchukProvisional)
@@ -717,7 +722,8 @@ private fun ControllerRoute(activity: MainActivity, link: UiLink) {
         activity.currentScreen = Screen.Home
     }
 
-    when (Route.route(link, intent)) {
+    val padMouse by LinkState.padMouse.collectAsState()
+    when (if (padMouse && LinkState.mouseOverride(link)) PadScreen.GamePad else Route.route(link, intent)) {
         PadScreen.GamePad -> GamePadScreen(link = link, onDisconnect = onDisconnect)
 
         PadScreen.Nunchuk -> NunchukScreen(link = link, onDisconnect = onDisconnect)
@@ -728,6 +734,12 @@ private fun ControllerRoute(activity: MainActivity, link: UiLink) {
                 PhysicalPad.target = PhysicalPad.Target.WIIMOTE
                 onDispose { PhysicalPad.target = PhysicalPad.Target.NONE }
             }
+            // Modo puntero: el ratón con el dedo en vez de apuntando con el
+            // móvil (capa debajo de todo: solo coge los huecos sin botones)
+            val pointerMode = (link as? UiLink.Connected)?.mode == LinkState.MODE_POINTER
+            var pointerPad by remember { mutableStateOf(AppPrefs.pointerTrackpad(context)) }
+            val pointerPadOn = pointerMode && pointerPad
+            if (pointerPadOn) PointerTrackpadLayer(Modifier.matchParentSize())
             val landscape =
                 LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
             // Selector Puntero/Dolphin/Wii U: entrando por Conectar/Mando/Wii U
@@ -745,12 +757,22 @@ private fun ControllerRoute(activity: MainActivity, link: UiLink) {
             } else {
                 ControllerScreen(link = link, showChips = showChips, onDisconnect = onDisconnect)
             }
-            // Candado de orientación: que el mando no gire solo al inclinarlo
-            OrientationLockButton(
+            // Candado de orientación (que el mando no gire solo al inclinarlo)
+            // y, en modo puntero, el trackpad sí/no
+            Row(
                 Modifier
                     .align(Alignment.BottomStart)
-                    .navigationBarsPadding()
-            )
+                    .navigationBarsPadding(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OrientationLockButton()
+                if (pointerMode) {
+                    PointerTrackpadChip(pointerPad) {
+                        pointerPad = it
+                        AppPrefs.setPointerTrackpad(context, it)
+                    }
+                }
+            }
         }
     }
 }

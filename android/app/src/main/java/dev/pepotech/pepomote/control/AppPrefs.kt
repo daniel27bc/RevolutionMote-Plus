@@ -122,6 +122,44 @@ object AppPrefs {
             .edit().putFloat("rightStickAntiDeadzone", value).apply()
     }
 
+    /** Inercia del trackpad derecho del diseño original (0 = sin inercia). */
+    fun trackpadInertia(context: Context): Float =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getFloat("trackpadInertia", 0f)
+
+    fun setTrackpadInertia(context: Context, value: Float) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putFloat("trackpadInertia", value).apply()
+    }
+
+    /** Modo puntero: el ratón se mueve con el dedo (trackpad) en vez de apuntando con el móvil. */
+    fun pointerTrackpad(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("pointerTrackpad", false)
+
+    fun setPointerTrackpad(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean("pointerTrackpad", value).apply()
+    }
+
+    fun pointerTrackpadInertia(context: Context): Float =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getFloat("pointerTrackpadInertia", 0f)
+
+    fun setPointerTrackpadInertia(context: Context, value: Float) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putFloat("pointerTrackpadInertia", value).apply()
+    }
+
+    fun pointerTrackpadSens(context: Context): Float =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getFloat("pointerTrackpadSens", 1f)
+
+    fun setPointerTrackpadSens(context: Context, value: Float) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putFloat("pointerTrackpadSens", value).apply()
+    }
+
     /** Zona muerta del stick derecho del diseño original (los perfiles llevan la suya). */
     fun rightStickDeadzone(context: Context): Float =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -40,6 +40,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import dev.pepotech.pepomote.control.PadProfileStore
+import dev.pepotech.pepomote.control.PadProfiles
 import dev.pepotech.pepomote.control.PhysicalPad
 import kotlin.math.roundToInt
 import dev.pepotech.pepomote.control.GameRumble
@@ -213,6 +214,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
     var rightStickMode by remember { mutableStateOf(AppPrefs.rightStickMode(context)) }
     var antiDeadzone by remember { mutableStateOf(AppPrefs.rightStickAntiDeadzone(context)) }
     var trackpadSens by remember { mutableStateOf(AppPrefs.trackpadSensitivity(context)) }
+    var trackpadInertia by remember { mutableStateOf(AppPrefs.trackpadInertia(context)) }
     var rightDeadzone by remember { mutableStateOf(AppPrefs.rightStickDeadzone(context)) }
     var hapticLevel by remember { mutableStateOf(AppPrefs.hapticLevel(context)) }
     var physicalPad by remember { mutableStateOf(AppPrefs.physicalPad(context)) }
@@ -284,6 +286,17 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                     AppPrefs.setGlobalGyro(context, it)
                 }
             }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        // Modo puntero: el ratón con el dedo
+        Card(
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
+            border = BorderStroke(1.5.dp, PepoColors.CardBorder),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(Modifier.fillMaxWidth().padding(18.dp)) { PointerTrackpadSettings() }
         }
 
         Spacer(Modifier.height(14.dp))
@@ -518,7 +531,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                 }
                 LabeledSlider(
                     stringResource(R.string.anti_deadzone_title),
-                    antiDeadzone, 0f..0.6f,
+                    antiDeadzone, 0f..0.9f,
                     "${(antiDeadzone * 100).roundToInt()}%",
                     stringResource(R.string.anti_deadzone_sub)
                 ) {
@@ -527,11 +540,18 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                 }
                 LabeledSlider(
                     stringResource(R.string.ed_sensitivity),
-                    trackpadSens, 0.2f..3f,
-                    "%.1fx".format(trackpadSens)
+                    trackpadSens, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
+                    "%.2fx".format(trackpadSens),
+                    log = true
                 ) {
                     trackpadSens = it
                     AppPrefs.setTrackpadSensitivity(context, it)
+                }
+                if (rightStickMode == AppPrefs.RIGHT_STICK_MODE_TRACKPAD) {
+                    InertiaControls(trackpadInertia) {
+                        trackpadInertia = it
+                        AppPrefs.setTrackpadInertia(context, it)
+                    }
                 }
                 Text(stringResource(R.string.right_stick_profiles_note), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
             }

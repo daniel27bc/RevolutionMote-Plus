@@ -71,6 +71,18 @@ object GyroAim {
         GyroActivation.HOLD_LT -> ButtonState.current() and ButtonState.ZL != 0
         GyroActivation.HOLD_BUTTON -> buttonHeld
         GyroActivation.TOGGLE_BUTTON -> toggled
+        GyroActivation.TOGGLE_LT -> ltToggled
+    }
+
+    /** Modo «alternar con LT / ZL»: cada pulsación (flanco de bajada) lo cambia. */
+    @Volatile
+    var ltToggled: Boolean = false
+    private var ltWasDown = false
+
+    private fun trackLt() {
+        val down = ButtonState.current() and ButtonState.ZL != 0
+        if (down && !ltWasDown) ltToggled = !ltToggled
+        ltWasDown = down
     }
 
     /** Una muestra del giroscopio (hilo de sensores). */
@@ -88,13 +100,16 @@ object GyroAim {
             hasUp = true
         }
         val c = config
+        if (c.enabled && c.activation == GyroActivation.TOGGLE_LT) trackLt()
         if (!gateOpen(c)) {
             sx = 0f
             sy = 0f
             zero()
             return
         }
-        val (yaw, pitch) = playerSpace(g[0], g[1], g[2], ux, uy, uz)
+        val (yaw0, pitch0) = playerSpace(g[0], g[1], g[2], ux, uy, uz)
+        val yaw = if (c.swapAxes) pitch0 else yaw0
+        val pitch = if (c.swapAxes) yaw0 else pitch0
         var tx = -yaw * c.sensX / FULL_RATE
         var ty = pitch * c.sensY / FULL_RATE
         if (c.invertX) tx = -tx

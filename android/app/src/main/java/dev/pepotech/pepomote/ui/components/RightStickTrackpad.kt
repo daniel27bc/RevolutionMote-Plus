@@ -41,38 +41,63 @@ import kotlin.math.roundToInt
  * sin levantarse, se apaga en unas decenas de milisegundos: la cámara para,
  * no sigue girando sola.
  *
+ * [inertia] (0..1): al SOLTAR con el dedo en movimiento, el giro sigue y se
+ * va frenando (0 = para en seco; 1 = frena muy poco). Un toque nuevo la corta.
  * [onTouch]: dónde está el dedo (null al soltar), para pintarlo.
+ * [onVelocity]: la velocidad cruda (dp/ms, +y abajo) cada fotograma, para
+ * quien la quiera en vez del stick (el trackpad de ratón).
  */
 @Composable
 fun Modifier.trackpadInput(
     sensitivity: Float,
     antiDeadzone: Float,
     invertY: Boolean = false,
+    inertia: Float = 0f,
     accept: (Offset) -> Boolean = { true },
     onTouch: (Offset?) -> Unit = {},
+    onVelocity: ((vx: Float, vy: Float) -> Unit)? = null,
     onStick: (x: Int, y: Int) -> Unit
 ): Modifier {
     val acceptNow by rememberUpdatedState(accept)
-    var active by remember { mutableStateOf(false) }
+    // Dedo encima o girando por inercia
+    var running by remember { mutableStateOf(false) }
     val emit by rememberUpdatedState(onStick)
+    val emitV by rememberUpdatedState(onVelocity)
     val touch by rememberUpdatedState(onTouch)
     val sens by rememberUpdatedState(sensitivity)
     val adz by rememberUpdatedState(antiDeadzone)
     val inv by rememberUpdatedState(invertY)
+    val inert by rememberUpdatedState(inertia)
     val motion = remember { TrackpadMotion() }
 
-    // Mientras hay dedo: cada fotograma se apaga la velocidad si el dedo no
-    // se mueve, y se manda lo que toque (también el 0 al quedarse quieto)
-    LaunchedEffect(active) {
-        if (!active) return@LaunchedEffect
+    // Cada fotograma: con el dedo quieto la velocidad se apaga deprisa; sin
+    // dedo (inercia) se va frenando poco a poco. Se manda lo que toque
+    LaunchedEffect(running) {
+        if (!running) return@LaunchedEffect
         var lastSent = 0 to 0
         while (true) {
             withFrameMillis { }
-            val idle = SystemClock.uptimeMillis() - motion.lastMoveMs
-            if (idle > IDLE_MS) {
-                motion.vx *= DECAY
-                motion.vy *= DECAY
+            if (motion.down) {
+                val idle = SystemClock.uptimeMillis() - motion.lastMoveMs
+                if (idle > IDLE_MS) {
+                    motion.vx *= DECAY
+                    motion.vy *= DECAY
+                }
+            } else {
+                // Inercia: de 0,80 (corta) a 0,985 (larga) por fotograma
+                val k = 0.80f + 0.185f * inert.coerceIn(0f, 1f)
+                motion.vx *= k
+                motion.vy *= k
+                if (kotlin.math.hypot(motion.vx, motion.vy) < TrackpadEngine.REST_SPEED) {
+                    motion.vx = 0f
+                    motion.vy = 0f
+                    emitV?.invoke(0f, 0f)
+                    emit(0, 0)
+                    running = false
+                    break
+                }
             }
+            emitV?.invoke(motion.vx, motion.vy)
             val (x, y) = TrackpadEngine.fromVelocity(motion.vx, motion.vy, sens, adz)
             val out = x to (if (inv) -y else y)
             if (out != lastSent) {
@@ -95,8 +120,10 @@ fun Modifier.trackpadInput(
             }
             down.consume()
             motion.reset()
+            motion.down = true
             touch(down.position)
-            active = true
+            running = true
+            var coast = false
             try {
                 drag(down.id) { change ->
                     // El movimiento se lee ANTES de consumir: una vez
@@ -111,11 +138,19 @@ fun Modifier.trackpadInput(
                     motion.lastMoveMs = SystemClock.uptimeMillis()
                     touch(change.position)
                 }
+                // Soltar en movimiento con inercia: sigue girando un rato
+                val moving = SystemClock.uptimeMillis() - motion.lastMoveMs < 60 &&
+                    kotlin.math.hypot(motion.vx, motion.vy) > TrackpadEngine.REST_SPEED * 4
+                coast = inert > 0f && moving
             } finally {
-                active = false
-                motion.reset()
+                motion.down = false
                 touch(null)
-                emit(0, 0)
+                if (!coast) {
+                    running = false
+                    motion.reset()
+                    emitV?.invoke(0f, 0f)
+                    emit(0, 0)
+                }
             }
         }
     }
@@ -128,6 +163,7 @@ fun RightStickTrackpad(
     sensitivity: Float = 1.0f,
     antiDeadzone: Float = 0.15f,
     invertY: Boolean = false,
+    inertia: Float = 0f,
     onStick: (x: Int, y: Int) -> Unit
 ) {
     val shape = RoundedCornerShape(20.dp)
@@ -139,7 +175,7 @@ fun RightStickTrackpad(
             .size(sizeDp)
             .background(PepoColors.Card, shape)
             .border(2.dp, if (active) PepoColors.Glow else PepoColors.CardBorder, shape)
-            .trackpadInput(sensitivity, antiDeadzone, invertY, onTouch = { touchPos = it }, onStick = onStick),
+            .trackpadInput(sensitivity, antiDeadzone, invertY, inertia, onTouch = { touchPos = it }, onStick = onStick),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -170,6 +206,7 @@ fun RightStickTrackpad(
 private class TrackpadMotion {
     var vx = 0f
     var vy = 0f
+    var down = false
     var lastMoveMs = 0L
     fun reset() {
         vx = 0f

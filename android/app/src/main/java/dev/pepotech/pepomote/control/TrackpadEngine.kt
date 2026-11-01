@@ -13,7 +13,7 @@ import kotlin.math.roundToInt
  */
 object TrackpadEngine {
     /** Velocidad (dp/ms) que da el tope con sensibilidad 1. */
-    const val FULL_SPEED = 1.1f
+    const val FULL_SPEED = 0.45f
 
     /** Por debajo de esto (dp/ms) el dedo se considera quieto. */
     const val REST_SPEED = 0.004f
@@ -26,9 +26,9 @@ object TrackpadEngine {
     ): Pair<Int, Int> {
         val speed = hypot(vx, vy)
         if (speed < REST_SPEED) return 0 to 0
-        val sens = sensitivity.coerceIn(0.2f, 3f)
+        val sens = sensitivity.coerceIn(0.1f, 10f)
         val mag = min(1f, speed * sens / FULL_SPEED)
-        val adz = antiDeadzone.coerceIn(0f, 0.8f)
+        val adz = antiDeadzone.coerceIn(0f, 0.9f)
         val power = adz + mag * (1f - adz)
         val x = (vx / speed * power * 127f).roundToInt().coerceIn(-127, 127)
         val y = (-vy / speed * power * 127f).roundToInt().coerceIn(-127, 127)

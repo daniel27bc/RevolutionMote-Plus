@@ -35,8 +35,8 @@ object StickMap {
         val dz = deadzone.coerceIn(0f, 0.9f)
         if (m <= dz) return 0 to 0
         val raw = ((min(m, 1f) - dz) / (1f - dz)).coerceIn(0f, 1f)
-        val gained = (raw * sensitivity.coerceIn(0.2f, 3f)).coerceAtMost(1f)
-        val adz = antiDeadzone.coerceIn(0f, 0.8f)
+        val gained = (raw * sensitivity.coerceIn(0.1f, 10f)).coerceAtMost(1f)
+        val adz = antiDeadzone.coerceIn(0f, 0.9f)
         val scaled = if (adz > 0f) adz + gained * (1f - adz) else gained
         val x = (dx / len * scaled * 127f).roundToInt().coerceIn(-127, 127)
         val y = (-dy / len * scaled * 127f).roundToInt().coerceIn(-127, 127)

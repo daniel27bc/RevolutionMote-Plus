@@ -120,7 +120,7 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "es-rES-w420dp-h1700dp-port-xhdpi")
     fun ajustesDelMando() = shot("07_ajustes_mando") {
         Column(Modifier.fillMaxWidth().padding(8.dp)) {
-            PadSettingsDialog(LookConfig(), GyroConfig(enabled = true), showGyro = true, onLook = {}, onGyro = {}, onDismiss = {})
+            PadSettingsDialog(LookConfig(inertia = 0.6f), GyroConfig(enabled = true), showGyro = true, onLook = {}, onGyro = {}, onDismiss = {})
         }
     }
 
@@ -130,7 +130,11 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "es-rES-w420dp-h900dp-port-xhdpi")
     fun menuDelMando() = shot("09_menu_mando") {
         Column(Modifier.fillMaxWidth().padding(8.dp)) {
-            PadMenuDialog("Shooter", locked = true, gyroOn = true, {}, {}, {}, {}, {}, {})
+            PadMenuDialog(
+                mouseOn = false, onMouseToggle = {}, pointerPadOn = null, onPointerPadToggle = {},
+                activeName = "Shooter", locked = true, gyroOn = true,
+                onLock = {}, onProfiles = {}, onGyroToggle = {}, onPadSettings = {}, onEdit = {}, onDismiss = {}
+            )
         }
     }
 }

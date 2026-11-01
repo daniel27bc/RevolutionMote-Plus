@@ -576,4 +576,16 @@
     <string name="orientation_free">Libre</string>
     <string name="state_on">Activado</string>
     <string name="state_off">Apagado</string>
+    <string name="gyro_toggle_lt">Alternar con LT / ZL</string>
+    <string name="gyro_swap">Intercambiar horizontal y vertical</string>
+    <string name="gyro_swap_sub">Solo si en tu móvil el giro horizontal mueve la cámara en vertical</string>
+    <string name="inertia_title">Inercia</string>
+    <string name="inertia_sub">Al soltar el dedo en movimiento, el giro sigue un poco y se va frenando</string>
+    <string name="inertia_amount">Duración de la inercia</string>
+    <string name="pointer_trackpad_chip">Trackpad</string>
+    <string name="pointer_trackpad_title">Ratón con el dedo (modo puntero)</string>
+    <string name="pointer_trackpad_sub">En modo puntero (mando de Wii o modo ratón del mando universal), desliza el dedo en cualquier hueco para mover el ratón del PC, como el trackpad de un portátil. Mientras está activo, mover el móvil no mueve el cursor</string>
+    <string name="pointer_trackpad_enable">Mover el ratón con el dedo</string>
+    <string name="mouse_mode_badge">Ratón</string>
+    <string name="mouse_mode_title">Modo ratón (giro = ratón, A / B = clics)</string>
 </resources>

@@ -576,4 +576,16 @@
     <string name="orientation_free">Free</string>
     <string name="state_on">On</string>
     <string name="state_off">Off</string>
+    <string name="gyro_toggle_lt">Toggle with LT / ZL</string>
+    <string name="gyro_swap">Swap horizontal and vertical</string>
+    <string name="gyro_swap_sub">Only if on your phone horizontal turning moves the camera vertically</string>
+    <string name="inertia_title">Inertia</string>
+    <string name="inertia_sub">When you lift a moving finger, the turn keeps going for a moment and slows down</string>
+    <string name="inertia_amount">Inertia length</string>
+    <string name="pointer_trackpad_chip">Trackpad</string>
+    <string name="pointer_trackpad_title">Mouse with your finger (pointer mode)</string>
+    <string name="pointer_trackpad_sub">In pointer mode (Wii Remote or the universal pad\'s mouse mode), swipe on any free spot to move the PC mouse, like a laptop trackpad. While it is on, moving the phone does not move the cursor</string>
+    <string name="pointer_trackpad_enable">Move the mouse with your finger</string>
+    <string name="mouse_mode_badge">Mouse</string>
+    <string name="mouse_mode_title">Mouse mode (motion = mouse, A / B = clicks)</string>
 </resources>
