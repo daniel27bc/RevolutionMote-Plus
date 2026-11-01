@@ -72,6 +72,7 @@ import dev.pepotech.pepomote.R
 import dev.pepotech.pepomote.control.AddOption
 import dev.pepotech.pepomote.control.ButtonState
 import dev.pepotech.pepomote.control.ElementKind
+import dev.pepotech.pepomote.control.GyroConfig
 import dev.pepotech.pepomote.control.Haptics
 import dev.pepotech.pepomote.control.PadElement
 import dev.pepotech.pepomote.control.PadProfile
@@ -201,7 +202,7 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig,
             // Al quitar el stick o cambiar de tipo, nada se queda inclinado
             DisposableEffect(e.kind, e.trackpad) { onDispose { sink(0, 0) } }
             if (e.trackpad) {
-                RightStickTrackpad(bw, e.sensitivity, e.antiDeadzone, sink)
+                RightStickTrackpad(bw, e.sensitivity, e.antiDeadzone, onStick = sink)
             } else {
                 AnalogStick(bw, e.deadzone, e.antiDeadzone, e.sensitivity, sink)
             }
