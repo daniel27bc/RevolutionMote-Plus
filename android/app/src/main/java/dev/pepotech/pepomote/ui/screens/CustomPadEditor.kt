@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -397,7 +398,7 @@ internal fun sliderColors() = SliderDefaults.colors(
 
 /** Tarjeta flotante de los diálogos del editor. */
 @Composable
-internal fun EditorDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun EditorDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.widthIn(max = 520.dp).heightIn(max = 560.dp),

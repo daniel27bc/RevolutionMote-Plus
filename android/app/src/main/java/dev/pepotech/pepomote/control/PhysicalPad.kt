@@ -223,7 +223,7 @@ object PhysicalPad {
     /** Nombres de los mandos físicos conectados ahora (para Ajustes). */
     fun connectedNames(context: Context): List<String> {
         val im = context.getSystemService(Context.INPUT_SERVICE) as? InputManager ?: return emptyList()
-        return im.inputDeviceIds.mapNotNull { InputDevice.getDevice(it) }
+        return im.inputDeviceIds.toList().mapNotNull { InputDevice.getDevice(it) }
             .filter { !it.isVirtual && isFromPad(it.sources) }
             .map { it.name }
             .distinct()
