@@ -75,8 +75,8 @@
     <string name="current">current</string>
 
     <!-- settings -->
-    <string name="vol_title">Volume buttons = A / B</string>
-    <string name="vol_sub">With the controller open: volume up = A, volume down = B trigger. Play with your phone’s physical buttons</string>
+    <string name="vol_title">Volume keys as pad buttons</string>
+    <string name="vol_sub">With the pad open, the physical volume keys press the button you choose (for example, the triggers for shooters)</string>
     <string name="sounds_title">Sounds</string>
     <string name="sounds_sub">Button beeps and the connect/disconnect melody (vibration stays)</string>
     <string name="slide_press_title">Slide to press</string>
@@ -539,4 +539,41 @@
     <string name="physical_pad_none">No controller connected right now</string>
     <string name="physical_pad_found">Connected: %1$s</string>
     <string name="right_stick_profiles_note">For the original layout. In a custom profile each stick has its own settings under its ⚙</string>
+    <string name="ed_gyro_button">Gyro button 🎯</string>
+    <string name="ed_pad_settings">Pad settings</string>
+    <string name="gyro_short">GYRO</string>
+    <string name="gyro_on">Gyro on</string>
+    <string name="gyro_off">Gyro off</string>
+    <string name="look_title">Camera on free space</string>
+    <string name="look_sub">Like CoD Mobile: swipe on any spot without controls to turn the camera. The right stick or trackpad still works for moving through menus</string>
+    <string name="look_off">Off</string>
+    <string name="look_right">Right half</string>
+    <string name="look_all">Whole screen</string>
+    <string name="invert_y">Invert vertical axis</string>
+    <string name="invert_x">Invert horizontal axis</string>
+    <string name="gyro_title">Gyro aiming</string>
+    <string name="gyro_sub">Universal pad: turning the phone moves the camera (right stick), horizontally and vertically, however you hold it</string>
+    <string name="gyro_enable">Gyro enabled</string>
+    <string name="gyro_activation">When it aims</string>
+    <string name="gyro_always">Always</string>
+    <string name="gyro_hold_lt">While holding LT / ZL</string>
+    <string name="gyro_hold_btn">While holding 🎯</string>
+    <string name="gyro_toggle_btn">Toggle with 🎯</string>
+    <string name="gyro_button_note">Needs the 🎯 button in your layout: it is added automatically and you can move it in “Edit layout”</string>
+    <string name="gyro_sens_x">Horizontal sensitivity</string>
+    <string name="gyro_sens_y">Vertical sensitivity</string>
+    <string name="gyro_smoothing">Smoothing</string>
+    <string name="gyro_smoothing_sub">Removes hand shake; too much feels laggy</string>
+    <string name="pad_settings_global_note">For the original layout. Each layout profile has its own under “⚙ Pad settings”, inside the pad</string>
+    <string name="haptic_system_title">Compatibility mode</string>
+    <string name="haptic_system_sub">Uses the system touch vibration. Turn it on if you feel nothing with the app\'s click</string>
+    <string name="haptic_test">Test</string>
+    <string name="ed_sensitivity">Sensitivity</string>
+    <string name="pad_menu">Pad</string>
+    <string name="pad_menu_title">Pad menu</string>
+    <string name="orientation_title">Screen orientation</string>
+    <string name="orientation_locked">Locked</string>
+    <string name="orientation_free">Free</string>
+    <string name="state_on">On</string>
+    <string name="state_off">Off</string>
 </resources>

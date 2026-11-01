@@ -142,6 +142,16 @@ object AppPrefs {
             .edit().putInt("hapticLevel", value.coerceIn(Haptics.OFF, Haptics.STRONG)).apply()
     }
 
+    /** Vibración por el camino del sistema (performHapticFeedback) en vez del clic propio. */
+    fun hapticSystem(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("hapticSystem", false)
+
+    fun setHapticSystem(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean("hapticSystem", value).apply()
+    }
+
     /** Mando físico (USB, Bluetooth, telescópico): sus botones van al PC. Encendido de serie. */
     fun physicalPad(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -152,24 +162,28 @@ object AppPrefs {
             .edit().putBoolean("physicalPad", value).apply()
     }
 
-    /** Mando universal: el giro solo apunta mientras se mantiene ZL / LT (gyro aiming). */
-    fun padAimHold(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean("padAimHold", false)
+    /** Cámara en el espacio libre del diseño original (los perfiles llevan la suya). */
+    fun globalLook(context: Context): LookConfig =
+        PadProfileJson.lookFromJson(
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("globalLook", null)
+                ?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
+        )
 
-    fun setPadAimHold(context: Context, value: Boolean) {
+    fun setGlobalLook(context: Context, value: LookConfig) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putBoolean("padAimHold", value).apply()
+            .edit().putString("globalLook", PadProfileJson.lookToJson(value).toString()).apply()
     }
 
-    /** Mando universal: cuánto mueve el giro (0.25..3; 1 = lo de siempre). */
-    fun padAimScale(context: Context): Float =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getFloat("padAimScale", 1f).coerceIn(0.25f, 3f)
+    /** Giroscopio del diseño original (los perfiles llevan el suyo). */
+    fun globalGyro(context: Context): GyroConfig =
+        PadProfileJson.gyroFromJson(
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("globalGyro", null)
+                ?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
+        )
 
-    fun setPadAimScale(context: Context, value: Float) {
+    fun setGlobalGyro(context: Context, value: GyroConfig) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putFloat("padAimScale", value.coerceIn(0.25f, 3f)).apply()
+            .edit().putString("globalGyro", PadProfileJson.gyroToJson(value).toString()).apply()
     }
 
     /** Sin bloqueo de orientación en el mando. */

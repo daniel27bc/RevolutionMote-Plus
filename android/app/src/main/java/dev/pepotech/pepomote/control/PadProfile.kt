@@ -4,7 +4,54 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Qué es cada control del diseño personalizado. */
-enum class ElementKind { BUTTON, STICK_L, STICK_R, DPAD, FACE }
+enum class ElementKind { BUTTON, STICK_L, STICK_R, DPAD, FACE, GYRO }
+
+/** Dónde gira la cámara un dedo que cae fuera de cualquier control (como en CoD Mobile). */
+enum class LookZone { OFF, RIGHT, ALL }
+
+/**
+ * Cámara en el espacio libre: cualquier hueco sin controles es un trackpad
+ * que mueve el stick derecho (velocidad del dedo = giro).
+ */
+data class LookConfig(
+    val zone: LookZone = LookZone.ALL,
+    val sensitivity: Float = 1f,
+    val antiDeadzone: Float = 0.15f,
+    val invertY: Boolean = false
+)
+
+/** Cuándo apunta el giroscopio (si está encendido). */
+enum class GyroActivation {
+    /** Siempre que el mando está abierto. */
+    ALWAYS,
+
+    /** Mientras se mantiene ZL / LT (táctil o mando físico). */
+    HOLD_LT,
+
+    /** Mientras se mantiene el botón 🎯 de la pantalla. */
+    HOLD_BUTTON,
+
+    /** Un toque al botón 🎯 lo enciende y otro lo apaga. */
+    TOGGLE_BUTTON
+}
+
+/**
+ * Apuntar con el giroscopio (mando universal): el giro del móvil se convierte
+ * en el MÓVIL en stick derecho, con giro horizontal de verdad.
+ */
+data class GyroConfig(
+    val enabled: Boolean = false,
+    val activation: GyroActivation = GyroActivation.ALWAYS,
+    val sensX: Float = 1f,
+    val sensY: Float = 1f,
+    val invertX: Boolean = false,
+    val invertY: Boolean = false,
+    val antiDeadzone: Float = 0.12f,
+    val smoothing: Float = 0.3f
+) {
+    val needsButton: Boolean
+        get() = enabled && (activation == GyroActivation.HOLD_BUTTON || activation == GyroActivation.TOGGLE_BUTTON)
+}
 
 /**
  * Un control colocado a mano. [x]/[y]: el CENTRO, en fracción del ancho y
@@ -39,7 +86,9 @@ data class PadProfile(
     val name: String,
     val elements: List<PadElement>,
     /** Opacidad de todos los controles (0.15..1). */
-    val opacity: Float = 1f
+    val opacity: Float = 1f,
+    val look: LookConfig = LookConfig(),
+    val gyro: GyroConfig = GyroConfig()
 ) {
     fun replace(old: PadElement, new: PadElement) =
         copy(elements = elements.map { if (it.id == old.id) new else it })
@@ -92,7 +141,7 @@ object PadProfiles {
         val kinds = profile.elements.map { it.kind }.toSet()
         val used = usedBits(profile, faceBits)
         val out = ArrayList<AddOption>()
-        for (k in listOf(ElementKind.STICK_L, ElementKind.STICK_R, ElementKind.DPAD)) {
+        for (k in listOf(ElementKind.STICK_L, ElementKind.STICK_R, ElementKind.DPAD, ElementKind.GYRO)) {
             if (k !in kinds) out += AddOption(k)
         }
         if (ElementKind.FACE !in kinds && faceBits.isNotEmpty() && faceBits.none { it in used }) {
@@ -113,6 +162,7 @@ object PadProfiles {
         ElementKind.STICK_L, ElementKind.STICK_R -> PadElement(option.kind, 0.5f, 0.5f, 0.42f)
         ElementKind.DPAD -> PadElement(option.kind, 0.5f, 0.5f, 0.36f)
         ElementKind.FACE -> PadElement(option.kind, 0.5f, 0.5f, 0.42f)
+        ElementKind.GYRO -> PadElement(option.kind, 0.5f, 0.5f, 0.15f)
         ElementKind.BUTTON -> PadElement(
             ElementKind.BUTTON, 0.5f, 0.5f,
             0.13f,
@@ -179,6 +229,8 @@ object PadProfileJson {
     fun toJson(p: PadProfile): JSONObject = JSONObject().apply {
         put("name", p.name)
         put("opacity", p.opacity.toDouble())
+        put("look", lookToJson(p.look))
+        put("gyro", gyroToJson(p.gyro))
         put("elements", JSONArray().apply {
             for (e in p.elements) put(JSONObject().apply {
                 put("kind", e.kind.name)
@@ -221,11 +273,49 @@ object PadProfileJson {
         PadProfile(
             name = o.getString("name"),
             elements = elements.distinctBy { it.id },
-            opacity = o.optDouble("opacity", 1.0).toFloat().coerceIn(PadProfiles.MIN_OPACITY, 1f)
+            opacity = o.optDouble("opacity", 1.0).toFloat().coerceIn(PadProfiles.MIN_OPACITY, 1f),
+            look = lookFromJson(o.optJSONObject("look")),
+            gyro = gyroFromJson(o.optJSONObject("gyro"))
         )
     } catch (_: Exception) {
         null
     }
+
+    fun gyroToJson(g: GyroConfig): JSONObject = JSONObject().apply {
+        put("on", g.enabled)
+        put("act", g.activation.name)
+        put("sx", g.sensX.toDouble())
+        put("sy", g.sensY.toDouble())
+        put("ix", g.invertX)
+        put("iy", g.invertY)
+        put("adz", g.antiDeadzone.toDouble())
+        put("smooth", g.smoothing.toDouble())
+    }
+
+    fun gyroFromJson(j: JSONObject?): GyroConfig = if (j == null) GyroConfig() else GyroConfig(
+        enabled = j.optBoolean("on", false),
+        activation = runCatching { GyroActivation.valueOf(j.getString("act")) }.getOrDefault(GyroActivation.ALWAYS),
+        sensX = j.optDouble("sx", 1.0).toFloat().coerceIn(0.1f, 4f),
+        sensY = j.optDouble("sy", 1.0).toFloat().coerceIn(0.1f, 4f),
+        invertX = j.optBoolean("ix", false),
+        invertY = j.optBoolean("iy", false),
+        antiDeadzone = j.optDouble("adz", 0.12).toFloat().coerceIn(0f, 0.6f),
+        smoothing = j.optDouble("smooth", 0.3).toFloat().coerceIn(0f, 0.9f)
+    )
+
+    fun lookToJson(l: LookConfig): JSONObject = JSONObject().apply {
+        put("zone", l.zone.name)
+        put("sens", l.sensitivity.toDouble())
+        put("adz", l.antiDeadzone.toDouble())
+        put("invY", l.invertY)
+    }
+
+    fun lookFromJson(j: JSONObject?): LookConfig = if (j == null) LookConfig() else LookConfig(
+        zone = runCatching { LookZone.valueOf(j.getString("zone")) }.getOrDefault(LookZone.ALL),
+        sensitivity = j.optDouble("sens", 1.0).toFloat().coerceIn(0.2f, 3f),
+        antiDeadzone = j.optDouble("adz", 0.15).toFloat().coerceIn(0f, 0.6f),
+        invertY = j.optBoolean("invY", false)
+    )
 
     fun listToString(list: List<PadProfile>): String =
         JSONArray().apply { for (p in list) put(toJson(p)) }.toString()

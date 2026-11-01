@@ -42,6 +42,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import dev.pepotech.pepomote.control.AddOption
+import dev.pepotech.pepomote.control.ElementKind
+import dev.pepotech.pepomote.control.GyroAim
+import dev.pepotech.pepomote.control.OrientationLock
+import dev.pepotech.pepomote.control.GyroConfig
+import dev.pepotech.pepomote.control.LookConfig
 import dev.pepotech.pepomote.control.PadProfile
 import dev.pepotech.pepomote.control.PadProfileStore
 import dev.pepotech.pepomote.control.PadProfiles
@@ -239,30 +245,13 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     // Mando universal: ¿mover el móvil mueve el stick derecho? Se pregunta la
     // primera vez que el modo se confirma y se cambia en Ajustes; sin elegir
     // va apagado
-    var padAim by remember { mutableStateOf(AppPrefs.padAim(context)) }
-    // Solo con el mando universal confirmado: sin el eco del modo los paquetes
-    // todavía alimentan lo de antes (el puntero, por ejemplo) y el giro a cero
-    // le congelaría el cursor
-    val aimOff = PadAim.motionOff(xboxPad, operative, padAim, keyboardOpen)
-    SideEffect { engine?.padAim = !aimOff }
+    // El giro crudo al PC: en el mando universal va SIEMPRE a cero, porque
+    // apuntar con el giro se calcula aquí ([GyroAim]) y llega como stick
+    // derecho. Solo con el modo confirmado: sin el eco los paquetes todavía
+    // alimentan lo de antes (el puntero) y el giro a cero le congelaría el cursor
+    SideEffect { engine?.padAim = !(xboxPad && operative) }
     // Al salir vuelve encendido, que es lo que esperan los demás modos
     DisposableEffect(engine) { onDispose { engine?.padAim = true } }
-    // Gyro aiming: con «solo al mantener ZL / LT» el giro apunta mientras se
-    // mantiene ese gatillo (táctil o mando físico); y su ganancia
-    val aimHold = remember { AppPrefs.padAimHold(context) }
-    val aimScale = remember { AppPrefs.padAimScale(context) }
-    SideEffect {
-        engine?.padAimGate = if (xboxPad && aimHold) {
-            { ButtonState.current() and ButtonState.ZL != 0 }
-        } else null
-        engine?.padAimScale = if (xboxPad) aimScale else 1f
-    }
-    DisposableEffect(engine) {
-        onDispose {
-            engine?.padAimGate = null
-            engine?.padAimScale = 1f
-        }
-    }
 
     // Mando físico: con el modo confirmado sus botones van a este mando, cada
     // uno al hueco del rombo que ocupa en la plantilla
@@ -279,6 +268,56 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
         editing -> draft
         customAllowed -> profiles.firstOrNull { it.name == activeName }
         else -> null
+    }
+    // Cámara en el espacio libre y giroscopio: los del perfil, o los del
+    // diseño original (Ajustes)
+    var globalLook by remember { mutableStateOf(AppPrefs.globalLook(context)) }
+    var globalGyro by remember { mutableStateOf(AppPrefs.globalGyro(context)) }
+    val lookCfg = shownProfile?.look ?: globalLook
+    val gyroCfg = shownProfile?.gyro ?: globalGyro
+    var showPadSettings by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    val orientationLock by OrientationLock.state.collectAsState()
+    fun setLook(l: LookConfig) {
+        val d = draft
+        if (editing && d != null) draft = d.copy(look = l)
+        else {
+            val p = shownProfile
+            if (p != null) PadProfileStore.save(context, p.copy(look = l)) else {
+                globalLook = l
+                AppPrefs.setGlobalLook(context, l)
+            }
+        }
+    }
+    fun setGyro(g: GyroConfig) {
+        val d = draft
+        val withButton: (PadProfile) -> PadProfile = { p ->
+            // Activar con el botón 🎯: si el diseño no lo tiene, se pone
+            if (g.needsButton && p.elements.none { it.kind == ElementKind.GYRO }) {
+                p.add(PadProfiles.newElement(AddOption(ElementKind.GYRO)).copy(x = 0.62f, y = 0.42f))
+            } else p
+        }
+        if (editing && d != null) draft = withButton(d.copy(gyro = g))
+        else {
+            val p = shownProfile
+            if (p != null) PadProfileStore.save(context, withButton(p.copy(gyro = g))) else {
+                globalGyro = g
+                AppPrefs.setGlobalGyro(context, g)
+            }
+        }
+    }
+    // Apuntar con el giro: solo el mando universal confirmado y sin el teclado abierto
+    val gyroLive = xboxPad && operative && !keyboardOpen
+    SideEffect { GyroAim.config = gyroCfg }
+    DisposableEffect(engine, gyroLive) {
+        if (engine != null && gyroLive) {
+            GyroAim.active = true
+            engine.gyroListener = { g, a, r, _ -> GyroAim.onSample(g, a, r) }
+        }
+        onDispose {
+            GyroAim.active = false
+            engine?.gyroListener = null
+        }
     }
     val defaultName = stringResource(R.string.ed_default_name)
     val copySuffix = stringResource(R.string.ed_copy_suffix)
@@ -298,7 +337,22 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
             ),
             centerBits = layout.center.map { it.bit },
             hasCapture = switchPad || retroPad
-        )
+        ).let { p ->
+            // El stick derecho nuevo arranca como el de Ajustes (stick o trackpad, con sus valores)
+            val trackpad = AppPrefs.rightStickMode(context) == AppPrefs.RIGHT_STICK_MODE_TRACKPAD
+            p.copy(
+                elements = p.elements.map { e ->
+                    if (e.kind != ElementKind.STICK_R) e else e.copy(
+                        trackpad = trackpad,
+                        deadzone = AppPrefs.rightStickDeadzone(context),
+                        antiDeadzone = AppPrefs.rightStickAntiDeadzone(context),
+                        sensitivity = AppPrefs.trackpadSensitivity(context)
+                    )
+                },
+                look = globalLook,
+                gyro = globalGyro
+            )
+        }
     }
     // Editar: el perfil activo, o uno nuevo con el diseño de fábrica
     fun startEditing(from: PadProfile?) {
@@ -441,6 +495,8 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                             )
                         }
                     } else {
+                    // Cámara en el espacio libre, debajo de los controles
+                    if (customAllowed) LookSurface(lookCfg, Modifier.matchParentSize())
                     // Cada plantilla es un trazado nuevo: ningún botón hereda el bit de otro
                     key(layout.id) { Row(
                         modifier = Modifier
@@ -710,44 +766,11 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
             // de él: una pregunta cada vez. En el mando universal no hay
             // pantalla completa (esa es la de Cemu), así que aquí solo se
             // espera a la cabecera
-            if (PadAim.shouldAsk(
-                    universalPad = xboxPad,
-                    operative = operative,
-                    pref = padAim,
-                    sideChosen = sideSaved != LandscapeSide.Unset,
-                    headerExpanded = headerExpanded,
-                    autoCollapse = autoCollapse
-                )
-            ) {
-                PadAimAskCard(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = if (headerExpanded) headerBox + 4.dp else headerH + gap)
-                ) { on ->
-                    AppPrefs.setPadAim(context, on)
-                    padAim = if (on) AppPrefs.PAD_AIM_ON else AppPrefs.PAD_AIM_OFF
-                }
-            }
-
             NoticeBanner(
                 Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = if (fullScreen) 8.dp else headerH + selectorH + gap * 2)
             )
-
-            if (!editing && !fullScreen) {
-                if (customAllowed) {
-                    ProfileBar(
-                        activeName = activeName,
-                        onProfiles = { showProfiles = true },
-                        onEdit = { startEditing(null) },
-                        lock = { OrientationLockButton() },
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
-                } else {
-                    OrientationLockButton(Modifier.align(Alignment.BottomCenter))
-                }
-            }
 
             if (keyboardOpen && Route.showsKeyboard(link)) {
                 KeyboardDialog(
@@ -779,12 +802,38 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                 )
             }
 
+            // «☰ Mando», encima de la cabecera: arriba a la derecha no hay controles
+            if (!editing && !fullScreen) {
+                if (customAllowed) {
+                    PadMenuButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 8.dp)
+                    )
+                } else {
+                    OrientationLockButton(Modifier.align(Alignment.TopEnd).padding(end = 4.dp))
+                }
+            }
+            if (showMenu) {
+                PadMenuDialog(
+                    activeName = activeName,
+                    locked = orientationLock != AppPrefs.ORIENTATION_FREE,
+                    gyroOn = if (xboxPad) gyroCfg.enabled else null,
+                    onLock = { OrientationLock.toggle(context, rotation) },
+                    onProfiles = { showMenu = false; showProfiles = true },
+                    onGyroToggle = { setGyro(gyroCfg.copy(enabled = !gyroCfg.enabled)) },
+                    onPadSettings = { showMenu = false; showPadSettings = true },
+                    onEdit = { showMenu = false; startEditing(null) },
+                    onDismiss = { showMenu = false }
+                )
+            }
+
             val d = draft
             if (editing && d != null) {
                 EditorToolbar(
                     profile = d,
                     onAdd = { showAdd = true },
                     onProfiles = { showProfiles = true },
+                    onPadSettings = { showPadSettings = true },
                     onOpacity = { draft = d.copy(opacity = it) },
                     onReset = { draft = factoryProfile(d.name) },
                     onCancel = {
@@ -827,6 +876,16 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         onDismiss = { showAdd = false }
                     )
                 }
+            }
+            if (showPadSettings) {
+                PadSettingsDialog(
+                    look = lookCfg,
+                    gyro = gyroCfg,
+                    showGyro = xboxPad,
+                    onLook = { setLook(it) },
+                    onGyro = { setGyro(it) },
+                    onDismiss = { showPadSettings = false }
+                )
             }
             if (showProfiles) {
                 ProfilesDialog(

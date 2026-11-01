@@ -12,6 +12,8 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -31,3 +33,20 @@ jobs:
         with:
           name: RevolutionMote-Plus-android-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      # APK y capturas de la interfaz en una rama aparte (ci-out/<rama>), sin
+      # historial: así se pueden bajar con git aunque los artefactos no
+      - name: Publicar APK y capturas
+        if: always() && github.event_name == 'push'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ci-out
+          cp android/app/build/outputs/apk/debug/app-debug.apk ci-out/ 2>/dev/null || true
+          cp -r android/app/build/screenshots ci-out/ 2>/dev/null || true
+          echo "${GITHUB_SHA} ${{ job.status }}" > ci-out/BUILD.txt
+          cd ci-out
+          git init -q
+          git checkout -q -b out
+          git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -qm "CI ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/ci-out/${GITHUB_REF_NAME}

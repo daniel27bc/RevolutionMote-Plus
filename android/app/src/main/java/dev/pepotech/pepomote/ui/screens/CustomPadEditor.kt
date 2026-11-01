@@ -72,6 +72,7 @@ import dev.pepotech.pepomote.R
 import dev.pepotech.pepomote.control.AddOption
 import dev.pepotech.pepomote.control.ButtonState
 import dev.pepotech.pepomote.control.ElementKind
+import dev.pepotech.pepomote.control.GyroConfig
 import dev.pepotech.pepomote.control.Haptics
 import dev.pepotech.pepomote.control.PadElement
 import dev.pepotech.pepomote.control.PadProfile
@@ -132,6 +133,7 @@ internal fun elementTitle(kind: ElementKind, bit: Int, layout: RetroLayout): Str
     ElementKind.STICK_R -> stringResource(R.string.ed_right_stick)
     ElementKind.DPAD -> stringResource(R.string.ed_dpad)
     ElementKind.FACE -> stringResource(R.string.ed_face)
+    ElementKind.GYRO -> stringResource(R.string.ed_gyro_button)
     ElementKind.BUTTON -> stringResource(R.string.ed_button, buttonLabel(bit, layout))
 }
 
@@ -152,6 +154,9 @@ internal fun CustomPadCanvas(
     BoxWithConstraints(modifier.fillMaxSize()) {
         val w = maxWidth
         val h = maxHeight
+        // Cámara en el espacio libre: debajo de todo, así solo coge los
+        // dedos que no caen en ningún control
+        if (!editing) LookSurface(profile.look, Modifier.matchParentSize())
         for (e in profile.elements) key(e.id) {
             val (bw, bh) = elementBox(e, h)
             val ox = w * e.x - bw / 2
@@ -163,7 +168,7 @@ internal fun CustomPadCanvas(
                     .alpha(if (editing) maxOf(profile.opacity, 0.55f) else profile.opacity),
                 contentAlignment = Alignment.Center
             ) {
-                ElementControl(e, layout, bw, bh)
+                ElementControl(e, layout, profile.gyro, bw, bh)
             }
             if (editing) {
                 EditFrame(
@@ -186,7 +191,7 @@ private fun elementBox(e: PadElement, areaH: Dp): Pair<Dp, Dp> {
 }
 
 @Composable
-private fun ElementControl(e: PadElement, layout: RetroLayout, bw: Dp, bh: Dp) {
+private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig, bw: Dp, bh: Dp) {
     when (e.kind) {
         ElementKind.STICK_L, ElementKind.STICK_R -> {
             val sink: (Int, Int) -> Unit = if (e.kind == ElementKind.STICK_L) {
@@ -197,13 +202,14 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, bw: Dp, bh: Dp) {
             // Al quitar el stick o cambiar de tipo, nada se queda inclinado
             DisposableEffect(e.kind, e.trackpad) { onDispose { sink(0, 0) } }
             if (e.trackpad) {
-                RightStickTrackpad(bw, e.sensitivity, e.antiDeadzone, sink)
+                RightStickTrackpad(bw, e.sensitivity, e.antiDeadzone, onStick = sink)
             } else {
                 AnalogStick(bw, e.deadzone, e.antiDeadzone, e.sensitivity, sink)
             }
         }
         ElementKind.DPAD -> PadCross(sizeDp = bw)
         ElementKind.FACE -> FaceCluster(layout, bw, bh)
+        ElementKind.GYRO -> GyroButton(bw, gyro)
         ElementKind.BUTTON -> {
             val label = buttonLabel(e.bit, layout)
             val text = (bh.value * 0.36f).roundToInt().coerceIn(9, 28)
@@ -299,7 +305,7 @@ private fun EditFrame(
 ) {
     val latest by rememberUpdatedState(element)
     val change by rememberUpdatedState(onChange)
-    val shape = if (element.kind == ElementKind.BUTTON && !element.pill || element.isStick && !element.trackpad) {
+    val shape = if (element.kind == ElementKind.BUTTON && !element.pill || element.kind == ElementKind.GYRO || element.isStick && !element.trackpad) {
         CircleShape
     } else {
         RoundedCornerShape(12.dp)
@@ -329,10 +335,10 @@ private fun EditFrame(
             }
     )
     // El ⚙, encima del marco (se queda el toque antes que el arrastre)
-    val gear = 30.dp
+    val gear = 28.dp
     Box(
         Modifier
-            .offset(ox + boxW - gear * 0.7f, oy - gear * 0.3f)
+            .offset(ox + boxW - gear * 0.45f, oy - gear * 0.55f)
             .size(gear)
             .shadow(4.dp, CircleShape)
             .background(PepoColors.Blue, CircleShape)
@@ -349,6 +355,7 @@ internal fun EditorToolbar(
     profile: PadProfile,
     onAdd: () -> Unit,
     onProfiles: () -> Unit,
+    onPadSettings: () -> Unit,
     onOpacity: (Float) -> Unit,
     onReset: () -> Unit,
     onCancel: () -> Unit,
@@ -371,6 +378,7 @@ internal fun EditorToolbar(
             TextButton(onClick = onProfiles) {
                 Text("▤ " + profile.name, color = PepoColors.Text, maxLines = 1)
             }
+            TextButton(onClick = onPadSettings) { Text("🎯 " + stringResource(R.string.ed_pad_settings), color = PepoColors.Blue) }
             Text(stringResource(R.string.ed_opacity), style = MaterialTheme.typography.labelMedium, color = PepoColors.TextDim)
             Slider(
                 value = profile.opacity,
@@ -396,9 +404,20 @@ internal fun sliderColors() = SliderDefaults.colors(
     inactiveTrackColor = PepoColors.CardBorder
 )
 
+/** Solo para las capturas de los tests: los diálogos se pintan en línea. */
+internal val LocalInlineDialogs = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 /** Tarjeta flotante de los diálogos del editor. */
 @Composable
 internal fun EditorDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    // Capturas de los tests: el diálogo pintado en la misma ventana
+    if (LocalInlineDialogs.current) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = PepoColors.Background),
+            border = BorderStroke(1.5.dp, PepoColors.CardBorder)
+        ) { Column(Modifier.padding(18.dp)) { content() } }
+        return
+    }
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.widthIn(max = 520.dp).heightIn(max = 560.dp),
@@ -426,10 +445,10 @@ internal fun LabeledSlider(
 ) {
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            Text(shown, style = MaterialTheme.typography.titleSmall, color = PepoColors.Blue)
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(shown, style = MaterialTheme.typography.titleMedium, color = PepoColors.Blue, fontWeight = FontWeight.Bold)
         }
-        if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
+        if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = PepoColors.TextDim)
         Slider(value = value.coerceIn(range), onValueChange = onChange, valueRange = range, colors = sliderColors())
     }
 }
@@ -461,7 +480,7 @@ internal fun ElementSettingsDialog(
             Spacer(Modifier.height(6.dp))
             Text(stringResource(R.string.ed_stick_type), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ChipFlow {
                 ModeChip(stringResource(R.string.mode_stick), selected = !element.trackpad) {
                     onChange(element.copy(trackpad = false))
                 }
@@ -486,7 +505,7 @@ internal fun ElementSettingsDialog(
                 stringResource(R.string.anti_deadzone_sub)
             ) { onChange(element.copy(antiDeadzone = it)) }
             LabeledSlider(
-                stringResource(R.string.sensitivity_title),
+                stringResource(R.string.ed_sensitivity),
                 element.sensitivity, 0.2f..3f,
                 "%.1fx".format(element.sensitivity)
             ) { onChange(element.copy(sensitivity = it)) }
@@ -534,14 +553,10 @@ internal fun ElementSettingsDialog(
 
 /** Chips en varias filas (la lista de funciones de un botón). */
 @Composable
-private fun FlowChips(options: List<Pair<String, Int>>, selected: Int, onPick: (Int) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (row in options.chunked(5)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for ((label, bit) in row) {
-                    ModeChip(label, selected = bit == selected, dense = true) { onPick(bit) }
-                }
-            }
+internal fun FlowChips(options: List<Pair<String, Int>>, selected: Int, onPick: (Int) -> Unit) {
+    ChipFlow {
+        for ((label, bit) in options) {
+            ModeChip(label, selected = bit == selected, dense = true) { onPick(bit) }
         }
     }
 }
@@ -557,7 +572,7 @@ private fun StickResponsePreview(e: PadElement) {
     val border = PepoColors.CardBorder
     val blue = PepoColors.Blue
     val glow = PepoColors.Glow
-    val dead = PepoColors.Error.copy(alpha = 0.35f)
+    val dead = PepoColors.Error.copy(alpha = 0.55f)
     val dim = PepoColors.TextDim
     Row(
         Modifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -567,10 +582,10 @@ private fun StickResponsePreview(e: PadElement) {
         Canvas(Modifier.size(104.dp)) {
             val r = size.minDimension / 2f
             val c = Offset(size.width / 2f, size.height / 2f)
-            drawCircle(border, r, c, style = Stroke(3f))
+            drawCircle(dim, r, c, style = Stroke(4f))
             if (!e.trackpad) {
-                drawCircle(dead, r * e.deadzone, c)
-                drawCircle(glow, r * e.deadzone, c, style = Stroke(2f))
+                drawCircle(dead, maxOf(r * e.deadzone, 4f), c)
+                drawCircle(glow, maxOf(r * e.deadzone, 4f), c, style = Stroke(3f))
                 // Hasta dónde hay que llevar el dedo para el tope
                 val full = (e.deadzone + (1f - e.deadzone) / e.sensitivity).coerceAtMost(1f)
                 drawCircle(blue, r * full, c, style = Stroke(2.5f))
@@ -588,8 +603,8 @@ private fun StickResponsePreview(e: PadElement) {
                 val pad = 6f
                 val gw = size.width - pad * 2
                 val gh = size.height - pad * 2
-                drawLine(border, Offset(pad, pad + gh), Offset(pad + gw, pad + gh), 2f)
-                drawLine(border, Offset(pad, pad), Offset(pad, pad + gh), 2f)
+                drawLine(dim, Offset(pad, pad + gh), Offset(pad + gw, pad + gh), 3f)
+                drawLine(dim, Offset(pad, pad), Offset(pad, pad + gh), 3f)
                 val path = Path()
                 val steps = 60
                 for (i in 0..steps) {
@@ -603,7 +618,7 @@ private fun StickResponsePreview(e: PadElement) {
                     val py = pad + gh * (1f - out)
                     if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
                 }
-                drawPath(path, glow, style = Stroke(4f))
+                drawPath(path, blue, style = Stroke(7f))
             }
             Text(
                 stringResource(if (e.trackpad) R.string.ed_curve_trackpad else R.string.ed_curve_stick),
@@ -734,31 +749,88 @@ private fun ProfileRow(
     }
 }
 
-/** La pastilla de abajo fuera de edición: perfil activo (cambiarlo) y «Editar diseño». */
+/** Una pastilla de la barra del mando: legible encima de los controles. */
 @Composable
-internal fun ProfileBar(
-    activeName: String?,
-    onProfiles: () -> Unit,
-    onEdit: () -> Unit,
-    lock: @Composable () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+private fun BarChip(text: String, color: Color, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        Modifier
+            .shadow(3.dp, shape)
+            .background(PepoColors.Card, shape)
+            .border(1.5.dp, PepoColors.CardBorder, shape)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
-        lock()
-        TextButton(onClick = onProfiles) {
-            Text(
-                "▤ " + (activeName ?: stringResource(R.string.ed_original)),
-                style = MaterialTheme.typography.labelSmall,
-                color = PepoColors.TextDim,
-                maxLines = 1
+        Text(text, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+/** El botón «☰ Mando», arriba a la derecha (en la franja de la cabecera, sin controles). */
+@Composable
+internal fun PadMenuButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier) { BarChip("☰ " + stringResource(R.string.pad_menu), PepoColors.Blue, onClick) }
+}
+
+/** Una fila grande del menú del mando. */
+@Composable
+private fun MenuRow(icon: String, title: String, value: String? = null, valueColor: Color = PepoColors.TextDim, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(PepoColors.Card, shape)
+            .border(1.5.dp, PepoColors.CardBorder, shape)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(icon, fontSize = 20.sp, modifier = Modifier.width(36.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        if (value != null) Text(value, style = MaterialTheme.typography.titleMedium, color = valueColor, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/**
+ * El menú del mando: candado de orientación, perfil de diseño, giroscopio
+ * sí/no ([gyroOn] null = este mando no lo usa), ajustes del mando y editar.
+ */
+@Composable
+internal fun PadMenuDialog(
+    activeName: String?,
+    locked: Boolean,
+    gyroOn: Boolean?,
+    onLock: () -> Unit,
+    onProfiles: () -> Unit,
+    onGyroToggle: () -> Unit,
+    onPadSettings: () -> Unit,
+    onEdit: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    EditorDialog(onDismiss) {
+        Text(stringResource(R.string.pad_menu_title), style = MaterialTheme.typography.headlineSmall)
+        Spacer(Modifier.height(10.dp))
+        MenuRow(
+            if (locked) "🔒" else "🔓",
+            stringResource(R.string.orientation_title),
+            stringResource(if (locked) R.string.orientation_locked else R.string.orientation_free),
+            if (locked) PepoColors.Warn else PepoColors.TextDim,
+            onLock
+        )
+        MenuRow("▤", stringResource(R.string.ed_profiles), activeName ?: stringResource(R.string.ed_original), PepoColors.Text, onProfiles)
+        if (gyroOn != null) {
+            MenuRow(
+                "🎯", stringResource(R.string.gyro_title),
+                stringResource(if (gyroOn) R.string.state_on else R.string.state_off),
+                if (gyroOn) PepoColors.Ok else PepoColors.TextDim,
+                onGyroToggle
             )
         }
-        TextButton(onClick = onEdit) {
-            Text("⚙ " + stringResource(R.string.layout_edit_btn), style = MaterialTheme.typography.labelSmall, color = PepoColors.Blue)
+        MenuRow("⚙", stringResource(R.string.ed_pad_settings), onClick = onPadSettings)
+        MenuRow("✎", stringResource(R.string.layout_edit_btn), onClick = onEdit)
+        Spacer(Modifier.height(6.dp))
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.ed_done), color = PepoColors.Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
     }
 }
