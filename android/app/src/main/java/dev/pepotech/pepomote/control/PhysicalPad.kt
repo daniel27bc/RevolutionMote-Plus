@@ -143,7 +143,7 @@ object PhysicalPad {
         val l = stick(event, dev, MotionEvent.AXIS_X, MotionEvent.AXIS_Y)
         if (l != stickL) {
             stickL = l
-            ButtonState.setStick(l.first, l.second)
+            ButtonState.setStickFrom(ButtonState.SRC_PHYSICAL, l.first, l.second)
         }
         if (t == Target.PAD) {
             val useZ = dev?.getMotionRange(MotionEvent.AXIS_Z, event.source) != null
@@ -154,7 +154,7 @@ object PhysicalPad {
             }
             if (r != stickR) {
                 stickR = r
-                ButtonState.setStick2(r.first, r.second)
+                ButtonState.setStick2From(ButtonState.SRC_PHYSICAL, r.first, r.second)
             }
         }
 
@@ -214,8 +214,8 @@ object PhysicalPad {
         hatBits = 0
         triggerBits = 0
         flush()
-        if (stickL != (0 to 0)) ButtonState.setStick(0, 0)
-        if (stickR != (0 to 0)) ButtonState.setStick2(0, 0)
+        if (stickL != (0 to 0)) ButtonState.setStickFrom(ButtonState.SRC_PHYSICAL, 0, 0)
+        if (stickR != (0 to 0)) ButtonState.setStick2From(ButtonState.SRC_PHYSICAL, 0, 0)
         stickL = 0 to 0
         stickR = 0 to 0
     }

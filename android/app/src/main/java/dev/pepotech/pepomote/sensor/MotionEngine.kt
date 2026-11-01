@@ -99,16 +99,13 @@ class MotionEngine(
     var padAim: Boolean = true
 
     /**
-     * Gyro aiming: si hay puerta, el giro solo pasa mientras ella diga que sí
-     * (mantener ZL / LT, del táctil o del mando físico). null = sin puerta.
-     * Solo la pone la pantalla del mando universal.
+     * Cada muestra del giroscopio, en crudo (marco del móvil) con el último
+     * acelerómetro y la rotación de la pantalla: para apuntar con el giro en
+     * el propio móvil ([dev.pepotech.pepomote.control.GyroAim]). Se llama en
+     * el hilo de los sensores; no debe guardarse los arrays.
      */
     @Volatile
-    var padAimGate: (() -> Boolean)? = null
-
-    /** Ganancia del giro en el mando universal (1 = lo de siempre). */
-    @Volatile
-    var padAimScale: Float = 1f
+    var gyroListener: ((gyro: FloatArray, accel: FloatArray, rotation: Int, timestampNs: Long) -> Unit)? = null
 
     private val sensorManager =
         context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -277,6 +274,7 @@ class MotionEngine(
                 }
                 lastGyroNs = event.timestamp
                 for (i in 0..2) latestGyro[i] = event.values[i]
+                gyroListener?.invoke(event.values, accel, rotation, event.timestamp)
                 // Tope de 250 Hz del protocolo: móviles con gyro a 400-500 Hz
                 // saturan el Wi-Fi y provocan ráfagas/pérdidas (cursor errático)
                 if (now - lastSendNs >= GYRO_INTERVAL_NS) {
@@ -392,11 +390,7 @@ class MotionEngine(
                 // Mando universal con el giro apagado: a cero solo en el
                 // paquete, que la media ponderada sigue viva y volver a
                 // encender no hereda ni un hueco ni una muestra vieja
-                if (!padAim || padAimGate?.invoke() == false) {
-                    gyroOut.fill(0f)
-                } else if (padAimScale != 1f) {
-                    for (i in gyroOut.indices) gyroOut[i] *= padAimScale
-                }
+                if (!padAim) gyroOut.fill(0f)
                 Frame.remapAccel(accel, rot, accelOut)
                 val touch = ButtonState.touch()
                 PmpCodec.encodeInput(

@@ -1,7 +1,9 @@
 package dev.pepotech.pepomote.control
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.os.Build
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -44,6 +46,14 @@ object Haptics {
         val level = AppPrefs.hapticLevel(view.context)
         if (level == OFF) return
         emitted++
+        // Modo compatible: la vibración táctil del sistema, la de toda la vida
+        if (AppPrefs.hapticSystem(view.context)) {
+            view.performHapticFeedback(
+                if (level == STRONG && Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else constant,
+                HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+            )
+            return
+        }
         val tick = constant == HapticFeedbackConstants.CLOCK_TICK
         if (!play(view.context, level, if (tick) Kind.TICK else Kind.CLICK)) {
             view.performHapticFeedback(constant)
@@ -54,14 +64,30 @@ object Haptics {
     fun release(view: View?) {
         if (GameRumble.isOn || view == null) return
         val level = AppPrefs.hapticLevel(view.context)
-        if (level < CRISP) return
+        if (level < CRISP || AppPrefs.hapticSystem(view.context)) return
         play(view.context, level, Kind.RELEASE)
     }
 
     /** Para la vista previa de Ajustes. */
-    fun preview(context: Context, level: Int) {
+    fun preview(view: View, level: Int) {
         if (level == OFF) return
-        play(context, level, Kind.CLICK)
+        if (AppPrefs.hapticSystem(view.context)) {
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING)
+            return
+        }
+        play(view.context, level, Kind.CLICK)
+    }
+
+    /** Diagnóstico para Ajustes: qué motor hay y qué camino se usa. */
+    fun describe(context: Context): String {
+        val v = vib(context) ?: return "no vibrator"
+        val path = when {
+            !v.hasVibrator() -> "no vibrator"
+            Build.VERSION.SDK_INT >= 30 && supportsPrimitives(v) -> "primitives"
+            Build.VERSION.SDK_INT >= 29 -> "predefined"
+            else -> "one-shot"
+        }
+        return "API ${Build.VERSION.SDK_INT} · $path · amp=${v.hasAmplitudeControl()}"
     }
 
     private enum class Kind { CLICK, TICK, RELEASE }
@@ -82,7 +108,22 @@ object Haptics {
         val v = vib(context) ?: return false
         if (!v.hasVibrator()) return false
         return try {
-            v.vibrate(effect(v, level, kind))
+            val e = effect(v, level, kind)
+            // Como vibración TÁCTIL: con el móvil en silencio o la vibración
+            // de notificaciones apagada sigue sonando (manda el ajuste
+            // «Respuesta táctil» del sistema)
+            if (Build.VERSION.SDK_INT >= 33) {
+                v.vibrate(e, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH))
+            } else {
+                @Suppress("DEPRECATION")
+                v.vibrate(
+                    e,
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+            }
             true
         } catch (_: Exception) {
             false
