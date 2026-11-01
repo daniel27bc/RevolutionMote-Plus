@@ -513,12 +513,20 @@ internal fun ModeChip(
     val current by rememberUpdatedState(onClick)
     val shape = RoundedCornerShape(18.dp)
     val fill = if (!selected) PepoColors.Card else if (toggle) PepoColors.Ok else PepoColors.Blue
-    val text = if (!selected) PepoColors.TextDim else if (toggle) PepoColors.OnAccent else PepoColors.Card
+    // Sin elegir: texto normal y borde, para que se vea también dentro de
+    // una tarjeta (del mismo color que el chip)
+    val text = if (!selected) PepoColors.Text else if (toggle) PepoColors.OnAccent else PepoColors.Card
     Box(
         modifier = modifier
             .alpha(if (enabled) 1f else 0.5f)
             .background(fill, shape)
-            .then(if (toggle && !selected) Modifier.border(1.5.dp, PepoColors.Ok, shape) else Modifier)
+            .then(
+                when {
+                    toggle && !selected -> Modifier.border(1.5.dp, PepoColors.Ok, shape)
+                    !selected -> Modifier.border(1.5.dp, PepoColors.CardBorder, shape)
+                    else -> Modifier
+                }
+            )
             .semantics { this.selected = selected }
             .clickable(enabled = enabled, role = if (toggle) Role.Switch else Role.RadioButton) { current() }
             .padding(

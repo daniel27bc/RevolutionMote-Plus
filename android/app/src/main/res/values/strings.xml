@@ -75,8 +75,8 @@
     <string name="current">actual</string>
 
     <!-- ajustes -->
-    <string name="vol_title">Botones de volumen = A / B</string>
-    <string name="vol_sub">Con el mando abierto: subir volumen = A, bajar = gatillo B. Juega con los botones físicos del móvil</string>
+    <string name="vol_title">Botones de volumen como botones del mando</string>
+    <string name="vol_sub">Con el mando abierto, los botones físicos de volumen pulsan el botón que elijas (por ejemplo, los gatillos para shooters)</string>
     <string name="sounds_title">Sonidos</string>
     <string name="sounds_sub">Bips de botones y melodía de conexión/desconexión (la vibración se mantiene)</string>
     <string name="slide_press_title">Pulsar deslizando</string>
@@ -568,4 +568,12 @@
     <string name="haptic_system_title">Modo compatible</string>
     <string name="haptic_system_sub">Usa la vibración táctil del sistema. Actívalo si con el clic de la app no notas nada</string>
     <string name="haptic_test">Probar</string>
+    <string name="ed_sensitivity">Sensibilidad</string>
+    <string name="pad_menu">Mando</string>
+    <string name="pad_menu_title">Menú del mando</string>
+    <string name="orientation_title">Orientación de la pantalla</string>
+    <string name="orientation_locked">Bloqueada</string>
+    <string name="orientation_free">Libre</string>
+    <string name="state_on">Activado</string>
+    <string name="state_off">Apagado</string>
 </resources>
