@@ -36,6 +36,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.pepotech.pepomote.control.AppPrefs
 import dev.pepotech.pepomote.control.Haptics
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
 import dev.pepotech.pepomote.control.PadProfileStore
 import dev.pepotech.pepomote.control.PhysicalPad
 import kotlin.math.roundToInt
@@ -204,7 +207,6 @@ private fun rumbleStatus(rumble: String?): Int = when (rumble) {
 fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     var kbClick by remember { mutableStateOf(AppPrefs.keyboardClickFirst(context)) }
-    var padAim by remember { mutableStateOf(AppPrefs.padAimEnabled(context)) }
     var volB by remember { mutableStateOf(AppPrefs.volDownIsB(context)) }
     var volUpAction by remember { mutableStateOf(AppPrefs.volUpAction(context)) }
     var volDownAction by remember { mutableStateOf(AppPrefs.volDownAction(context)) }
@@ -214,8 +216,11 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
     var rightDeadzone by remember { mutableStateOf(AppPrefs.rightStickDeadzone(context)) }
     var hapticLevel by remember { mutableStateOf(AppPrefs.hapticLevel(context)) }
     var physicalPad by remember { mutableStateOf(AppPrefs.physicalPad(context)) }
-    var padAimHold by remember { mutableStateOf(AppPrefs.padAimHold(context)) }
-    var padAimScale by remember { mutableStateOf(AppPrefs.padAimScale(context)) }
+    var globalLook by remember { mutableStateOf(AppPrefs.globalLook(context)) }
+    var globalGyro by remember { mutableStateOf(AppPrefs.globalGyro(context)) }
+    var hapticSystem by remember { mutableStateOf(AppPrefs.hapticSystem(context)) }
+    val hapticInfo = remember { Haptics.describe(context) }
+    val view = LocalView.current
     val padNames = remember { PhysicalPad.connectedNames(context) }
     var sounds by remember { mutableStateOf(AppPrefs.soundsEnabled(context)) }
     var slidePress by remember { mutableStateOf(AppPrefs.slidePress(context)) }
@@ -256,60 +261,27 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
 
         GameRumbleCard()
         Spacer(Modifier.height(14.dp))
-        // Mando universal: mover el móvil mueve el stick derecho (se pregunta
-        // la primera vez que conecta; aquí se cambia)
+        // Cámara en el espacio libre y giroscopio del diseño original (cada
+        // perfil de diseño lleva los suyos, en «⚙ Ajustes del mando»)
         Card(
             shape = MaterialTheme.shapes.medium,
             colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
             border = BorderStroke(1.5.dp, PepoColors.CardBorder),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.pad_aim_title), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.pad_aim_sub),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+            Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                Text(stringResource(R.string.pad_settings_global_note), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
+                Spacer(Modifier.height(10.dp))
+                LookSettingsSection(globalLook) {
+                    globalLook = it
+                    AppPrefs.setGlobalLook(context, it)
                 }
-                Switch(
-                    checked = padAim,
-                    onCheckedChange = {
-                        padAim = it
-                        AppPrefs.setPadAim(context, it)
-                    },
-                    colors = SwitchDefaults.colors(checkedTrackColor = PepoColors.Blue)
-                )
-            }
-            if (padAim) {
-                Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.pad_aim_hold_title), style = MaterialTheme.typography.titleSmall)
-                            Text(stringResource(R.string.pad_aim_hold_sub), style = MaterialTheme.typography.bodySmall)
-                        }
-                        Switch(
-                            checked = padAimHold,
-                            onCheckedChange = {
-                                padAimHold = it
-                                AppPrefs.setPadAimHold(context, it)
-                            },
-                            colors = SwitchDefaults.colors(checkedTrackColor = PepoColors.Blue)
-                        )
-                    }
-                    LabeledSlider(
-                        stringResource(R.string.pad_aim_scale_title),
-                        padAimScale, 0.25f..3f,
-                        "%.2fx".format(padAimScale)
-                    ) {
-                        padAimScale = it
-                        AppPrefs.setPadAimScale(context, it)
-                    }
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = PepoColors.CardBorder)
+                Spacer(Modifier.height(12.dp))
+                GyroSettingsSection(globalGyro) {
+                    globalGyro = it
+                    AppPrefs.setGlobalGyro(context, it)
                 }
             }
         }
@@ -336,9 +308,25 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                         ModeChip(stringResource(label), selected = hapticLevel == lvl, dense = true) {
                             hapticLevel = lvl
                             AppPrefs.setHapticLevel(context, lvl)
-                            Haptics.preview(context, lvl)
+                            Haptics.preview(view, lvl)
                         }
                     }
+                }
+                Spacer(Modifier.height(8.dp))
+                SwitchRow(
+                    stringResource(R.string.haptic_system_title),
+                    hapticSystem,
+                    stringResource(R.string.haptic_system_sub)
+                ) {
+                    hapticSystem = it
+                    AppPrefs.setHapticSystem(context, it)
+                    Haptics.preview(view, hapticLevel)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { Haptics.preview(view, maxOf(hapticLevel, Haptics.SUBTLE)) }) {
+                        Text("📳 " + stringResource(R.string.haptic_test), color = PepoColors.Blue, fontWeight = FontWeight.SemiBold)
+                    }
+                    Text(hapticInfo, style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
                 }
             }
         }

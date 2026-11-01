@@ -144,19 +144,48 @@ object ButtonState {
     /** Vacía el acumulador de scroll (lo llama el hilo de sensores por paquete). */
     fun drainScroll(): Int = scrollAcc.getAndSet(0).coerceIn(-32768, 32767)
 
+    /**
+     * Quién mueve cada stick. Varias fuentes a la vez se SUMAN (con tope):
+     * el stick derecho táctil, la cámara en el espacio libre, el giroscopio
+     * y el mando físico pueden girar la cámara juntos sin pisarse; cuando una
+     * suelta, las demás siguen como estaban.
+     */
+    const val SRC_TOUCH = 0
+    const val SRC_LOOK = 1
+    const val SRC_GYRO = 2
+    const val SRC_PHYSICAL = 3
+    private const val SOURCES = 4
+    private val mixLock = Any()
+    private val leftX = IntArray(SOURCES)
+    private val leftY = IntArray(SOURCES)
+    private val rightX = IntArray(SOURCES)
+    private val rightY = IntArray(SOURCES)
+
     /** Posición del stick (el stick va sin latch: es continuo, no un flanco). */
-    fun setStick(x: Int, y: Int) {
-        stickXv.set(x.coerceIn(-127, 127))
-        stickYv.set(y.coerceIn(-127, 127))
+    fun setStick(x: Int, y: Int) = setStickFrom(SRC_TOUCH, x, y)
+
+    fun setStickFrom(source: Int, x: Int, y: Int) {
+        synchronized(mixLock) {
+            leftX[source] = x
+            leftY[source] = y
+            stickXv.set(leftX.sum().coerceIn(-127, 127))
+            stickYv.set(leftY.sum().coerceIn(-127, 127))
+        }
     }
 
     fun stickX(): Int = stickXv.get()
     fun stickY(): Int = stickYv.get()
 
-    /** Stick derecho del GamePad (solo lo escribe la pantalla GamePad). */
-    fun setStick2(x: Int, y: Int) {
-        stick2Xv.set(x.coerceIn(-127, 127))
-        stick2Yv.set(y.coerceIn(-127, 127))
+    /** Stick derecho del GamePad (el táctil). */
+    fun setStick2(x: Int, y: Int) = setStick2From(SRC_TOUCH, x, y)
+
+    fun setStick2From(source: Int, x: Int, y: Int) {
+        synchronized(mixLock) {
+            rightX[source] = x
+            rightY[source] = y
+            stick2Xv.set(rightX.sum().coerceIn(-127, 127))
+            stick2Yv.set(rightY.sum().coerceIn(-127, 127))
+        }
     }
 
     fun stickRX(): Int = stick2Xv.get()
@@ -187,6 +216,9 @@ object ButtonState {
                 stickYv.set(0)
                 stick2Xv.set(0)
                 stick2Yv.set(0)
+                synchronized(mixLock) {
+                    leftX.fill(0); leftY.fill(0); rightX.fill(0); rightY.fill(0)
+                }
                 touchV = NO_TOUCH
                 val change = Change(0, reset = true)
                 buttonChangeListeners.forEach { it(change) }
