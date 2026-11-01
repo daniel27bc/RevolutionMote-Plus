@@ -11,10 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import dev.pepotech.pepomote.control.AppPrefs
 import dev.pepotech.pepomote.control.ButtonState
@@ -64,8 +61,14 @@ class ScreenshotTest {
                 }
             }
             compose.waitForIdle()
-            val bmp = compose.onRoot().captureToImage().asAndroidBitmap()
-            File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            // La vista dibujada a mano: captureToImage espera un fotograma
+            // que Robolectric no llega a pintar
+            compose.runOnIdle {
+                val v = compose.activity.window.decorView.rootView
+                val bmp = Bitmap.createBitmap(v.width.coerceAtLeast(1), v.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+                v.draw(android.graphics.Canvas(bmp))
+                File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
         } catch (t: Throwable) {
             File(dir, "$name.error.txt").writeText(t.stackTraceToString())
         }
