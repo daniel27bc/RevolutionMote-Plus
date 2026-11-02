@@ -46,14 +46,13 @@ fun ChannelCard(
 ) {
     val ink = PepoColors.Text
     val card = PepoColors.Card
+    val land = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val glyphSize = if (land) 40.dp else 52.dp
     Card(
         onClick = onClick,
         // Apaisado: tarjetas más bajas que anchas (cuadradas eran enormes)
-        modifier = if (wide) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().aspectRatio(
-            if (androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-                android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            ) 1.55f else 1f
-        ),
+        modifier = if (wide) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().aspectRatio(if (land) 1.3f else 1f),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
         border = BorderStroke(1.5.dp, PepoColors.CardBorder),
@@ -82,9 +81,9 @@ fun ChannelCard(
                 verticalArrangement = Arrangement.Center
             ) {
                 if (icon != null) {
-                    Ico(icon, accent, 52.dp, Modifier.padding(bottom = 4.dp))
+                    Ico(icon, accent, glyphSize, Modifier.padding(bottom = 4.dp))
                 } else {
-                    Canvas(modifier = Modifier.size(52.dp).padding(bottom = 4.dp)) {
+                    Canvas(modifier = Modifier.size(glyphSize).padding(bottom = 4.dp)) {
                         drawGlyph(glyph, accent, ink, card)
                     }
                 }
@@ -92,7 +91,8 @@ fun ChannelCard(
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
+                    maxLines = if (land) 1 else 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
