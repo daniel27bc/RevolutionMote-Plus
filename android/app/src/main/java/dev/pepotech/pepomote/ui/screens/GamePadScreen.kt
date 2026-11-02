@@ -908,6 +908,12 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     OrientationLockButton(Modifier.align(Alignment.TopEnd).padding(end = 4.dp))
                 }
             }
+            // Pistas de primera vez: el modo ratón y sus gestos; el editor
+            if (mouseMode && !editing) {
+                OneTimeHint("pad_mouse", stringResource(R.string.hint_pad_mouse), Modifier.align(Alignment.BottomCenter))
+            } else if (editing) {
+                OneTimeHint("editor", stringResource(R.string.hint_editor), Modifier.align(Alignment.BottomCenter))
+            }
             if (showMenu) {
                 PadMenuDialog(
                     mouseOn = if (xboxPad) padMouse else null,

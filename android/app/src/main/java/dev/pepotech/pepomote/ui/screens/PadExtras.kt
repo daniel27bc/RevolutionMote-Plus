@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.role
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -333,12 +337,19 @@ internal fun GyroButton(size: Dp, gyro: GyroConfig) {
     DisposableEffect(Unit) {
         onDispose { GyroAim.buttonHeld = false }
     }
+    val gyroDesc = stringResource(R.string.ed_gyro_button)
+    val gyroState = stringResource(if (on) R.string.diag_on else R.string.diag_off)
     Box(
         Modifier
             .size(size)
             .shadow(if (on) 1.dp else 6.dp, CircleShape)
             .background(if (on) PepoColors.Ok else PepoColors.Card, CircleShape)
             .border(2.dp, if (on) PepoColors.Ok else PepoColors.Blue, CircleShape)
+            .semantics(mergeDescendants = true) {
+                contentDescription = gyroDesc
+                role = androidx.compose.ui.semantics.Role.Switch
+                stateDescription = gyroState
+            }
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -604,6 +615,8 @@ internal fun MousePad(
     val lastMove = remember { LongArray(1) }
     var isDown by remember { mutableStateOf(false) }
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)
+    val padDesc = stringResource(if (mouseMode) R.string.mousepad_label_mouse else R.string.mousepad_label_pad) +
+        ". " + stringResource(R.string.mousepad_help)
 
     fun out(vx: Float, vy: Float) {
         if (mouseNow) {
@@ -646,6 +659,7 @@ internal fun MousePad(
             .size(w, h)
             .background(PepoColors.Card, shape)
             .border(2.dp, if (touching) PepoColors.Glow else PepoColors.CardBorder, shape)
+            .semantics(mergeDescendants = true) { contentDescription = padDesc }
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val first = awaitFirstDown()
@@ -774,6 +788,17 @@ internal fun IconPadButton(
             .shadow(if (down) 1.dp else 6.dp, CircleShape)
             .background(if (on) PepoColors.Blue else PepoColors.Card, CircleShape)
             .border(1.5.dp, if (on) PepoColors.Blue else PepoColors.CardBorder, CircleShape)
+            // TalkBack: se lee el rótulo y el doble toque pulsa y suelta
+            .semantics(mergeDescendants = true) {
+                role = androidx.compose.ui.semantics.Role.Button
+                contentDescription = label
+                if (!enabled) disabled()
+                onClick {
+                    onPress(true)
+                    onPress(false)
+                    true
+                }
+            }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 awaitEachGesture {
@@ -803,5 +828,35 @@ internal fun IconPadButton(
                 maxLines = 1
             )
         }
+    }
+}
+
+/**
+ * Una pista que sale la primera vez (y hasta que se toca «Entendido»): para
+ * que se descubra lo que no se ve (gestos del touchpad, selector del puntero).
+ */
+@Composable
+internal fun OneTimeHint(id: String, text: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var show by remember(id) { mutableStateOf(!AppPrefs.hintSeen(context, id)) }
+    if (!show) return
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    Row(
+        modifier
+            .padding(12.dp)
+            .widthIn(max = 520.dp)
+            .shadow(8.dp, shape)
+            .background(PepoColors.Card, shape)
+            .border(1.5.dp, PepoColors.Blue, shape)
+            .padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Ico(R.drawable.ms_info, PepoColors.Blue, 22.dp)
+        Spacer(Modifier.size(10.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.Text), modifier = Modifier.weight(1f))
+        TextButton(onClick = {
+            show = false
+            AppPrefs.setHintSeen(context, id)
+        }) { Text(stringResource(R.string.hint_ok), color = PepoColors.Blue, fontWeight = FontWeight.Bold) }
     }
 }

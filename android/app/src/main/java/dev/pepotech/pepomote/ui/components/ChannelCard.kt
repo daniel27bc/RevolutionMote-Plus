@@ -105,9 +105,9 @@ private fun DrawScope.drawKeyboardGlyph(accent: Color) {
     val kbW = w * 0.68f
     val kbH = w * 0.44f
     val top = h * 0.36f
-    val o = androidx.compose.ui.geometry.Offset
-    val sz = androidx.compose.ui.geometry.Size
-    val cr = androidx.compose.ui.geometry.CornerRadius
+    fun o(x: Float, y: Float) = androidx.compose.ui.geometry.Offset(x, y)
+    fun sz(x: Float, y: Float) = androidx.compose.ui.geometry.Size(x, y)
+    fun cr(r: Float) = androidx.compose.ui.geometry.CornerRadius(r)
     drawRoundRect(accent, o(stroke / 2f, top + stroke / 2f), sz(kbW - stroke, kbH - stroke), cr(w * 0.08f), style = Stroke(width = stroke))
     val key = w * 0.075f
     for (row in 0..1) {

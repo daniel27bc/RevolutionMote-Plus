@@ -723,4 +723,8 @@
     <string name="settings_sec_wii">Wii y Wii U</string>
     <string name="settings_sec_app">Conexión y app</string>
     <string name="turbo_tag" translatable="false">TURBO</string>
+    <string name="hint_ok">Entendido</string>
+    <string name="hint_pad_mouse">Modo ratón: A es clic izquierdo y B derecho. En el touchpad, toque = clic, dos dedos = clic derecho, mantener quieto = agarrar y arrastrar.</string>
+    <string name="hint_editor">Arrastra para mover y pellizca para cambiar el tamaño. Con el imán los controles se alinean; «Deshacer» revierte el último cambio y «Espejo» lo pasa a zurdos.</string>
+    <string name="hint_pointer_modes">Arriba a la derecha eliges cómo se mueve el cursor: apuntando, con el dedo o con los dos. Mantén pulsado un icono para ver qué hace.</string>
 </resources>

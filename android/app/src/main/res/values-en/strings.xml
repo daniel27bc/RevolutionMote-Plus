@@ -722,4 +722,8 @@
     <string name="settings_sec_vibration">Vibration</string>
     <string name="settings_sec_wii">Wii and Wii U</string>
     <string name="settings_sec_app">Connection and app</string>
+    <string name="hint_ok">Got it</string>
+    <string name="hint_pad_mouse">Mouse mode: A is left click and B right click. On the touchpad, tap = click, two fingers = right click, hold still = grab and drag.</string>
+    <string name="hint_editor">Drag to move and pinch to resize. Snap lines controls up; Undo reverts the last change and Mirror makes it left-handed.</string>
+    <string name="hint_pointer_modes">Top right you choose how the cursor moves: by pointing, with your finger or both. Hold an icon to see what it does.</string>
 </resources>

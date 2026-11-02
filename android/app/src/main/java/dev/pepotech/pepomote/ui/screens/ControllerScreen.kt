@@ -234,6 +234,9 @@ fun ControllerScreen(link: UiLink, showChips: Boolean, onDisconnect: () -> Unit)
                     }
                 }
 
+                if ((link as? UiLink.Connected)?.mode == LinkState.MODE_POINTER) {
+                    OneTimeHint("pointer_modes", stringResource(R.string.hint_pointer_modes))
+                }
                 if (link is UiLink.Connected) {
                     // Chips de modo (Jugador 1 con el ajuste activo, y siempre dentro de
                     // Wii U) y, en Dolphin, el interruptor «Nunchuk» a la derecha de Wii U

@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -180,20 +182,46 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit) {
                 discoverable.launch(Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120))
             })
             Spacer(Modifier.height(6.dp))
-            // El touchpad grande
-            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                MousePad(maxWidth, maxHeight, mouseMode = true, sensitivity = mouse.padSens, antiDeadzone = 0f, inertia = mouse.inertia)
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((idx, label) in listOf(0 to R.string.ed_mouse_left, 2 to R.string.kbm_middle, 1 to R.string.ed_mouse_right)) {
-                    HoldKey(stringResource(label), Modifier.weight(1f).height(54.dp)) { down -> Kbm.button(idx, down) }
+            val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val clicks: @Composable (Modifier) -> Unit = { m ->
+                Row(m, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((idx, label) in listOf(0 to R.string.ed_mouse_left, 2 to R.string.kbm_middle, 1 to R.string.ed_mouse_right)) {
+                        HoldKey(stringResource(label), Modifier.weight(1f).height(54.dp)) { down -> Kbm.button(idx, down) }
+                    }
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            SpecialKeys()
-            Spacer(Modifier.height(8.dp))
-            TextSender()
+            if (landscape) {
+                // Apaisado: el touchpad a la izquierda, a todo lo alto; los
+                // clics, las teclas y el texto a la derecha
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    BoxWithConstraints(Modifier.weight(1.25f).fillMaxHeight()) {
+                        MousePad(maxWidth, maxHeight, mouseMode = true, sensitivity = mouse.padSens, antiDeadzone = 0f, inertia = mouse.inertia)
+                    }
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        clicks(Modifier.fillMaxWidth())
+                        SpecialKeys()
+                        TextSender()
+                    }
+                }
+            } else {
+                // El touchpad grande
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                    MousePad(maxWidth, maxHeight, mouseMode = true, sensitivity = mouse.padSens, antiDeadzone = 0f, inertia = mouse.inertia)
+                }
+                Spacer(Modifier.height(8.dp))
+                clicks(Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                SpecialKeys()
+                Spacer(Modifier.height(8.dp))
+                TextSender()
+            }
         }
 
         if (asking) {
