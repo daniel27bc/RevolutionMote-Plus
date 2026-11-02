@@ -1,6 +1,5 @@
 package dev.pepotech.pepomote.ui.components
 
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -10,7 +9,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
 import dev.pepotech.pepomote.R
 import dev.pepotech.pepomote.control.AppPrefs
 import dev.pepotech.pepomote.control.OrientationLock
@@ -29,10 +28,10 @@ fun OrientationLockButton(modifier: Modifier = Modifier) {
         onClick = { OrientationLock.toggle(context, rotation) },
         modifier = modifier.semantics { contentDescription = desc }
     ) {
-        Text(
-            if (locked) "🔒" else "🔓",
-            fontSize = 15.sp,
-            color = if (locked) PepoColors.Warn else PepoColors.TextDim
+        Ico(
+            if (locked) R.drawable.ms_lock_fill1 else R.drawable.ms_lock_open,
+            if (locked) PepoColors.Warn else PepoColors.TextDim,
+            22.dp
         )
     }
 }

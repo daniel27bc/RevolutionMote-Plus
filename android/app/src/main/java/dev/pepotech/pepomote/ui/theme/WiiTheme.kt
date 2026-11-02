@@ -9,6 +9,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -75,6 +77,14 @@ val DarkPepo = PepoPalette(
     warn = LightPepo.warn,
     error = LightPepo.error,
     isDark = true
+)
+
+/** OLED: negro puro de fondo (los píxeles se apagan) y tarjetas casi negras. */
+val OledPepo = DarkPepo.copy(
+    background = Color(0xFF000000),
+    card = Color(0xFF0B0D10),
+    cardBorder = Color(0xFF23292F),
+    glow = Color(0xFF103044)
 )
 
 val LocalPepoColors = staticCompositionLocalOf { LightPepo }
@@ -153,10 +163,23 @@ private fun pepoColorScheme(c: PepoPalette): ColorScheme {
     )
 }
 
-/** El tema de la app: sigue al sistema (claro u oscuro). */
+/**
+ * El tema de la app: el que se elija en Ajustes (sistema, claro, oscuro u
+ * OLED). [dark] fuerza claro u oscuro (los tests).
+ */
 @Composable
-fun PepoMoteTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val palette = if (dark) DarkPepo else LightPepo
+fun PepoMoteTheme(dark: Boolean? = null, content: @Composable () -> Unit) {
+    val mode by ThemeMode.state.collectAsState()
+    val system = isSystemInDarkTheme()
+    val palette = when {
+        dark == true -> DarkPepo
+        dark == false -> LightPepo
+        mode == ThemeMode.LIGHT -> LightPepo
+        mode == ThemeMode.DARK -> DarkPepo
+        mode == ThemeMode.OLED -> OledPepo
+        system -> DarkPepo
+        else -> LightPepo
+    }
     CompositionLocalProvider(LocalPepoColors provides palette) {
         MaterialTheme(
             colorScheme = pepoColorScheme(palette),
@@ -164,5 +187,27 @@ fun PepoMoteTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable ()
             shapes = pepoShapes,
             content = content
         )
+    }
+}
+
+/** El tema elegido en Ajustes. */
+object ThemeMode {
+    const val SYSTEM = "system"
+    const val LIGHT = "light"
+    const val DARK = "dark"
+    const val OLED = "oled"
+    private const val PREFS = "app"
+    private val _state = kotlinx.coroutines.flow.MutableStateFlow(SYSTEM)
+    val state: kotlinx.coroutines.flow.StateFlow<String> = _state
+
+    fun load(context: android.content.Context) {
+        _state.value = context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .getString("themeMode", SYSTEM) ?: SYSTEM
+    }
+
+    fun set(context: android.content.Context, mode: String) {
+        _state.value = mode
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .edit().putString("themeMode", mode).apply()
     }
 }

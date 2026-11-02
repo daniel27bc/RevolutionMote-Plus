@@ -4,7 +4,35 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Qué es cada control del diseño personalizado. */
-enum class ElementKind { BUTTON, STICK_L, STICK_R, DPAD, FACE, GYRO }
+enum class ElementKind {
+    BUTTON, STICK_L, STICK_R, DPAD, FACE, GYRO,
+
+    /** Touchpad: en modo ratón mueve el cursor (toque = clic, dos dedos = clic derecho y rueda); en modo mando, la cámara. */
+    MOUSE_PAD,
+
+    /** Clic izquierdo / derecho (solo en modo ratón). */
+    MOUSE_LEFT, MOUSE_RIGHT,
+
+    /** Abre el teclado para escribir en el PC. */
+    KEYBOARD,
+
+    /** Cambia entre mando y ratón (como el botón de los juegos). */
+    MODE_TOGGLE
+}
+
+/**
+ * Modo ratón del mando universal: el cursor se mueve de forma RELATIVA
+ * (como un ratón), con el giro del móvil y/o los touchpads, calculado en el
+ * móvil. Así el puntero no se descentra con el uso.
+ */
+data class MouseConfig(
+    val gyro: Boolean = true,
+    val gyroSens: Float = 1f,
+    val padSens: Float = 1f,
+    val inertia: Float = 0f,
+    val smoothing: Float = 0.5f,
+    val invertY: Boolean = false
+)
 
 /** Dónde gira la cámara un dedo que cae fuera de cualquier control (como en CoD Mobile). */
 enum class LookZone { OFF, RIGHT, ALL }
@@ -46,8 +74,12 @@ enum class GyroActivation {
 data class GyroConfig(
     val enabled: Boolean = false,
     val activation: GyroActivation = GyroActivation.ALWAYS,
+    /** Sensibilidad con la pantalla en horizontal (apaisado). */
     val sensX: Float = 2.1f,
     val sensY: Float = 1.9f,
+    /** Sensibilidad con la pantalla en vertical. */
+    val sensXPortrait: Float = 2.1f,
+    val sensYPortrait: Float = 1.9f,
     val invertX: Boolean = false,
     val invertY: Boolean = false,
     val antiDeadzone: Float = 0.12f,
@@ -96,7 +128,8 @@ data class PadProfile(
     /** Opacidad de todos los controles (0.15..1). */
     val opacity: Float = 1f,
     val look: LookConfig = LookConfig(),
-    val gyro: GyroConfig = GyroConfig()
+    val gyro: GyroConfig = GyroConfig(),
+    val mouse: MouseConfig = MouseConfig()
 ) {
     fun replace(old: PadElement, new: PadElement) =
         copy(elements = elements.map { if (it.id == old.id) new else it })
@@ -151,7 +184,11 @@ object PadProfiles {
         val kinds = profile.elements.map { it.kind }.toSet()
         val used = usedBits(profile, faceBits)
         val out = ArrayList<AddOption>()
-        for (k in listOf(ElementKind.STICK_L, ElementKind.STICK_R, ElementKind.DPAD, ElementKind.GYRO)) {
+        for (k in listOf(
+            ElementKind.STICK_L, ElementKind.STICK_R, ElementKind.DPAD, ElementKind.GYRO,
+            ElementKind.MODE_TOGGLE, ElementKind.MOUSE_PAD, ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT,
+            ElementKind.KEYBOARD
+        )) {
             if (k !in kinds) out += AddOption(k)
         }
         if (ElementKind.FACE !in kinds && faceBits.isNotEmpty() && faceBits.none { it in used }) {
@@ -172,7 +209,9 @@ object PadProfiles {
         ElementKind.STICK_L, ElementKind.STICK_R -> PadElement(option.kind, 0.5f, 0.5f, 0.42f)
         ElementKind.DPAD -> PadElement(option.kind, 0.5f, 0.5f, 0.36f)
         ElementKind.FACE -> PadElement(option.kind, 0.5f, 0.5f, 0.42f)
-        ElementKind.GYRO -> PadElement(option.kind, 0.5f, 0.5f, 0.15f)
+        ElementKind.GYRO, ElementKind.MODE_TOGGLE, ElementKind.KEYBOARD,
+        ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT -> PadElement(option.kind, 0.5f, 0.5f, 0.15f)
+        ElementKind.MOUSE_PAD -> PadElement(option.kind, 0.5f, 0.5f, 0.45f, pill = true)
         ElementKind.BUTTON -> PadElement(
             ElementKind.BUTTON, 0.5f, 0.5f,
             0.13f,
@@ -242,6 +281,7 @@ object PadProfileJson {
         put("opacity", p.opacity.toDouble())
         put("look", lookToJson(p.look))
         put("gyro", gyroToJson(p.gyro))
+        put("mouse", mouseToJson(p.mouse))
         put("elements", JSONArray().apply {
             for (e in p.elements) put(JSONObject().apply {
                 put("kind", e.kind.name)
@@ -288,7 +328,8 @@ object PadProfileJson {
             elements = elements.distinctBy { it.id },
             opacity = o.optDouble("opacity", 1.0).toFloat().coerceIn(PadProfiles.MIN_OPACITY, 1f),
             look = lookFromJson(o.optJSONObject("look")),
-            gyro = gyroFromJson(o.optJSONObject("gyro"))
+            gyro = gyroFromJson(o.optJSONObject("gyro")),
+            mouse = o.optJSONObject("mouse")?.let { mouseFromJson(it) } ?: MouseConfig()
         )
     } catch (_: Exception) {
         null
@@ -304,6 +345,8 @@ object PadProfileJson {
         put("adz", g.antiDeadzone.toDouble())
         put("smooth", g.smoothing.toDouble())
         put("swap", g.swapAxes)
+        put("sxp", g.sensXPortrait.toDouble())
+        put("syp", g.sensYPortrait.toDouble())
     }
 
     fun gyroFromJson(j: JSONObject?): GyroConfig = if (j == null) GyroConfig() else GyroConfig(
@@ -315,7 +358,27 @@ object PadProfileJson {
         invertY = j.optBoolean("iy", false),
         antiDeadzone = j.optDouble("adz", 0.12).toFloat().coerceIn(0f, 0.9f),
         smoothing = j.optDouble("smooth", 0.9).toFloat().coerceIn(0f, 0.97f),
-        swapAxes = j.optBoolean("swap", false)
+        swapAxes = j.optBoolean("swap", false),
+        sensXPortrait = j.optDouble("sxp", 2.1).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS),
+        sensYPortrait = j.optDouble("syp", 1.9).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS)
+    )
+
+    fun mouseToJson(m: MouseConfig): JSONObject = JSONObject().apply {
+        put("gyro", m.gyro)
+        put("gs", m.gyroSens.toDouble())
+        put("ps", m.padSens.toDouble())
+        put("inertia", m.inertia.toDouble())
+        put("smooth", m.smoothing.toDouble())
+        put("iy", m.invertY)
+    }
+
+    fun mouseFromJson(m: JSONObject): MouseConfig = MouseConfig(
+        gyro = m.optBoolean("gyro", true),
+        gyroSens = m.optDouble("gs", 1.0).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS),
+        padSens = m.optDouble("ps", 1.0).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS),
+        inertia = m.optDouble("inertia", 0.0).toFloat().coerceIn(0f, 1f),
+        smoothing = m.optDouble("smooth", 0.5).toFloat().coerceIn(0f, 0.97f),
+        invertY = m.optBoolean("iy", false)
     )
 
     fun lookToJson(l: LookConfig): JSONObject = JSONObject().apply {

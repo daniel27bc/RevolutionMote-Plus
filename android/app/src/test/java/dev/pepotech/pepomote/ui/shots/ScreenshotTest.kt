@@ -93,8 +93,53 @@ class ScreenshotTest {
         CustomPadCanvas(profile(), layout, editing = false, onElementChange = { _, _ -> }, onGear = {})
     }
 
+    @Test fun lienzoRaton() = shot("10_lienzo_raton") {
+        val p = profile().let { q ->
+            q.add(dev.pepotech.pepomote.control.PadElement(ElementKind.MOUSE_PAD, 0.5f, 0.75f, 0.4f))
+                .add(dev.pepotech.pepomote.control.PadElement(ElementKind.MODE_TOGGLE, 0.5f, 0.45f, 0.15f))
+                .add(dev.pepotech.pepomote.control.PadElement(ElementKind.KEYBOARD, 0.38f, 0.45f, 0.13f))
+        }
+        androidx.compose.runtime.CompositionLocalProvider(
+            dev.pepotech.pepomote.ui.screens.LocalPadActions provides dev.pepotech.pepomote.ui.screens.PadActions(mouseMode = true)
+        ) {
+            CustomPadCanvas(p, layout, editing = false, onElementChange = { _, _ -> }, onGear = {})
+        }
+    }
+
     @Test fun lienzoEditando() = shot("03_lienzo_editando") {
         CustomPadCanvas(profile(), layout, editing = true, onElementChange = { _, _ -> }, onGear = {})
+    }
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h900dp-port-xhdpi")
+    fun menuOled() {
+        dev.pepotech.pepomote.ui.theme.ThemeMode.set(compose.activity, dev.pepotech.pepomote.ui.theme.ThemeMode.OLED)
+        try {
+            compose.setContent {
+                PepoMoteTheme {
+                    CompositionLocalProvider(LocalInlineDialogs provides true) {
+                        Box(Modifier.fillMaxSize().background(PepoColors.Background)) {
+                            Column(Modifier.fillMaxWidth().padding(8.dp)) {
+                                PadMenuDialog(
+                                    mouseOn = true, onMouseToggle = {}, activeName = null, locked = false, gyroOn = false,
+                                    onLock = {}, onProfiles = {}, onGyroToggle = {}, onPadSettings = {}, onEdit = {}, onDismiss = {}
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            compose.waitForIdle()
+            compose.runOnIdle {
+                val v = compose.activity.window.decorView.rootView
+                val bmp = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888)
+                v.draw(android.graphics.Canvas(bmp))
+                File(dir, "11_menu_oled.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+        } catch (t: Throwable) {
+            File(dir, "11_menu_oled.error.txt").writeText(t.stackTraceToString())
+        } finally {
+            dev.pepotech.pepomote.ui.theme.ThemeMode.set(compose.activity, dev.pepotech.pepomote.ui.theme.ThemeMode.SYSTEM)
+        }
     }
 
     @Test fun lienzoClaro() = shot("04_lienzo_claro", dark = false) {
@@ -120,7 +165,10 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "es-rES-w420dp-h1700dp-port-xhdpi")
     fun ajustesDelMando() = shot("07_ajustes_mando") {
         Column(Modifier.fillMaxWidth().padding(8.dp)) {
-            PadSettingsDialog(LookConfig(inertia = 0.6f), GyroConfig(enabled = true), showGyro = true, onLook = {}, onGyro = {}, onDismiss = {})
+            PadSettingsDialog(
+                LookConfig(inertia = 0.6f), GyroConfig(enabled = true), showGyro = true, onLook = {}, onGyro = {}, onDismiss = {},
+                mouse = dev.pepotech.pepomote.control.MouseConfig()
+            )
         }
     }
 
@@ -131,7 +179,7 @@ class ScreenshotTest {
     fun menuDelMando() = shot("09_menu_mando") {
         Column(Modifier.fillMaxWidth().padding(8.dp)) {
             PadMenuDialog(
-                mouseOn = false, onMouseToggle = {}, pointerPadOn = null, onPointerPadToggle = {},
+                mouseOn = false, onMouseToggle = {},
                 activeName = "Shooter", locked = true, gyroOn = true,
                 onLock = {}, onProfiles = {}, onGyroToggle = {}, onPadSettings = {}, onEdit = {}, onDismiss = {}
             )

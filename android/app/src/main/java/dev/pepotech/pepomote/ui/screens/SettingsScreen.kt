@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.pepotech.pepomote.control.AppPrefs
 import dev.pepotech.pepomote.control.Haptics
+import dev.pepotech.pepomote.ui.theme.ThemeMode
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -263,6 +264,32 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
 
         GameRumbleCard()
         Spacer(Modifier.height(14.dp))
+        // Tema: sistema, claro, oscuro u OLED (negro puro)
+        val themeMode by ThemeMode.state.collectAsState()
+        Card(
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
+            border = BorderStroke(1.5.dp, PepoColors.CardBorder),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                Text(stringResource(R.string.theme_title), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.theme_sub), style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(10.dp))
+                ChipFlow {
+                    for ((label, mode) in listOf(
+                        R.string.theme_system to ThemeMode.SYSTEM,
+                        R.string.theme_light to ThemeMode.LIGHT,
+                        R.string.theme_dark to ThemeMode.DARK,
+                        R.string.theme_oled to ThemeMode.OLED
+                    )) {
+                        ModeChip(stringResource(label), selected = themeMode == mode) { ThemeMode.set(context, mode) }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
         // Cámara en el espacio libre y giroscopio del diseño original (cada
         // perfil de diseño lleva los suyos, en «⚙ Ajustes del mando»)
         Card(
@@ -337,7 +364,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { Haptics.preview(view, maxOf(hapticLevel, Haptics.SUBTLE)) }) {
-                        Text("📳 " + stringResource(R.string.haptic_test), color = PepoColors.Blue, fontWeight = FontWeight.SemiBold)
+                        IconLabel(R.drawable.ms_vibration, stringResource(R.string.haptic_test), PepoColors.Blue)
                     }
                     Text(hapticInfo, style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
                 }

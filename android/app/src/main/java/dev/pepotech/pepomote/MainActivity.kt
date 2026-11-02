@@ -37,7 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.pepotech.pepomote.ui.components.OrientationLockButton
 import dev.pepotech.pepomote.ui.screens.PointerTrackpadChip
-import dev.pepotech.pepomote.ui.screens.PointerTrackpadLayer
+import dev.pepotech.pepomote.control.PointerTrackpad
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -286,6 +286,8 @@ class MainActivity : ComponentActivity() {
         NunchukSide.load(this)
         GamePadSide.load(this)
         PadProfileStore.load(this)
+        PointerTrackpad.loadEnabled(this)
+        dev.pepotech.pepomote.ui.theme.ThemeMode.load(this)
         OrientationLock.load(this)
         UpdateNotice.refresh(this)
         lifecycleScope.launch {
@@ -737,9 +739,7 @@ private fun ControllerRoute(activity: MainActivity, link: UiLink) {
             // Modo puntero: el ratón con el dedo en vez de apuntando con el
             // móvil (capa debajo de todo: solo coge los huecos sin botones)
             val pointerMode = (link as? UiLink.Connected)?.mode == LinkState.MODE_POINTER
-            var pointerPad by remember { mutableStateOf(AppPrefs.pointerTrackpad(context)) }
-            val pointerPadOn = pointerMode && pointerPad
-            if (pointerPadOn) PointerTrackpadLayer(Modifier.matchParentSize())
+            val pointerPad by PointerTrackpad.enabled.collectAsState()
             val landscape =
                 LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
             // Selector Puntero/Dolphin/Wii U: entrando por Conectar/Mando/Wii U
@@ -767,10 +767,7 @@ private fun ControllerRoute(activity: MainActivity, link: UiLink) {
             ) {
                 OrientationLockButton()
                 if (pointerMode) {
-                    PointerTrackpadChip(pointerPad) {
-                        pointerPad = it
-                        AppPrefs.setPointerTrackpad(context, it)
-                    }
+                    PointerTrackpadChip(pointerPad) { PointerTrackpad.setEnabled(context, it) }
                 }
             }
         }

@@ -99,6 +99,11 @@ object GyroAim {
             uz += (a[2] / an - uz) * k
             hasUp = true
         }
+        // Modo ratón: el giro mueve el cursor (relativo), no la cámara
+        if (mouse) {
+            mouseSample(rotation)
+            return
+        }
         val c = config
         if (c.enabled && c.activation == GyroActivation.TOGGLE_LT) trackLt()
         if (!gateOpen(c)) {
@@ -110,8 +115,9 @@ object GyroAim {
         val (yaw0, pitch0) = playerSpace(g[0], g[1], g[2], ux, uy, uz)
         val yaw = if (c.swapAxes) pitch0 else yaw0
         val pitch = if (c.swapAxes) yaw0 else pitch0
-        var tx = -yaw * c.sensX / FULL_RATE
-        var ty = pitch * c.sensY / FULL_RATE
+        val portrait = rotation == Frame.ROTATION_0 || rotation == Frame.ROTATION_180
+        var tx = -yaw * (if (portrait) c.sensXPortrait else c.sensX) / FULL_RATE
+        var ty = pitch * (if (portrait) c.sensYPortrait else c.sensY) / FULL_RATE
         if (c.invertX) tx = -tx
         if (c.invertY) ty = -ty
         val alpha = (1f - c.smoothing).coerceIn(0.1f, 1f)
@@ -123,6 +129,40 @@ object GyroAim {
             lastY = oy
             ButtonState.setStick2From(ButtonState.SRC_GYRO, ox, oy)
         }
+    }
+
+    /** Modo ratón del mando universal (lo pone la pantalla). */
+    @Volatile
+    var mouse: Boolean = false
+        set(value) {
+            field = value
+            mx = 0f
+            my = 0f
+            PointerTrackpad.setGyro(0f, 0f)
+        }
+
+    @Volatile
+    var mouseConfig: MouseConfig = MouseConfig()
+
+    private var mx = 0f
+    private var my = 0f
+
+    /** Pulso quieto en modo ratón (rad/s): por debajo, el cursor no se mueve. */
+    private const val MOUSE_REST = 0.025f
+
+    private fun mouseSample(rotation: Int) {
+        val m = mouseConfig
+        if (!m.gyro) {
+            PointerTrackpad.setGyro(0f, 0f)
+            return
+        }
+        val (yaw, pitch) = playerSpace(g[0], g[1], g[2], ux, uy, uz)
+        val alpha = (1f - m.smoothing).coerceIn(0.1f, 1f)
+        mx += (yaw - mx) * alpha
+        my += (pitch - my) * alpha
+        val still = hypot(mx, my) < MOUSE_REST
+        val py = if (m.invertY) -my else my
+        if (still) PointerTrackpad.setGyro(0f, 0f) else PointerTrackpad.setGyro(mx * m.gyroSens, py * m.gyroSens)
     }
 
     private fun zero() {

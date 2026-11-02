@@ -151,6 +151,8 @@ fun ControllerScreen(link: UiLink, showChips: Boolean, onDisconnect: () -> Unit)
                 .navigationBarsPadding()
                 .slideCanvas()
         ) {
+            // Modo puntero con «ratón con el dedo»: los huecos sin botones son un trackpad
+            PointerPadUnderlay(link)
             // En una tablet todo crece a la vez (UiScale; en cualquier móvil, 1),
             // la columna del mando se limita a 520·grow y las tiras la abrazan (en
             // vez de irse a los bordes de la pantalla); los huecos entre grupos se

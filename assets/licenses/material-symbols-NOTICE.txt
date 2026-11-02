@@ -1,0 +1,5 @@
+Iconos: Material Symbols (estilo redondeado) de Google
+https://github.com/google/material-design-icons
+Licencia: Apache License, Version 2.0 — https://www.apache.org/licenses/LICENSE-2.0
+Los ficheros android/app/src/main/res/drawable/ms_*.xml son copias sin cambios
+(salvo quitar el atributo android:tint) de symbols/android/*/materialsymbolsrounded/.

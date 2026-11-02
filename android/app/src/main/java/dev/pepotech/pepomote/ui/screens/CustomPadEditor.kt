@@ -31,6 +31,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.annotation.DrawableRes
+import dev.pepotech.pepomote.ui.components.Ico
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -134,6 +139,11 @@ internal fun elementTitle(kind: ElementKind, bit: Int, layout: RetroLayout): Str
     ElementKind.DPAD -> stringResource(R.string.ed_dpad)
     ElementKind.FACE -> stringResource(R.string.ed_face)
     ElementKind.GYRO -> stringResource(R.string.ed_gyro_button)
+    ElementKind.MOUSE_PAD -> stringResource(R.string.ed_mouse_pad)
+    ElementKind.MOUSE_LEFT -> stringResource(R.string.ed_mouse_left)
+    ElementKind.MOUSE_RIGHT -> stringResource(R.string.ed_mouse_right)
+    ElementKind.KEYBOARD -> stringResource(R.string.ed_keyboard)
+    ElementKind.MODE_TOGGLE -> stringResource(R.string.ed_mode_toggle)
     ElementKind.BUTTON -> stringResource(R.string.ed_button, buttonLabel(bit, layout))
 }
 
@@ -188,7 +198,11 @@ internal fun CustomPadCanvas(
 
 private fun elementBox(e: PadElement, areaH: Dp): Pair<Dp, Dp> {
     val s = areaH * e.size
-    return if (e.kind == ElementKind.BUTTON && e.pill) (s * PILL_RATIO) to s else s to s
+    return when {
+        e.kind == ElementKind.BUTTON && e.pill -> (s * PILL_RATIO) to s
+        e.kind == ElementKind.MOUSE_PAD -> (s * 1.6f) to s
+        else -> s to s
+    }
 }
 
 @Composable
@@ -211,6 +225,35 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig,
         ElementKind.DPAD -> PadCross(sizeDp = bw)
         ElementKind.FACE -> FaceCluster(layout, bw, bh)
         ElementKind.GYRO -> GyroButton(bw, gyro)
+        ElementKind.MOUSE_PAD -> {
+            val act = LocalPadActions.current
+            MousePad(bw, bh, act.mouseMode, e.sensitivity * act.mouse.padSens, e.antiDeadzone, maxOf(e.inertia, act.mouse.inertia))
+        }
+        ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT -> {
+            val act = LocalPadActions.current
+            val left = e.kind == ElementKind.MOUSE_LEFT
+            // En modo puntero el receptor hace A = clic izquierdo y B = derecho
+            val bit = if (left) ButtonState.A else ButtonState.B
+            IconPadButton(
+                bw,
+                if (left) R.drawable.ms_left_click else R.drawable.ms_right_click,
+                stringResource(if (left) R.string.mouse_left_short else R.string.mouse_right_short),
+                enabled = act.mouseMode
+            ) { down -> ButtonState.set(bit, down) }
+        }
+        ElementKind.KEYBOARD -> {
+            val act = LocalPadActions.current
+            IconPadButton(bw, R.drawable.ms_keyboard, stringResource(R.string.keyboard_short)) { down -> if (down) act.onKeyboard() }
+        }
+        ElementKind.MODE_TOGGLE -> {
+            val act = LocalPadActions.current
+            IconPadButton(
+                bw,
+                if (act.mouseMode) R.drawable.ms_mouse else R.drawable.ms_sports_esports,
+                stringResource(if (act.mouseMode) R.string.input_mode_mouse else R.string.input_mode_pad),
+                highlighted = act.mouseMode
+            ) { down -> if (down) act.onToggleMouse() }
+        }
         ElementKind.BUTTON -> {
             val label = buttonLabel(e.bit, layout)
             val text = (bh.value * 0.36f).roundToInt().coerceIn(9, 28)
@@ -282,11 +325,11 @@ private fun TurboButton(label: String, bit: Int, w: Dp, h: Dp, shape: Shape, tex
             modifier = Modifier.padding(horizontal = 3.dp)
         )
         Text(
-            "T",
+            "TURBO",
             color = PepoColors.Warn,
-            fontSize = 9.sp,
+            fontSize = 7.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.TopEnd).padding(end = 6.dp, top = 2.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 3.dp)
         )
     }
 }
@@ -306,7 +349,10 @@ private fun EditFrame(
 ) {
     val latest by rememberUpdatedState(element)
     val change by rememberUpdatedState(onChange)
-    val shape = if (element.kind == ElementKind.BUTTON && !element.pill || element.kind == ElementKind.GYRO || element.isStick && !element.trackpad) {
+    val round = element.kind in setOf(
+        ElementKind.GYRO, ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT, ElementKind.KEYBOARD, ElementKind.MODE_TOGGLE
+    )
+    val shape = if (element.kind == ElementKind.BUTTON && !element.pill || round || element.isStick && !element.trackpad) {
         CircleShape
     } else {
         RoundedCornerShape(12.dp)
@@ -346,7 +392,7 @@ private fun EditFrame(
             .clickable { onGear() },
         contentAlignment = Alignment.Center
     ) {
-        Text("⚙", color = PepoColors.OnAccent, fontSize = 16.sp)
+        Ico(R.drawable.ms_settings, PepoColors.OnAccent, 18.dp)
     }
 }
 
@@ -375,11 +421,9 @@ internal fun EditorToolbar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            TextButton(onClick = onAdd) { Text("＋ " + stringResource(R.string.ed_add), color = PepoColors.Blue) }
-            TextButton(onClick = onProfiles) {
-                Text("▤ " + profile.name, color = PepoColors.Text, maxLines = 1)
-            }
-            TextButton(onClick = onPadSettings) { Text("🎯 " + stringResource(R.string.ed_pad_settings), color = PepoColors.Blue) }
+            TextButton(onClick = onAdd) { IconLabel(R.drawable.ms_add, stringResource(R.string.ed_add), PepoColors.Blue) }
+            TextButton(onClick = onProfiles) { IconLabel(R.drawable.ms_view_list, profile.name, PepoColors.Text) }
+            TextButton(onClick = onPadSettings) { IconLabel(R.drawable.ms_tune, stringResource(R.string.ed_pad_settings), PepoColors.Blue) }
             Text(stringResource(R.string.ed_opacity), style = MaterialTheme.typography.labelMedium, color = PepoColors.TextDim)
             Slider(
                 value = profile.opacity,
@@ -404,6 +448,16 @@ internal fun sliderColors() = SliderDefaults.colors(
     activeTrackColor = PepoColors.Blue,
     inactiveTrackColor = PepoColors.CardBorder
 )
+
+/** Lo que los controles del diseño necesitan de la pantalla del mando. */
+internal data class PadActions(
+    val mouseMode: Boolean = false,
+    val mouse: dev.pepotech.pepomote.control.MouseConfig = dev.pepotech.pepomote.control.MouseConfig(),
+    val onKeyboard: () -> Unit = {},
+    val onToggleMouse: () -> Unit = {}
+)
+
+internal val LocalPadActions = androidx.compose.runtime.staticCompositionLocalOf { PadActions() }
 
 /** Solo para las capturas de los tests: los diálogos se pintan en línea. */
 internal val LocalInlineDialogs = androidx.compose.runtime.staticCompositionLocalOf { false }
@@ -490,6 +544,16 @@ internal fun ElementSettingsDialog(
             "${(element.size * 100).roundToInt()}%"
         ) { onChange(element.copy(size = it)) }
 
+        if (element.kind == ElementKind.MOUSE_PAD) {
+            Text(stringResource(R.string.mousepad_help), style = MaterialTheme.typography.bodyMedium, color = PepoColors.TextDim)
+            LabeledSlider(
+                stringResource(R.string.ed_sensitivity),
+                element.sensitivity, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
+                "%.2fx".format(element.sensitivity),
+                log = true
+            ) { onChange(element.copy(sensitivity = it)) }
+            InertiaControls(element.inertia) { onChange(element.copy(inertia = it)) }
+        }
         if (element.isStick) {
             Spacer(Modifier.height(6.dp))
             Text(stringResource(R.string.ed_stick_type), style = MaterialTheme.typography.titleSmall)
@@ -563,7 +627,7 @@ internal fun ElementSettingsDialog(
 
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = onRemove) { Text("🗑 " + stringResource(R.string.ed_remove), color = PepoColors.Error) }
+            TextButton(onClick = onRemove) { IconLabel(R.drawable.ms_delete, stringResource(R.string.ed_remove), PepoColors.Error) }
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.ed_done), color = PepoColors.Blue, fontWeight = FontWeight.Bold) }
         }
     }
@@ -671,7 +735,7 @@ internal fun AddControlDialog(
                     .padding(vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("＋", color = PepoColors.Blue, fontSize = 18.sp, modifier = Modifier.width(28.dp))
+                Ico(R.drawable.ms_add, PepoColors.Blue, 22.dp, Modifier.padding(end = 10.dp))
                 Text(elementTitle(o.kind, o.bit, layout), style = MaterialTheme.typography.bodyLarge)
             }
         }
@@ -709,9 +773,9 @@ internal fun ProfilesDialog(
         }
         for (p in profiles) {
             ProfileRow(p.name, selected = current == p.name, onClick = { onPick(p.name) }) {
-                TextButton(onClick = { renaming = p; newName = p.name }) { Text("✎", color = PepoColors.Blue) }
-                TextButton(onClick = { onDuplicate(p) }) { Text("⧉", color = PepoColors.Blue) }
-                TextButton(onClick = { onDelete(p) }) { Text("🗑", color = PepoColors.Error) }
+                IconButton(onClick = { renaming = p; newName = p.name }) { Ico(R.drawable.ms_edit, PepoColors.Blue) }
+                IconButton(onClick = { onDuplicate(p) }) { Ico(R.drawable.ms_content_copy, PepoColors.Blue) }
+                IconButton(onClick = { onDelete(p) }) { Ico(R.drawable.ms_delete, PepoColors.Error) }
             }
         }
         val r = renaming
@@ -737,7 +801,7 @@ internal fun ProfilesDialog(
         }
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = onNew) { Text("＋ " + stringResource(R.string.ed_new_profile), color = PepoColors.Blue) }
+            TextButton(onClick = onNew) { IconLabel(R.drawable.ms_add, stringResource(R.string.ed_new_profile), PepoColors.Blue) }
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.ed_done), color = PepoColors.Blue, fontWeight = FontWeight.Bold) }
         }
     }
@@ -761,34 +825,46 @@ private fun ProfileRow(
             .padding(horizontal = 12.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(if (selected) "●" else "○", color = PepoColors.Blue, modifier = Modifier.width(22.dp))
+        RadioButton(selected = selected, onClick = onClick, colors = RadioButtonDefaults.colors(selectedColor = PepoColors.Blue))
         Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 1)
         actions()
     }
 }
 
+/** Icono + texto (botones de texto de los diálogos y la barra). */
+@Composable
+internal fun IconLabel(@DrawableRes icon: Int, text: String, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Ico(icon, color, 18.dp, Modifier.padding(end = 6.dp))
+        Text(text, color = color, maxLines = 1)
+    }
+}
+
 /** Una pastilla de la barra del mando: legible encima de los controles. */
 @Composable
-private fun BarChip(text: String, color: Color, onClick: () -> Unit) {
+private fun BarChip(@DrawableRes icon: Int, text: String, color: Color, onClick: () -> Unit) {
     val shape = RoundedCornerShape(16.dp)
-    Box(
+    Row(
         Modifier
             .shadow(3.dp, shape)
             .background(PepoColors.Card, shape)
             .border(1.5.dp, PepoColors.CardBorder, shape)
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Ico(icon, color, 18.dp, Modifier.padding(end = 6.dp))
         Text(text, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
-/** El botón «☰ Mando», arriba a la derecha (en la franja de la cabecera, sin controles). */
+/** El botón «Mando» (o «Ratón» en modo ratón), arriba a la derecha, en la franja de la cabecera. */
 @Composable
 internal fun PadMenuButton(onClick: () -> Unit, modifier: Modifier = Modifier, mouse: Boolean = false) {
     Box(modifier) {
         BarChip(
-            if (mouse) "🖱 " + stringResource(R.string.mouse_mode_badge) else "☰ " + stringResource(R.string.pad_menu),
+            if (mouse) R.drawable.ms_mouse else R.drawable.ms_menu,
+            stringResource(if (mouse) R.string.mouse_mode_badge else R.string.pad_menu),
             if (mouse) PepoColors.Ok else PepoColors.Blue,
             onClick
         )
@@ -797,7 +873,13 @@ internal fun PadMenuButton(onClick: () -> Unit, modifier: Modifier = Modifier, m
 
 /** Una fila grande del menú del mando. */
 @Composable
-private fun MenuRow(icon: String, title: String, value: String? = null, valueColor: Color = PepoColors.TextDim, onClick: () -> Unit) {
+private fun MenuRow(
+    @DrawableRes icon: Int,
+    title: String,
+    value: String? = null,
+    valueColor: Color = PepoColors.TextDim,
+    onClick: () -> Unit
+) {
     val shape = RoundedCornerShape(14.dp)
     Row(
         Modifier
@@ -809,22 +891,21 @@ private fun MenuRow(icon: String, title: String, value: String? = null, valueCol
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(icon, fontSize = 20.sp, modifier = Modifier.width(36.dp))
+        Ico(icon, PepoColors.Blue, 24.dp, Modifier.padding(end = 14.dp))
         Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         if (value != null) Text(value, style = MaterialTheme.typography.titleMedium, color = valueColor, fontWeight = FontWeight.SemiBold)
     }
 }
 
 /**
- * El menú del mando: candado de orientación, perfil de diseño, giroscopio
- * sí/no ([gyroOn] null = este mando no lo usa), ajustes del mando y editar.
+ * El menú del mando: candado de orientación, perfil, mando o ratón
+ * ([mouseOn] null = este mando no tiene modo ratón), giroscopio sí/no
+ * ([gyroOn] null = no lo usa), ajustes del mando y editar diseño.
  */
 @Composable
 internal fun PadMenuDialog(
     mouseOn: Boolean?,
     onMouseToggle: () -> Unit,
-    pointerPadOn: Boolean?,
-    onPointerPadToggle: () -> Unit,
     activeName: String?,
     locked: Boolean,
     gyroOn: Boolean?,
@@ -838,40 +919,33 @@ internal fun PadMenuDialog(
     EditorDialog(onDismiss) {
         Text(stringResource(R.string.pad_menu_title), style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(10.dp))
+        if (mouseOn != null) {
+            MenuRow(
+                if (mouseOn) R.drawable.ms_mouse else R.drawable.ms_sports_esports,
+                stringResource(R.string.input_mode_title),
+                stringResource(if (mouseOn) R.string.input_mode_mouse else R.string.input_mode_pad),
+                if (mouseOn) PepoColors.Ok else PepoColors.Text,
+                onMouseToggle
+            )
+        }
         MenuRow(
-            if (locked) "🔒" else "🔓",
+            if (locked) R.drawable.ms_lock_fill1 else R.drawable.ms_lock_open,
             stringResource(R.string.orientation_title),
             stringResource(if (locked) R.string.orientation_locked else R.string.orientation_free),
             if (locked) PepoColors.Warn else PepoColors.TextDim,
             onLock
         )
-        MenuRow("▤", stringResource(R.string.ed_profiles), activeName ?: stringResource(R.string.ed_original), PepoColors.Text, onProfiles)
+        MenuRow(R.drawable.ms_view_list, stringResource(R.string.ed_profiles), activeName ?: stringResource(R.string.ed_original), PepoColors.Text, onProfiles)
         if (gyroOn != null) {
             MenuRow(
-                "🎯", stringResource(R.string.gyro_title),
+                R.drawable.ms_my_location, stringResource(R.string.gyro_title),
                 stringResource(if (gyroOn) R.string.state_on else R.string.state_off),
                 if (gyroOn) PepoColors.Ok else PepoColors.TextDim,
                 onGyroToggle
             )
         }
-        if (mouseOn != null) {
-            MenuRow(
-                "🖱", stringResource(R.string.mouse_mode_title),
-                stringResource(if (mouseOn) R.string.state_on else R.string.state_off),
-                if (mouseOn) PepoColors.Ok else PepoColors.TextDim,
-                onMouseToggle
-            )
-        }
-        if (pointerPadOn != null) {
-            MenuRow(
-                "☝", stringResource(R.string.pointer_trackpad_enable),
-                stringResource(if (pointerPadOn) R.string.state_on else R.string.state_off),
-                if (pointerPadOn) PepoColors.Ok else PepoColors.TextDim,
-                onPointerPadToggle
-            )
-        }
-        MenuRow("⚙", stringResource(R.string.ed_pad_settings), onClick = onPadSettings)
-        MenuRow("✎", stringResource(R.string.layout_edit_btn), onClick = onEdit)
+        MenuRow(R.drawable.ms_tune, stringResource(R.string.ed_pad_settings), onClick = onPadSettings)
+        MenuRow(R.drawable.ms_edit, stringResource(R.string.layout_edit_btn), onClick = onEdit)
         Spacer(Modifier.height(6.dp))
         TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
             Text(stringResource(R.string.ed_done), color = PepoColors.Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp)

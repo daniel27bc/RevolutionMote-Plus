@@ -212,6 +212,17 @@ object AppPrefs {
             .edit().putString("globalLook", PadProfileJson.lookToJson(value).toString()).apply()
     }
 
+    /** Modo ratón del diseño original (los perfiles llevan el suyo). */
+    fun globalMouse(context: Context): MouseConfig =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("globalMouse", null)
+            ?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
+            ?.let { PadProfileJson.mouseFromJson(it) } ?: MouseConfig()
+
+    fun setGlobalMouse(context: Context, value: MouseConfig) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString("globalMouse", PadProfileJson.mouseToJson(value).toString()).apply()
+    }
+
     /** Giroscopio del diseño original (los perfiles llevan el suyo). */
     fun globalGyro(context: Context): GyroConfig =
         PadProfileJson.gyroFromJson(

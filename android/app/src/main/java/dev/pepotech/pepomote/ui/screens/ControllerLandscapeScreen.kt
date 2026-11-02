@@ -106,6 +106,8 @@ fun ControllerLandscapeScreen(link: UiLink, showChips: Boolean, onDisconnect: ()
                 .navigationBarsPadding()
                 .slideCanvas()
         ) {
+            // Modo puntero con «ratón con el dedo»: los huecos sin botones son un trackpad
+            PointerPadUnderlay(link)
             // En una tablet todo crece a la vez (UiScale; en cualquier móvil, 1)
             val s = UiScale.landscape(maxWidth.value, maxHeight.value)
 

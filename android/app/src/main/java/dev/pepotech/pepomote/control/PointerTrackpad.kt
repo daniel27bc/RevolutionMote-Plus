@@ -23,7 +23,10 @@ object PointerTrackpad {
     var active: Boolean = false
         set(value) {
             field = value
-            if (!value) setVelocity(0f, 0f)
+            if (!value) {
+                setVelocity(0f, 0f)
+                setGyro(0f, 0f)
+            }
         }
 
     @Volatile
@@ -35,22 +38,54 @@ object PointerTrackpad {
     @Volatile
     private var gz = 0f
 
+    // Lo que aporta el giro del móvil (modo ratón), ya en rad/s sintéticos
+    @Volatile
+    private var gyroGx = 0f
+
+    @Volatile
+    private var gyroGz = 0f
+
     /** Velocidad del dedo en dp/ms (+x derecha, +y abajo, como en pantalla). */
     fun setVelocity(vxDp: Float, vyDp: Float) {
         gz = toGyro(vxDp)
         gx = toGyro(vyDp)
     }
 
+    /**
+     * El giro del móvil como ratón relativo: [yaw] (rad/s, + = girar a la
+     * izquierda) y [pitch] (+ = apuntar arriba), ya con su sensibilidad.
+     */
+    fun setGyro(yaw: Float, pitch: Float) {
+        // Cursor a la derecha (dx > 0) = gz < 0; arriba (dy < 0) = gx > 0
+        gyroGz = withPcDeadzone(yaw)
+        gyroGx = withPcDeadzone(pitch)
+    }
+
+    private fun withPcDeadzone(rate: Float): Float =
+        if (rate == 0f) 0f else rate + (if (rate > 0f) PC_DEADZONE else -PC_DEADZONE)
+
+    /** El ajuste del usuario (pantallas del mando de Wii): el trackpad de ratón sí o no. */
+    private val _enabled = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val enabled: kotlinx.coroutines.flow.StateFlow<Boolean> = _enabled
+
+    fun loadEnabled(context: android.content.Context) {
+        _enabled.value = AppPrefs.pointerTrackpad(context)
+    }
+
+    fun setEnabled(context: android.content.Context, on: Boolean) {
+        _enabled.value = on
+        AppPrefs.setPointerTrackpad(context, on)
+    }
+
     internal fun toGyro(v: Float): Float {
         if (v == 0f) return 0f
-        val rate = -v * GAIN * sensitivity
-        return rate + (if (rate > 0f) PC_DEADZONE else -PC_DEADZONE)
+        return withPcDeadzone(-v * GAIN * sensitivity)
     }
 
     /** Escribe el giro sintético en [out] (marco del paquete). */
     fun fill(out: FloatArray) {
-        out[0] = gx
+        out[0] = gx + gyroGx
         out[1] = 0f
-        out[2] = gz
+        out[2] = gz + gyroGz
     }
 }

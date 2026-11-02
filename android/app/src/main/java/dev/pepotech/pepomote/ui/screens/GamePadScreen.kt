@@ -48,7 +48,11 @@ import dev.pepotech.pepomote.control.GyroAim
 import dev.pepotech.pepomote.control.OrientationLock
 import dev.pepotech.pepomote.control.GyroConfig
 import dev.pepotech.pepomote.control.LookConfig
+import dev.pepotech.pepomote.control.LookZone
+import dev.pepotech.pepomote.control.MouseConfig
+import dev.pepotech.pepomote.control.PointerTrackpad
 import dev.pepotech.pepomote.control.PadProfile
+import dev.pepotech.pepomote.control.PadElement
 import dev.pepotech.pepomote.control.PadProfileStore
 import dev.pepotech.pepomote.control.PadProfiles
 import dev.pepotech.pepomote.control.PhysicalPad
@@ -310,11 +314,35 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
             }
         }
     }
+    var globalMouse by remember { mutableStateOf(AppPrefs.globalMouse(context)) }
+    fun setMouse(mc: MouseConfig) {
+        val d = draft
+        if (editing && d != null) draft = d.copy(mouse = mc)
+        else {
+            val p = shownProfile
+            if (p != null) PadProfileStore.save(context, p.copy(mouse = mc)) else {
+                globalMouse = mc
+                AppPrefs.setGlobalMouse(context, mc)
+            }
+        }
+    }
     // Apuntar con el giro: solo el mando universal confirmado y sin el teclado abierto
-    val gyroLive = xboxPad && operative && !keyboardOpen && !mouseMode
-    // Modo ratón con el dedo: el trackpad de ratón en los huecos en vez de la cámara
-    var pointerPad by remember { mutableStateOf(AppPrefs.pointerTrackpad(context)) }
-    SideEffect { GyroAim.config = gyroCfg }
+    // El giro, en el móvil: cámara en modo mando, cursor relativo en modo ratón
+    val gyroLive = xboxPad && operative && !keyboardOpen
+    val mouseCfg = shownProfile?.mouse ?: globalMouse
+    SideEffect {
+        GyroAim.config = gyroCfg
+        GyroAim.mouseConfig = mouseCfg
+        GyroAim.mouse = mouseMode
+        PointerTrackpad.sensitivity = mouseCfg.padSens
+    }
+    // Modo ratón: el cursor siempre en relativo (giro y touchpads calculados
+    // aquí), así el puntero no se descentra con el uso
+    DisposableEffect(mouseMode) {
+        PointerTrackpad.active = mouseMode
+        onDispose { PointerTrackpad.active = false }
+    }
+    DisposableEffect(Unit) { onDispose { GyroAim.mouse = false } }
     DisposableEffect(engine, gyroLive) {
         if (engine != null && gyroLive) {
             GyroAim.active = true
@@ -358,7 +386,10 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                 },
                 look = globalLook,
                 gyro = globalGyro
-            )
+            ).let { q ->
+                // Mando universal: el interruptor mando / ratón, en el centro
+                if (xboxPad) q.add(PadElement(ElementKind.MODE_TOGGLE, 0.5f, 0.55f, 0.15f)) else q
+            }
         }
     }
     // Editar: el perfil activo, o uno nuevo con el diseño de fábrica
@@ -410,7 +441,13 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     // Sin el eco del modo la tarjeta no se pliega sola (ver GamePadCollapsibleHeader)
     val autoCollapse = operative && HeaderCollapse.autoCollapses(link is UiLink.Connected, rememberScreenReader())
 
-    CompositionLocalProvider(LocalPressRegistry provides press) {
+    val padActions = PadActions(
+        mouseMode = mouseMode,
+        mouse = mouseCfg,
+        onKeyboard = { if (Route.showsKeyboard(link)) keyboardOpen = true },
+        onToggleMouse = { LinkState.setPadMouse(!padMouse) }
+    )
+    CompositionLocalProvider(LocalPressRegistry provides press, LocalPadActions provides padActions) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
@@ -492,9 +529,11 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     val shown = shownProfile
                     if (shown != null) {
                         key(layout.id) {
-                            if (mouseMode && pointerPad) PointerTrackpadLayer(Modifier.matchParentSize())
+                            if (mouseMode && lookCfg.zone != LookZone.OFF) {
+                                PointerTrackpadLayer(Modifier.matchParentSize(), manageActive = false, inertia = mouseCfg.inertia)
+                            }
                             CustomPadCanvas(
-                                lookEnabled = !(mouseMode && pointerPad),
+                                lookEnabled = !mouseMode,
                                 profile = shown,
                                 layout = layout,
                                 editing = editing,
@@ -505,7 +544,9 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         }
                     } else {
                     // Cámara en el espacio libre, debajo de los controles
-                    if (mouseMode && pointerPad) PointerTrackpadLayer(Modifier.matchParentSize())
+                    if (mouseMode && lookCfg.zone != LookZone.OFF) {
+                        PointerTrackpadLayer(Modifier.matchParentSize(), manageActive = false, inertia = mouseCfg.inertia)
+                    }
                     else if (customAllowed) LookSurface(lookCfg, Modifier.matchParentSize())
                     // Cada plantilla es un trazado nuevo: ningún botón hereda el bit de otro
                     key(layout.id) { Row(
@@ -829,11 +870,6 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                 PadMenuDialog(
                     mouseOn = if (xboxPad) padMouse else null,
                     onMouseToggle = { LinkState.setPadMouse(!padMouse) },
-                    pointerPadOn = if (padMouse) pointerPad else null,
-                    onPointerPadToggle = {
-                        pointerPad = !pointerPad
-                        AppPrefs.setPointerTrackpad(context, pointerPad)
-                    },
                     activeName = activeName,
                     locked = orientationLock != AppPrefs.ORIENTATION_FREE,
                     gyroOn = if (xboxPad) gyroCfg.enabled else null,
@@ -900,6 +936,8 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                 PadSettingsDialog(
                     look = lookCfg,
                     gyro = gyroCfg,
+                    mouse = if (xboxPad) mouseCfg else null,
+                    onMouse = { setMouse(it) },
                     showGyro = xboxPad,
                     onLook = { setLook(it) },
                     onGyro = { setGyro(it) },

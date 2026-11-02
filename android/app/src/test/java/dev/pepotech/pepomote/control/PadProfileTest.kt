@@ -32,8 +32,11 @@ class PadProfileTest {
         // Con el rombo puesto no se ofrecen sus botones sueltos
         val add = PadProfiles.addable(p, xboxFace)
         assertFalse(add.any { it.kind == ElementKind.BUTTON && it.bit in xboxFace })
-        // Falta el botón 🎯 del giro y, sin Capturar en este mando, ese botón
-        assertEquals(listOf(AddOption(ElementKind.GYRO), AddOption(ElementKind.BUTTON, ButtonState.SCREEN)), add)
+        // Faltan los controles extra (giro, ratón, teclado…) y, sin Capturar en este mando, ese botón
+        assertTrue(add.contains(AddOption(ElementKind.GYRO)))
+        assertTrue(add.contains(AddOption(ElementKind.MOUSE_PAD)))
+        assertTrue(add.contains(AddOption(ElementKind.BUTTON, ButtonState.SCREEN)))
+        assertFalse(add.any { it.kind == ElementKind.BUTTON && it.bit != ButtonState.SCREEN })
     }
 
     @Test fun quitarElRomboDejaPonerBotonesSueltos() {
