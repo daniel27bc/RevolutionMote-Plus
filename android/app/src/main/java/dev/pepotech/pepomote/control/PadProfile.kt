@@ -144,7 +144,11 @@ data class PadProfile(
     val opacity: Float = 1f,
     val look: LookConfig = LookConfig(),
     val gyro: GyroConfig = GyroConfig(),
-    val mouse: MouseConfig = MouseConfig()
+    val mouse: MouseConfig = MouseConfig(),
+    /** Rótulos del rombo: «xbox», «nintendo» o «playstation» (solo cambian los nombres). */
+    val faceStyle: String = FaceStyle.XBOX,
+    /** Al usar este perfil, el mando arranca en modo ratón (el perfil Touchpad). */
+    val startMouse: Boolean = false
 ) {
     fun replace(old: PadElement, new: PadElement) =
         copy(elements = elements.map { if (it.id == old.id) new else it })
@@ -158,6 +162,36 @@ data class PadProfile(
 data class AddOption(val kind: ElementKind, val bit: Int = 0)
 
 /** Teclas que se pueden poner en el mando (nombre `KeyboardEvent.code` → rótulo). */
+/** Rótulos del rombo del mando universal. Solo cambian los NOMBRES: cada botón sigue enviando el de su sitio. */
+object FaceStyle {
+    const val XBOX = "xbox"
+    const val NINTENDO = "nintendo"
+    const val PLAYSTATION = "playstation"
+    val ALL = listOf(XBOX, NINTENDO, PLAYSTATION)
+
+    /** Rótulo del botón [bit] con el estilo [style] (null = el de siempre). */
+    fun label(style: String, bit: Int): String? = when (style) {
+        NINTENDO -> when (bit) {
+            ButtonState.A -> "B"
+            ButtonState.B -> "A"
+            ButtonState.X -> "Y"
+            ButtonState.Y -> "X"
+            else -> null
+        }
+        PLAYSTATION -> when (bit) {
+            ButtonState.A -> "✕"
+            ButtonState.B -> "○"
+            ButtonState.X -> "□"
+            ButtonState.Y -> "△"
+            else -> null
+        }
+        else -> null
+    }
+}
+
+/** Diseños de partida para un perfil nuevo. */
+enum class PadPreset { XBOX, NINTENDO, PLAYSTATION, TOUCHPAD }
+
 object PadKeys {
     val ALL: List<Pair<String, String>> = listOf(
         "Escape" to "Esc", "Tab" to "Tab", "Enter" to "Intro", "Space" to "Espacio", "Backspace" to "Borrar",
@@ -254,6 +288,29 @@ object PadProfiles {
         return PadKeys.ALL.firstOrNull { it.first !in used }?.first ?: "Escape"
     }
 
+    /**
+     * El perfil «Touchpad»: un touchpad grande en el centro, los dos clics a
+     * los lados, teclado, el interruptor mando / ratón, el giro y las teclas
+     * más usadas. Arranca en modo ratón.
+     */
+    fun touchpad(name: String, look: LookConfig = LookConfig(), gyro: GyroConfig = GyroConfig()): PadProfile = PadProfile(
+        name = name,
+        elements = listOf(
+            PadElement(ElementKind.MOUSE_PAD, 0.5f, 0.55f, 0.62f, pill = true),
+            PadElement(ElementKind.MOUSE_LEFT, 0.11f, 0.72f, 0.2f),
+            PadElement(ElementKind.MOUSE_RIGHT, 0.89f, 0.72f, 0.2f),
+            PadElement(ElementKind.KEYBOARD, 0.09f, 0.3f, 0.15f),
+            PadElement(ElementKind.MODE_TOGGLE, 0.91f, 0.3f, 0.15f),
+            PadElement(ElementKind.KEY, 0.25f, 0.12f, 0.12f, key = "Escape"),
+            PadElement(ElementKind.KEY, 0.75f, 0.12f, 0.12f, key = "Enter"),
+            PadElement(ElementKind.PRECISION, 0.23f, 0.92f, 0.12f),
+            PadElement(ElementKind.RECENTER, 0.77f, 0.92f, 0.12f)
+        ),
+        look = look,
+        gyro = gyro,
+        startMouse = true
+    )
+
     fun newElement(option: AddOption): PadElement = when (option.kind) {
         ElementKind.STICK_L, ElementKind.STICK_R -> PadElement(option.kind, 0.5f, 0.5f, 0.42f)
         ElementKind.DPAD -> PadElement(option.kind, 0.5f, 0.5f, 0.36f)
@@ -297,7 +354,9 @@ object PadProfiles {
         if (hasRightStick) e += PadElement(ElementKind.STICK_R, 0.68f, 0.80f, 0.40f)
         if (stickClicks && hasLeftStick) btn(ButtonState.STICK_L, 0.28f, 0.42f, 0.11f)
         if (stickClicks && hasRightStick) btn(ButtonState.STICK_R, 0.72f, 0.42f, 0.11f)
-        val center = (centerBits + ButtonState.HOME).distinct()
+        // Back a la izquierda, Home en medio y Start a la derecha
+        val own = centerBits.filter { it != ButtonState.HOME }
+        val center = (own.take(own.size / 2) + ButtonState.HOME + own.drop(own.size / 2)).distinct()
         val step = 0.085f
         val first = 0.5f - step * (center.size - 1) / 2f
         for ((i, bit) in center.withIndex()) btn(bit, first + step * i, 0.30f, 0.11f)
@@ -332,6 +391,8 @@ object PadProfileJson {
         put("look", lookToJson(p.look))
         put("gyro", gyroToJson(p.gyro))
         put("mouse", mouseToJson(p.mouse))
+        put("face", p.faceStyle)
+        if (p.startMouse) put("startMouse", true)
         put("elements", JSONArray().apply {
             for (e in p.elements) put(JSONObject().apply {
                 put("kind", e.kind.name)
@@ -381,7 +442,9 @@ object PadProfileJson {
             opacity = o.optDouble("opacity", 1.0).toFloat().coerceIn(PadProfiles.MIN_OPACITY, 1f),
             look = lookFromJson(o.optJSONObject("look")),
             gyro = gyroFromJson(o.optJSONObject("gyro")),
-            mouse = o.optJSONObject("mouse")?.let { mouseFromJson(it) } ?: MouseConfig()
+            mouse = o.optJSONObject("mouse")?.let { mouseFromJson(it) } ?: MouseConfig(),
+            faceStyle = o.optString("face", FaceStyle.XBOX).takeIf { it in FaceStyle.ALL } ?: FaceStyle.XBOX,
+            startMouse = o.optBoolean("startMouse", false)
         )
     } catch (_: Exception) {
         null

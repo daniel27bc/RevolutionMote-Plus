@@ -78,6 +78,8 @@ import dev.pepotech.pepomote.control.UiSounds
 import dev.pepotech.pepomote.ui.components.Ico
 import dev.pepotech.pepomote.ui.components.LocalPressRegistry
 import dev.pepotech.pepomote.ui.components.trackpadInput
+import dev.pepotech.pepomote.ui.components.mouseGestures
+import androidx.compose.runtime.key
 import dev.pepotech.pepomote.ui.theme.PepoColors
 import kotlin.math.roundToInt
 
@@ -139,14 +141,10 @@ internal fun PointerTrackpadLayer(
             onDispose { PointerTrackpad.active = false }
         }
     }
-    Box(
-        modifier.trackpadInput(
-            sensitivity = 1f,
-            antiDeadzone = 0f,
-            inertia = inert,
-            onVelocity = { vx, vy -> PointerTrackpad.setVelocity(vx, vy) }
-        ) { _, _ -> }
-    )
+    val gestures = remember { AppPrefs.touchGestures(context) }
+    // El mismo touchpad completo que en el modo ratón: toque = A (clic),
+    // dos dedos = B, doble toque y mantener = arrastrar con A
+    Box(modifier.mouseGestures(dev.pepotech.pepomote.ui.components.PointerOut, 1f, inert, gestures))
 }
 
 /**
@@ -155,16 +153,11 @@ internal fun PointerTrackpadLayer(
  */
 @Composable
 internal fun MouseFreeLayer(modifier: Modifier, sensitivity: Float, inertia: Float) {
-    val sens by rememberUpdatedState(sensitivity)
+    val context = LocalContext.current
+    val gestures = remember { AppPrefs.touchGestures(context) }
     DisposableEffect(Unit) { onDispose { Kbm.setTouch(Kbm.SRC_FREE, 0f, 0f) } }
-    Box(
-        modifier.trackpadInput(
-            sensitivity = 1f,
-            antiDeadzone = 0f,
-            inertia = inertia,
-            onVelocity = { vx, vy -> Kbm.setTouch(Kbm.SRC_FREE, vx * sens, vy * sens) }
-        ) { _, _ -> }
-    )
+    // Los huecos libres son un touchpad completo: clic, doble clic, agarrar…
+    Box(modifier.mouseGestures(dev.pepotech.pepomote.ui.components.KbmOut(Kbm.SRC_FREE), sensitivity, inertia, gestures))
 }
 
 /**
@@ -287,24 +280,115 @@ internal fun PointerModeSwitch(modifier: Modifier = Modifier) {
     }
 }
 
-/** Candado de orientación y, en modo puntero, el selector del trackpad (arriba a la derecha). */
+/** Un globo con el título y lo que hace un botón (mantener pulsado para verlo). */
+@Composable
+internal fun HintPopup(title: String, desc: String, onDismiss: () -> Unit) {
+    androidx.compose.runtime.LaunchedEffect(title) {
+        kotlinx.coroutines.delay(4000)
+        onDismiss()
+    }
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+    androidx.compose.ui.window.Popup(
+        alignment = Alignment.TopEnd,
+        offset = androidx.compose.ui.unit.IntOffset(0, 110),
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            Modifier
+                .padding(8.dp)
+                .widthIn(max = 260.dp)
+                .shadow(6.dp, shape)
+                .background(PepoColors.Card, shape)
+                .padding(12.dp)
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(desc, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/** Botón de icono: un toque lo usa y mantenerlo explica qué hace. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+internal fun HintIconButton(
+    @androidx.annotation.DrawableRes icon: Int,
+    tint: androidx.compose.ui.graphics.Color,
+    title: String,
+    desc: String,
+    onClick: () -> Unit
+) {
+    val view = LocalView.current
+    var hint by remember { mutableStateOf(false) }
+    Box(
+        Modifier
+            .size(40.dp)
+            .combinedClickable(
+                onClickLabel = title,
+                onLongClick = {
+                    Haptics.tap(view, HapticFeedbackConstants.LONG_PRESS)
+                    hint = true
+                },
+                onClick = onClick
+            )
+            .semantics { contentDescription = title },
+        contentAlignment = Alignment.Center
+    ) {
+        Ico(icon, tint, 22.dp)
+        if (hint) HintPopup(title, desc) { hint = false }
+    }
+}
+
+/**
+ * Arriba a la derecha del mando de Wii: en modo puntero, el selector del
+ * trackpad y sus ajustes (⚙); y el candado de orientación. Mantener
+ * cualquiera explica lo que hace.
+ */
 @Composable
 internal fun PointerQuickControls(link: dev.pepotech.pepomote.service.UiLink, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val pointer = (link as? dev.pepotech.pepomote.service.UiLink.Connected)?.mode == dev.pepotech.pepomote.service.LinkState.MODE_POINTER
+    val lock by dev.pepotech.pepomote.control.OrientationLock.state.collectAsState()
+    val rotation = rememberDisplayRotation()
+    val locked = lock != AppPrefs.ORIENTATION_FREE
+    var settings by remember { mutableStateOf(false) }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (pointer) PointerModeSwitch()
-        dev.pepotech.pepomote.ui.components.OrientationLockButton()
+        if (pointer) {
+            PointerModeSwitch()
+            HintIconButton(
+                R.drawable.ms_tune, PepoColors.TextDim,
+                stringResource(R.string.pointer_settings_title), stringResource(R.string.pointer_settings_hint)
+            ) { settings = true }
+        }
+        HintIconButton(
+            if (locked) R.drawable.ms_lock_fill1 else R.drawable.ms_screen_rotation,
+            if (locked) PepoColors.Warn else PepoColors.TextDim,
+            stringResource(if (locked) R.string.orientation_unlock else R.string.orientation_lock),
+            stringResource(R.string.orientation_hint)
+        ) { dev.pepotech.pepomote.control.OrientationLock.toggle(context, rotation) }
+    }
+    if (settings) {
+        EditorDialog({ settings = false }) {
+            PointerTrackpadSettings(inPointer = true)
+            TextButton(onClick = { settings = false }, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(R.string.ed_done), color = PepoColors.Blue, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 
 /** Ajustes del ratón con el dedo: modo, sensibilidad e inercia. */
 @Composable
-internal fun PointerTrackpadSettings() {
+internal fun PointerTrackpadSettings(inPointer: Boolean = false) {
     val context = LocalContext.current
     val mode by PointerTrackpad.mode.collectAsState()
     var sens by remember { mutableStateOf(AppPrefs.pointerTrackpadSens(context)) }
     var inertia by remember { mutableStateOf(AppPrefs.pointerTrackpadInertia(context)) }
-    SectionTitle(stringResource(R.string.pointer_trackpad_title), stringResource(R.string.pointer_trackpad_sub))
+    var gestures by remember { mutableStateOf(AppPrefs.touchGestures(context)) }
+    SectionTitle(
+        stringResource(if (inPointer) R.string.pointer_settings_title else R.string.pointer_trackpad_title),
+        stringResource(R.string.pointer_trackpad_sub)
+    )
     ChipFlow {
         for ((m, label, _) in POINTER_MODES) {
             ModeChip(stringResource(label), selected = mode == m, dense = true) { PointerTrackpad.setMode(context, m) }
@@ -325,15 +409,33 @@ internal fun PointerTrackpadSettings() {
             AppPrefs.setPointerTrackpadInertia(context, it)
         }
     }
+    SwitchRow(stringResource(R.string.gestures_title), gestures, stringResource(R.string.gestures_sub)) {
+        gestures = it
+        AppPrefs.setTouchGestures(context, it)
+    }
 }
 
-/** El botón 🎯: mantenerlo apunta con el giro, o un toque lo enciende y lo apaga. */
+/**
+ * El botón del giroscopio, según cómo se active el giro:
+ * - «Siempre»: un toque lo pausa y otro lo reanuda (verde = apuntando);
+ * - «Alternar con el botón»: un toque lo enciende y otro lo apaga;
+ * - el resto: mientras se mantiene, apunta.
+ */
 @Composable
 internal fun GyroButton(size: Dp, gyro: GyroConfig) {
     val view = LocalView.current
-    val toggle = gyro.activation == GyroActivation.TOGGLE_BUTTON
-    var on by remember { mutableStateOf(if (toggle) GyroAim.toggled else false) }
-    val isToggle by rememberUpdatedState(toggle)
+    val mode = when (gyro.activation) {
+        GyroActivation.ALWAYS -> 0
+        GyroActivation.TOGGLE_BUTTON -> 1
+        else -> 2
+    }
+    fun current(): Boolean = when (mode) {
+        0 -> !GyroAim.paused
+        1 -> GyroAim.toggled
+        else -> false
+    }
+    var on by remember(mode) { mutableStateOf(current()) }
+    val modeNow by rememberUpdatedState(mode)
     DisposableEffect(Unit) {
         onDispose { GyroAim.buttonHeld = false }
     }
@@ -344,7 +446,7 @@ internal fun GyroButton(size: Dp, gyro: GyroConfig) {
             .size(size)
             .shadow(if (on) 1.dp else 6.dp, CircleShape)
             .background(if (on) PepoColors.Ok else PepoColors.Card, CircleShape)
-            .border(2.dp, if (on) PepoColors.Ok else PepoColors.Blue, CircleShape)
+            .border(2.dp, if (on) PepoColors.Ok else PepoColors.CardBorder, CircleShape)
             .semantics(mergeDescendants = true) {
                 contentDescription = gyroDesc
                 role = androidx.compose.ui.semantics.Role.Switch
@@ -356,19 +458,27 @@ internal fun GyroButton(size: Dp, gyro: GyroConfig) {
                     down.consume()
                     Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
                     UiSounds.blip()
-                    if (isToggle) {
-                        GyroAim.toggled = !GyroAim.toggled
-                        on = GyroAim.toggled
-                        waitForUpOrCancellation()
-                    } else {
-                        GyroAim.buttonHeld = true
-                        on = true
-                        try {
+                    when (modeNow) {
+                        0 -> {
+                            GyroAim.paused = !GyroAim.paused
+                            on = !GyroAim.paused
                             waitForUpOrCancellation()
-                        } finally {
-                            GyroAim.buttonHeld = false
-                            on = false
-                            Haptics.release(view)
+                        }
+                        1 -> {
+                            GyroAim.toggled = !GyroAim.toggled
+                            on = GyroAim.toggled
+                            waitForUpOrCancellation()
+                        }
+                        else -> {
+                            GyroAim.buttonHeld = true
+                            on = true
+                            try {
+                                waitForUpOrCancellation()
+                            } finally {
+                                GyroAim.buttonHeld = false
+                                on = false
+                                Haptics.release(view)
+                            }
                         }
                     }
                 }
@@ -376,10 +486,10 @@ internal fun GyroButton(size: Dp, gyro: GyroConfig) {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Ico(R.drawable.ms_my_location, if (on) PepoColors.OnAccent else PepoColors.Blue, (size.value * 0.38f).coerceIn(14f, 34f).dp)
+            Ico(R.drawable.ms_my_location, if (on) PepoColors.OnAccent else PepoColors.TextDim, (size.value * 0.38f).coerceIn(14f, 34f).dp)
             Text(
                 stringResource(R.string.gyro_short),
-                color = if (on) PepoColors.OnAccent else PepoColors.Text,
+                color = if (on) PepoColors.OnAccent else PepoColors.TextDim,
                 fontSize = (size.value * 0.16f).coerceIn(8f, 14f).sp,
                 fontWeight = FontWeight.Bold
             )
@@ -589,10 +699,10 @@ internal fun MouseSettingsSection(mouse: MouseConfig, onChange: (MouseConfig) ->
 }
 
 /**
- * Touchpad del mando universal. En modo ratón es el trackpad de un portátil:
- * un dedo mueve el cursor, un toque es clic izquierdo, un toque con dos dedos
- * es clic derecho y arrastrar con dos dedos es la rueda. En modo mando hace de
- * trackpad de cámara (stick derecho). Con inercia opcional al soltar.
+ * Touchpad del mando universal. En modo ratón es el trackpad de un portátil
+ * completo ([mouseGestures]: clics, doble toque, agarrar, rueda, zoom y
+ * gestos de tres dedos). En modo mando hace de trackpad de cámara (stick
+ * derecho). Con inercia opcional al soltar.
  */
 @Composable
 internal fun MousePad(
@@ -603,170 +713,50 @@ internal fun MousePad(
     antiDeadzone: Float,
     inertia: Float
 ) {
-    val view = LocalView.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val mouseNow by rememberUpdatedState(mouseMode)
-    val sens by rememberUpdatedState(sensitivity)
-    val adz by rememberUpdatedState(antiDeadzone)
-    val inert by rememberUpdatedState(inertia)
-    var running by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     var touching by remember { mutableStateOf(false) }
-    val m = remember { FloatArray(2) } // vx, vy (dp/ms)
-    val lastMove = remember { LongArray(1) }
-    var isDown by remember { mutableStateOf(false) }
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)
     val padDesc = stringResource(if (mouseMode) R.string.mousepad_label_mouse else R.string.mousepad_label_pad) +
         ". " + stringResource(R.string.mousepad_help)
-
-    fun out(vx: Float, vy: Float) {
-        if (mouseNow) {
-            Kbm.setTouch(Kbm.SRC_PAD, vx * sens, vy * sens)
-        } else {
-            val (x, y) = dev.pepotech.pepomote.control.TrackpadEngine.fromVelocity(vx, vy, sens, adz)
-            ButtonState.setStick2From(ButtonState.SRC_LOOK, x, y)
+    val gestures = remember { AppPrefs.touchGestures(context) }
+    DisposableEffect(mouseMode) {
+        onDispose {
+            Kbm.setTouch(Kbm.SRC_PAD, 0f, 0f)
+            ButtonState.setStick2From(ButtonState.SRC_LOOK, 0, 0)
         }
     }
-    fun stop() {
-        m[0] = 0f; m[1] = 0f
-        Kbm.setTouch(Kbm.SRC_PAD, 0f, 0f)
-        ButtonState.setStick2From(ButtonState.SRC_LOOK, 0, 0)
-    }
-    DisposableEffect(Unit) { onDispose { stop() } }
-
-    androidx.compose.runtime.LaunchedEffect(running) {
-        if (!running) return@LaunchedEffect
-        while (true) {
-            androidx.compose.runtime.withFrameMillis { }
-            if (isDown) {
-                if (android.os.SystemClock.uptimeMillis() - lastMove[0] > 24L) {
-                    m[0] *= 0.45f; m[1] *= 0.45f
-                }
+    val base = Modifier
+        .size(w, h)
+        .background(PepoColors.Card, shape)
+        .border(2.dp, if (touching) PepoColors.Glow else PepoColors.CardBorder, shape)
+        .semantics(mergeDescendants = true) { contentDescription = padDesc }
+    key(mouseMode) {
+        Box(
+            if (mouseMode) {
+                base.mouseGestures(
+                    dev.pepotech.pepomote.ui.components.KbmOut(Kbm.SRC_PAD),
+                    sensitivity, inertia, gestures, onTouching = { touching = it }
+                )
             } else {
-                val k = 0.80f + 0.185f * inert.coerceIn(0f, 1f)
-                m[0] *= k; m[1] *= k
-                if (kotlin.math.hypot(m[0], m[1]) < 0.004f) {
-                    stop()
-                    running = false
-                    break
-                }
-            }
-            out(m[0], m[1])
-        }
-    }
-
-    Box(
-        Modifier
-            .size(w, h)
-            .background(PepoColors.Card, shape)
-            .border(2.dp, if (touching) PepoColors.Glow else PepoColors.CardBorder, shape)
-            .semantics(mergeDescendants = true) { contentDescription = padDesc }
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val first = awaitFirstDown()
-                    first.consume()
-                    val t0 = android.os.SystemClock.uptimeMillis()
-                    m[0] = 0f; m[1] = 0f; lastMove[0] = t0
-                    isDown = true
-                    touching = true
-                    running = true
-                    var travel = 0f
-                    var fingers = 1
-                    var scrollAcc = 0f
-                    // Mantener quieto un momento = agarrar (botón izquierdo
-                    // pulsado mientras se mueve: arrastrar pestañas, ventanas…)
-                    var dragging = false
-                    while (true) {
-                        val canGrab = mouseNow && !dragging && fingers == 1 && travel < GRAB_SLOP_DP
-                        val left = GRAB_MS - (android.os.SystemClock.uptimeMillis() - t0)
-                        val ev = if (canGrab) {
-                            if (left <= 0) null else withTimeoutOrNull(left) { awaitPointerEvent() }
-                        } else {
-                            awaitPointerEvent()
-                        }
-                        if (ev == null) {
-                            dragging = true
-                            Haptics.tap(view, HapticFeedbackConstants.LONG_PRESS)
-                            Kbm.button(0, true)
-                            continue
-                        }
-                        val pressed = ev.changes.filter { it.pressed }
-                        fingers = maxOf(fingers, pressed.size)
-                        if (pressed.size >= 2) {
-                            // Dos dedos: la rueda (en modo ratón)
-                            val dy = pressed.map { it.positionChangeIgnoreConsumed().y }.average().toFloat()
-                            travel += kotlin.math.abs(dy) / density
-                            m[0] = 0f; m[1] = 0f
-                            if (mouseNow) {
-                                scrollAcc += dy
-                                val step = scrollAcc.toInt()
-                                if (step != 0) {
-                                    Kbm.wheel(-step * 4)
-                                    scrollAcc -= step
-                                }
-                            }
-                        } else if (pressed.size == 1) {
-                            val c = pressed[0]
-                            val d = c.positionChangeIgnoreConsumed()
-                            val dt = (c.uptimeMillis - c.previousUptimeMillis).coerceAtLeast(1L)
-                            travel += d.getDistance() / density
-                            m[0] += (d.x / density / dt - m[0]) * 0.55f
-                            m[1] += (d.y / density / dt - m[1]) * 0.55f
-                            lastMove[0] = android.os.SystemClock.uptimeMillis()
-                        }
-                        ev.changes.forEach { it.consume() }
-                        if (ev.changes.none { it.pressed }) break
-                    }
-                    isDown = false
-                    touching = false
-                    val dur = android.os.SystemClock.uptimeMillis() - t0
-                    if (dragging) {
-                        Kbm.button(0, false)
-                        Haptics.release(view)
-                    } else if (mouseNow && dur < 260 && travel < 10f) {
-                        // Toque corto sin moverse: clic (dos dedos = derecho,
-                        // tres = central). Dos toques seguidos = doble clic
-                        val btn = when {
-                            fingers >= 3 -> 2
-                            fingers == 2 -> 1
-                            else -> 0
-                        }
-                        Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
-                        scope.launch {
-                            Kbm.button(btn, true)
-                            kotlinx.coroutines.delay(45)
-                            Kbm.button(btn, false)
-                        }
-                    }
-                    val moving = android.os.SystemClock.uptimeMillis() - lastMove[0] < 60 && kotlin.math.hypot(m[0], m[1]) > 0.02f
-                    if (!(inert > 0f && moving)) {
-                        stop()
-                        running = false
-                    }
-                }
+                base.trackpadInput(
+                    sensitivity = sensitivity,
+                    antiDeadzone = antiDeadzone,
+                    inertia = inertia,
+                    onTouch = { touching = it != null }
+                ) { x, y -> ButtonState.setStick2From(ButtonState.SRC_LOOK, x, y) }
             },
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Ico(
-                if (mouseMode) R.drawable.ms_mouse else R.drawable.ms_drag_pan,
-                if (touching) PepoColors.Blue else PepoColors.TextDim,
-                (minOf(w.value, h.value) * 0.22f).coerceIn(18f, 40f).dp
-            )
-            Text(
-                stringResource(if (mouseMode) R.string.mousepad_label_mouse else R.string.mousepad_label_pad),
-                color = PepoColors.TextDim,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Ico(
+                    if (mouseMode) R.drawable.ms_touchpad_mouse else R.drawable.ms_drag_pan,
+                    if (touching) PepoColors.Blue else PepoColors.TextDim,
+                    (minOf(w.value, h.value) * 0.22f).coerceIn(18f, 40f).dp
+                )
+            }
         }
     }
 }
-
-/** Mantener el dedo quieto este tiempo en el touchpad agarra (botón izquierdo pulsado). */
-private const val GRAB_MS = 380L
-
-/** Lo que puede moverse el dedo (dp) y seguir contando como «quieto» para agarrar. */
-private const val GRAB_SLOP_DP = 6f
 
 /** Un botón redondo con icono y rótulo (clics, teclado, mando/ratón). */
 @Composable
@@ -776,6 +766,8 @@ internal fun IconPadButton(
     label: String,
     enabled: Boolean = true,
     highlighted: Boolean = false,
+    /** false = solo el icono (el rótulo queda para TalkBack). */
+    showLabel: Boolean = true,
     onPress: (Boolean) -> Unit
 ) {
     val view = LocalView.current
@@ -819,8 +811,8 @@ internal fun IconPadButton(
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Ico(icon, if (on) PepoColors.OnAccent else PepoColors.Text, (size.value * 0.36f).coerceIn(14f, 34f).dp)
-            Text(
+            Ico(icon, if (on) PepoColors.OnAccent else PepoColors.Text, (size.value * (if (showLabel) 0.36f else 0.5f)).coerceIn(14f, 40f).dp)
+            if (showLabel) Text(
                 label,
                 color = if (on) PepoColors.OnAccent else PepoColors.TextDim,
                 fontSize = (size.value * 0.13f).coerceIn(8f, 13f).sp,

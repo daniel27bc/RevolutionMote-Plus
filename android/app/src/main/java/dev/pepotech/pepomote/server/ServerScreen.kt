@@ -158,24 +158,50 @@ fun ServerScreen(onBack: () -> Unit) {
         contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
+            // Cabecera como el resto de la app: título, salir y el estado con
+            // su punto de color y el botón grande de encender/apagar
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.channel_server), style = MaterialTheme.typography.headlineLarge,
+                androidx.compose.foundation.Image(
+                    androidx.compose.ui.res.painterResource(R.drawable.rm_logo), null,
+                    Modifier.size(34.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.channel_server), style = MaterialTheme.typography.headlineMedium,
                     modifier = Modifier.weight(1f))
-                TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+                TextButton(onClick = onBack) { Text(stringResource(R.string.back), color = PepoColors.TextDim) }
             }
             Text(stringResource(R.string.server_intro), style = MaterialTheme.typography.bodyMedium)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(when {
-                    state.running -> R.string.server_running_short
-                    state.starting -> R.string.server_starting
-                    else -> R.string.server_stopped
-                }), color = if (state.running) PepoColors.Ok else PepoColors.Text,
-                    style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                TextButton(onClick = {
-                    if (state.active) ServerForegroundService.stop(context) else ServerForegroundService.start(context)
-                }, enabled = !jobs.busy) { Text(stringResource(if (state.active) R.string.server_stop else R.string.server_start)) }
+            Spacer(Modifier.height(12.dp))
+            ServerCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.size(12.dp).background(
+                            when {
+                                state.running -> PepoColors.Ok
+                                state.starting -> PepoColors.Warn
+                                else -> PepoColors.TextDim
+                            },
+                            androidx.compose.foundation.shape.CircleShape
+                        )
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(stringResource(when {
+                        state.running -> R.string.server_running_short
+                        state.starting -> R.string.server_starting
+                        else -> R.string.server_stopped
+                    }), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Button(
+                        onClick = { if (state.active) ServerForegroundService.stop(context) else ServerForegroundService.start(context) },
+                        enabled = !jobs.busy,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = if (state.active) PepoColors.Card else PepoColors.Blue,
+                            contentColor = if (state.active) PepoColors.Error else PepoColors.OnAccent
+                        ),
+                        border = if (state.active) BorderStroke(1.5.dp, PepoColors.Error) else null
+                    ) { Text(stringResource(if (state.active) R.string.server_stop else R.string.server_start), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) }
+                }
+                state.error?.let { Text(it, color = PepoColors.Error) }
             }
-            state.error?.let { Text(it, color = PepoColors.Error) }
         }
         if (state.running) item { ServerPairingCard(state) }
         item {
@@ -346,7 +372,8 @@ fun ServerScreen(onBack: () -> Unit) {
 @Composable
 internal fun ServerCard(content: @Composable ColumnScope.() -> Unit) {
     Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = PepoColors.Card), border = BorderStroke(1.dp, PepoColors.CardBorder)) {
+        colors = CardDefaults.cardColors(containerColor = PepoColors.Card), border = BorderStroke(1.5.dp, PepoColors.CardBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }

@@ -118,6 +118,11 @@ internal fun snapElement(e: PadElement): PadElement = e.copy(
 /** Ancho de una pastilla (gatillo/hombro) respecto a su alto. */
 private const val PILL_RATIO = 2.3f
 
+/** La plantilla con los rótulos del estilo del perfil (Nintendo, PlayStation…) en el rombo. */
+internal fun RetroLayout.styled(style: String): RetroLayout =
+    if (id != "xbox" || style == dev.pepotech.pepomote.control.FaceStyle.XBOX) this
+    else copy(face = face.map { f -> dev.pepotech.pepomote.control.FaceStyle.label(style, f.bit)?.let { f.copy(label = it) } ?: f })
+
 /** Bits del rombo de la plantilla que se ve ahora. */
 internal fun RetroLayout.faceBits(): List<Int> = face.map { it.bit }
 
@@ -185,6 +190,7 @@ internal fun CustomPadCanvas(
     onGestureEnd: (PadElement) -> Unit = {},
     snap: Boolean = false
 ) {
+    val layout = remember(layout, profile.faceStyle) { layout.styled(profile.faceStyle) }
     BoxWithConstraints(modifier.fillMaxSize()) {
         val w = maxWidth
         val h = maxHeight
@@ -272,8 +278,9 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig,
             IconPadButton(
                 bw,
                 if (left) R.drawable.ms_left_click else R.drawable.ms_right_click,
-                stringResource(if (left) R.string.mouse_left_short else R.string.mouse_right_short),
-                enabled = act.mouseMode
+                stringResource(if (left) R.string.ed_mouse_left else R.string.ed_mouse_right),
+                enabled = act.mouseMode,
+                showLabel = false
             ) { down -> Kbm.button(if (left) 0 else 1, down) }
         }
         ElementKind.KEY -> {
@@ -290,7 +297,7 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig,
             var held by remember { mutableStateOf(false) }
             DisposableEffect(Unit) { onDispose { dev.pepotech.pepomote.control.Precision.set(false) } }
             IconPadButton(
-                bw, R.drawable.ms_center_focus_strong, stringResource(R.string.precision), highlighted = held
+                bw, R.drawable.ms_center_focus_strong, stringResource(R.string.precision), highlighted = held, showLabel = false
             ) { down ->
                 held = down
                 dev.pepotech.pepomote.control.Precision.set(down)
@@ -298,7 +305,7 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig,
         }
         ElementKind.RECENTER -> {
             val act = LocalPadActions.current
-            IconPadButton(bw, R.drawable.ms_restart_alt, stringResource(R.string.recenter)) { down ->
+            IconPadButton(bw, R.drawable.ms_recenter, stringResource(R.string.recenter), showLabel = false) { down ->
                 if (down) {
                     if (act.mouseMode) Kbm.center()
                     dev.pepotech.pepomote.control.GyroAim.recenter()
@@ -478,6 +485,42 @@ private fun EditFrame(
     }
 }
 
+/** Perfil nuevo: con qué diseño se empieza. */
+@Composable
+internal fun PresetDialog(onPick: (dev.pepotech.pepomote.control.PadPreset) -> Unit, onDismiss: () -> Unit) {
+    EditorDialog(onDismiss) {
+        Text(stringResource(R.string.preset_title), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.preset_sub), style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(8.dp))
+        for ((preset, icon, title, sub) in listOf(
+            PresetRow(dev.pepotech.pepomote.control.PadPreset.XBOX, R.drawable.ms_sports_esports, R.string.preset_xbox, R.string.preset_xbox_sub),
+            PresetRow(dev.pepotech.pepomote.control.PadPreset.NINTENDO, R.drawable.ms_videogame_asset, R.string.preset_nintendo, R.string.preset_nintendo_sub),
+            PresetRow(dev.pepotech.pepomote.control.PadPreset.PLAYSTATION, R.drawable.ms_gamepad, R.string.preset_playstation, R.string.preset_playstation_sub),
+            PresetRow(dev.pepotech.pepomote.control.PadPreset.TOUCHPAD, R.drawable.ms_touchpad_mouse, R.string.preset_touchpad, R.string.preset_touchpad_sub)
+        )) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onPick(preset) }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Ico(icon, PepoColors.Blue, 26.dp)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(sub), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.ed_cancel), color = PepoColors.TextDim)
+        }
+    }
+}
+
+private data class PresetRow(val preset: dev.pepotech.pepomote.control.PadPreset, val icon: Int, val title: Int, val sub: Int)
+
 /** Barra del modo edición, arriba: añadir, perfiles, opacidad, restablecer, cancelar y guardar. */
 @Composable
 internal fun EditorToolbar(
@@ -625,7 +668,8 @@ internal fun ElementSettingsDialog(
     layout: RetroLayout,
     onChange: (PadElement) -> Unit,
     onRemove: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onFaceStyle: ((String) -> Unit)? = null
 ) {
     EditorDialog(onDismiss) {
         Text(
@@ -633,6 +677,22 @@ internal fun ElementSettingsDialog(
             style = MaterialTheme.typography.headlineSmall
         )
         Spacer(Modifier.height(10.dp))
+        // El rombo: con qué rótulos se ve (cada botón sigue enviando el de su sitio)
+        if (element.kind == ElementKind.FACE && onFaceStyle != null) {
+            Text(stringResource(R.string.ed_face_style), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.ed_face_style_note), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
+            Spacer(Modifier.height(6.dp))
+            ChipFlow {
+                for ((style, label) in listOf(
+                    dev.pepotech.pepomote.control.FaceStyle.XBOX to R.string.preset_xbox,
+                    dev.pepotech.pepomote.control.FaceStyle.NINTENDO to R.string.preset_nintendo,
+                    dev.pepotech.pepomote.control.FaceStyle.PLAYSTATION to R.string.preset_playstation
+                )) {
+                    ModeChip(stringResource(label), selected = profile.faceStyle == style, dense = true) { onFaceStyle(style) }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
         LabeledSlider(
             stringResource(R.string.ed_size),
             element.size,

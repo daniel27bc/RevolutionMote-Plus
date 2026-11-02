@@ -122,8 +122,10 @@ fun HomeScreen(
             Spacer(Modifier.height(16.dp))
         }
         // Tres filas de pares: Conectar | Mando, Dolphin | Wii U, Nunchuk | Ajustes
+        // En vertical, dos columnas; apaisado (o tablet) caben más y las
+        // tarjetas no se estiran hasta ser cajas enormes
         LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+            columns = GridCells.Adaptive(minSize = 168.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {

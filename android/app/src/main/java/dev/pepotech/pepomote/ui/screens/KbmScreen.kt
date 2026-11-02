@@ -51,6 +51,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.pepotech.pepomote.ui.components.clickButtonDrag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -164,7 +167,8 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit) {
             .navigationBarsPadding()
             .displayCutoutPadding()
     ) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)) {
+        // Mantener un clic y deslizar el mismo dedo arrastra (como el botón de un touchpad)
+        Column(Modifier.fillMaxSize().clickButtonDrag(true, mouse.padSens).padding(horizontal = 12.dp, vertical = 8.dp)) {
             // Cabecera: atrás, por dónde va, estado, ajustes
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { IconLabel(R.drawable.ms_close, stringResource(R.string.kbm_exit), PepoColors.Error) }
@@ -186,8 +190,12 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit) {
                 android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val clicks: @Composable (Modifier) -> Unit = { m ->
                 Row(m, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((idx, label) in listOf(0 to R.string.ed_mouse_left, 2 to R.string.kbm_middle, 1 to R.string.ed_mouse_right)) {
-                        HoldKey(stringResource(label), Modifier.weight(1f).height(54.dp)) { down -> Kbm.button(idx, down) }
+                    for ((idx, label, icon) in listOf(
+                        Triple(0, R.string.ed_mouse_left, R.drawable.ms_left_click),
+                        Triple(2, R.string.kbm_middle, R.drawable.ms_mouse),
+                        Triple(1, R.string.ed_mouse_right, R.drawable.ms_right_click)
+                    )) {
+                        HoldKey(stringResource(label), Modifier.weight(1f).height(54.dp), icon) { down -> Kbm.button(idx, down) }
                     }
                 }
             }
@@ -371,7 +379,7 @@ private fun TransportOption(
 
 /** Una tecla de mantener (botones del ratón). */
 @Composable
-private fun HoldKey(label: String, modifier: Modifier, onPress: (Boolean) -> Unit) {
+private fun HoldKey(label: String, modifier: Modifier, icon: Int? = null, onPress: (Boolean) -> Unit) {
     val view = LocalView.current
     var down by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
@@ -379,13 +387,18 @@ private fun HoldKey(label: String, modifier: Modifier, onPress: (Boolean) -> Uni
         modifier
             .background(if (down) PepoColors.Blue else PepoColors.Card, shape)
             .border(1.5.dp, if (down) PepoColors.Blue else PepoColors.CardBorder, shape)
+            .semantics { contentDescription = label }
             .pointerInputHold(view) { d ->
                 down = d
                 onPress(d)
             },
         contentAlignment = Alignment.Center
     ) {
-        Text(label, color = if (down) PepoColors.OnAccent else PepoColors.Text, fontWeight = FontWeight.SemiBold)
+        if (icon != null) {
+            dev.pepotech.pepomote.ui.components.Ico(icon, if (down) PepoColors.OnAccent else PepoColors.Text, 28.dp)
+        } else {
+            Text(label, color = if (down) PepoColors.OnAccent else PepoColors.Text, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 

@@ -601,7 +601,7 @@
     <string name="ed_mouse_right">Clic derecho</string>
     <string name="ed_keyboard">Teclado</string>
     <string name="ed_mode_toggle">Interruptor mando / ratón</string>
-    <string name="mousepad_help">En modo ratón: un dedo mueve el cursor; un toque es clic y dos toques seguidos, doble clic; un toque con dos dedos es clic derecho (con tres, el central); mantener el dedo quieto un momento agarra (arrastra pestañas o ventanas hasta que lo levantes); arrastrar con dos dedos es la rueda. En modo mando gira la cámara.</string>
+    <string name="mousepad_help">En modo ratón: un dedo mueve el cursor; toque = clic; dos toques = doble clic; doble toque sin levantar el dedo (o mantenerlo quieto) = agarrar y arrastrar; dos dedos: toque = clic derecho, deslizar = rueda, pellizcar = zoom; tres dedos: toque = clic central, deslizar = vista de tareas, escritorio o cambiar de ventana. En modo mando gira la cámara.</string>
     <string name="mouse_settings_title">Modo ratón</string>
     <string name="mouse_settings_sub">Con el interruptor mando / ratón (o desde el menú del mando) el PC pasa a ratón: A es clic izquierdo y B clic derecho. Funciona también con el receptor original de PepoTech</string>
     <string name="mouse_gyro">Mover el ratón con el giroscopio</string>
@@ -724,7 +724,33 @@
     <string name="settings_sec_app">Conexión y app</string>
     <string name="turbo_tag" translatable="false">TURBO</string>
     <string name="hint_ok">Entendido</string>
-    <string name="hint_pad_mouse">Modo ratón: A es clic izquierdo y B derecho. En el touchpad, toque = clic, dos dedos = clic derecho, mantener quieto = agarrar y arrastrar.</string>
+    <string name="hint_pad_mouse">Modo ratón: A es clic izquierdo y B derecho (mantenlos y desliza para arrastrar). En los huecos y en el touchpad: toque = clic, doble toque = doble clic, doble toque y mantener = agarrar, dos dedos = clic derecho y rueda.</string>
     <string name="hint_editor">Arrastra para mover y pellizca para cambiar el tamaño. Con el imán los controles se alinean; «Deshacer» revierte el último cambio y «Espejo» lo pasa a zurdos.</string>
     <string name="hint_pointer_modes">Arriba a la derecha eliges cómo se mueve el cursor: apuntando, con el dedo o con los dos. Mantén pulsado un icono para ver qué hace.</string>
+    <string name="settings_sec_appearance_sub">Tema, color de acento y sonidos</string>
+    <string name="settings_sec_controls_sub">Sticks, cámara, giroscopio, botones de volumen y diseños</string>
+    <string name="settings_sec_pointer_sub">Sensor, trackpad del puntero y gestos</string>
+    <string name="settings_sec_vibration_sub">Vibración de los botones y de los juegos</string>
+    <string name="settings_sec_wii_sub">Nunchuk, GamePad de Wii U y lados</string>
+    <string name="settings_sec_app_sub">Avisos, actualizaciones, otro PC y diagnóstico</string>
+    <string name="settings_override_note">Estos son los ajustes generales. Lo que configures dentro de cada modo (el ⚙ del mando universal, los ajustes del puntero) tiene prioridad sobre ellos. La sensibilidad del apuntado con el móvil se ajusta en la ventana del receptor del PC.</string>
+    <string name="preset_title">Perfil nuevo</string>
+    <string name="preset_sub">¿De qué diseño partes? Luego lo cambias a tu gusto.</string>
+    <string name="preset_xbox">Xbox</string>
+    <string name="preset_xbox_sub">A abajo, B a la derecha, X a la izquierda e Y arriba</string>
+    <string name="preset_nintendo">Nintendo</string>
+    <string name="preset_nintendo_sub">Rótulos de Switch: B abajo, A a la derecha, Y a la izquierda y X arriba</string>
+    <string name="preset_playstation">PlayStation</string>
+    <string name="preset_playstation_sub">✕ abajo, ○ a la derecha, □ a la izquierda y △ arriba</string>
+    <string name="preset_touchpad">Touchpad</string>
+    <string name="preset_touchpad_sub">Un touchpad grande con los clics, el teclado y teclas. Arranca en modo ratón</string>
+    <string name="ed_face_style">Rótulos de los botones</string>
+    <string name="ed_face_style_note">Solo cambian los nombres: cada botón sigue enviando el de su posición (el de abajo es siempre la A de Xbox para el PC).</string>
+    <string name="pointer_settings_title">Ajustes del puntero</string>
+    <string name="pointer_settings_hint">Cómo se mueve el cursor con el dedo: modo, sensibilidad, inercia y gestos. Tiene prioridad sobre los ajustes generales.</string>
+    <string name="orientation_hint">Fija la pantalla en la orientación de ahora para que no gire al inclinar el móvil. Otro toque la suelta.</string>
+    <string name="gestures_title">Gestos con varios dedos</string>
+    <string name="gestures_sub">Pellizcar = zoom; tres dedos arriba = vista de tareas, abajo = escritorio, a los lados = cambiar de ventana (necesita teclas: receptor de RevolutionMote+ o Bluetooth)</string>
+    <string name="diag_system_touch">Respuesta táctil del sistema</string>
+    <string name="diag_compat">Modo compatible</string>
 </resources>

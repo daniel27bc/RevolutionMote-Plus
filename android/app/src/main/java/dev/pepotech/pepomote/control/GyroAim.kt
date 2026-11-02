@@ -67,12 +67,19 @@ object GyroAim {
 
     /** Si el giro debe apuntar ahora mismo, según cómo se activa. */
     fun gateOpen(c: GyroConfig = config): Boolean = c.enabled && when (c.activation) {
-        GyroActivation.ALWAYS -> true
+        GyroActivation.ALWAYS -> !paused
         GyroActivation.HOLD_LT -> ButtonState.current() and ButtonState.ZL != 0
         GyroActivation.HOLD_BUTTON -> buttonHeld
         GyroActivation.TOGGLE_BUTTON -> toggled
         GyroActivation.TOGGLE_LT -> ltToggled
     }
+
+    /**
+     * Con «Siempre», el botón del giro lo PAUSA y lo reanuda (verde = apunta,
+     * apagado = en pausa). Empieza siempre apuntando.
+     */
+    @Volatile
+    var paused: Boolean = false
 
     /** Modo «alternar con LT / ZL»: cada pulsación (flanco de bajada) lo cambia. */
     @Volatile

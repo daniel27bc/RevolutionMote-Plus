@@ -167,6 +167,9 @@ fun DiagScreen(onBack: () -> Unit) {
             Line(stringResource(R.string.diag_haptic_count), "${Diag.hapticPlayed.get()} / ${Diag.hapticAsked.get()}")
             Line(stringResource(R.string.diag_haptic_path), Diag.hapticPath.ifEmpty { "—" })
             if (Diag.hapticSkip.isNotEmpty()) Line(stringResource(R.string.diag_haptic_skip), Diag.hapticSkip, ok = false)
+            Line(stringResource(R.string.diag_system_touch), stringResource(if (Haptics.systemTouchFeedback(context)) R.string.diag_on else R.string.diag_off),
+                ok = Haptics.systemTouchFeedback(context) || !AppPrefs.hapticSystem(context))
+            Line(stringResource(R.string.diag_compat), stringResource(if (AppPrefs.hapticSystem(context)) R.string.diag_on else R.string.diag_off))
             Line(stringResource(R.string.diag_rumble), stringResource(if (GameRumble.isOn) R.string.diag_on else R.string.diag_off))
             Text(Haptics.describe(context), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
             TextButton(onClick = { Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP) }) {

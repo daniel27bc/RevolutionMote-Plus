@@ -97,6 +97,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.key
 import dev.pepotech.pepomote.control.ButtonState
+import dev.pepotech.pepomote.control.PadPreset
+import dev.pepotech.pepomote.control.FaceStyle
+import dev.pepotech.pepomote.ui.components.clickButtonDrag
 import dev.pepotech.pepomote.control.Haptics
 import dev.pepotech.pepomote.control.RetroLayouts
 import dev.pepotech.pepomote.control.RightStick
@@ -392,6 +395,14 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
         }
     }
     val defaultName = stringResource(R.string.ed_default_name)
+    val touchpadName = stringResource(R.string.preset_touchpad)
+    val presetNames = mapOf(
+        PadPreset.XBOX to stringResource(R.string.preset_xbox),
+        PadPreset.NINTENDO to stringResource(R.string.preset_nintendo),
+        PadPreset.PLAYSTATION to stringResource(R.string.preset_playstation)
+    )
+    fun presetName(p: PadPreset): String = presetNames[p] ?: defaultName
+    var showPresets by remember { mutableStateOf(false) }
     val copySuffix = stringResource(R.string.ed_copy_suffix)
     fun profileNames(): List<String> = PadProfileStore.profiles.value.map { it.name }
     fun factoryProfile(name: String): PadProfile {
@@ -428,6 +439,12 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                 // Mando universal: el interruptor mando / ratón, en el centro
                 if (xboxPad) q.add(PadElement(ElementKind.MODE_TOGGLE, 0.5f, 0.55f, 0.15f)) else q
             }
+        }
+    }
+    // El perfil Touchpad (o cualquiera marcado así) arranca en modo ratón
+    LaunchedEffect(activeName, xboxPad) {
+        if (xboxPad && PadProfileStore.activeProfile()?.startMouse == true && !LinkState.padMouse.value) {
+            LinkState.setPadMouse(true)
         }
     }
     // Editar: el perfil activo, o uno nuevo con el diseño de fábrica
@@ -564,6 +581,8 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     Modifier
                         .fillMaxWidth()
                         .height(bodyH)
+                        // Modo ratón: A o B mantenidos y deslizando = arrastrar
+                        .clickButtonDrag(mouseMode && kbmCapable && !editing, mouseCfg.padSens)
                 ) {
                     val shown = shownProfile
                     if (shown != null) {
@@ -980,7 +999,8 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                             draft = d.remove(target)
                             gearFor = null
                         },
-                        onDismiss = { gearFor = null }
+                        onDismiss = { gearFor = null },
+                        onFaceStyle = if (xboxPad) ({ style: String -> pushUndo(); draft = d.copy(faceStyle = style) }) else null
                     )
                 }
                 if (showAdd) {
@@ -996,6 +1016,28 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         onDismiss = { showAdd = false }
                     )
                 }
+            }
+            if (showPresets) {
+                PresetDialog(
+                    onPick = { preset ->
+                        showPresets = false
+                        val base = when (preset) {
+                            PadPreset.TOUCHPAD -> PadProfiles.touchpad(PadProfiles.uniqueName(touchpadName, profileNames()), globalLook, globalGyro)
+                            else -> factoryProfile(PadProfiles.uniqueName(presetName(preset), profileNames())).copy(
+                                faceStyle = when (preset) {
+                                    PadPreset.NINTENDO -> FaceStyle.NINTENDO
+                                    PadPreset.PLAYSTATION -> FaceStyle.PLAYSTATION
+                                    else -> FaceStyle.XBOX
+                                }
+                            )
+                        }
+                        draft = base
+                        draftOldName = null
+                        undo.clear()
+                        editing = true
+                    },
+                    onDismiss = { showPresets = false }
+                )
             }
             if (showPadSettings) {
                 PadSettingsDialog(
@@ -1027,9 +1069,14 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     },
                     onNew = {
                         showProfiles = false
-                        draft = factoryProfile(PadProfiles.uniqueName(defaultName, profileNames()))
-                        draftOldName = null
-                        editing = true
+                        // Mando universal: elegir de qué diseño se parte
+                        if (xboxPad) {
+                            showPresets = true
+                        } else {
+                            draft = factoryProfile(PadProfiles.uniqueName(defaultName, profileNames()))
+                            draftOldName = null
+                            editing = true
+                        }
                     },
                     onDuplicate = { p ->
                         PadProfileStore.save(context, p.copy(name = PadProfiles.uniqueName(p.name + copySuffix, profileNames())))

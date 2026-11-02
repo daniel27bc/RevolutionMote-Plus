@@ -142,6 +142,14 @@ object AppPrefs {
             .edit().putBoolean("pointerTrackpad", value).apply()
     }
 
+    /** Gestos de varios dedos en los touchpads (zoom, vista de tareas…). */
+    fun touchGestures(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("touchGestures", true)
+
+    fun setTouchGestures(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("touchGestures", value).apply()
+    }
+
     /** Pistas de primera vez ya vistas («Entendido»). */
     fun hintSeen(context: Context, id: String): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("hint_$id", false)

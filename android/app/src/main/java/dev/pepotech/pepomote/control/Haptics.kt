@@ -87,6 +87,13 @@ object Haptics {
         play(view.context, level, Kind.CLICK)
     }
 
+    /** ¿Tiene el sistema la «Respuesta táctil» encendida? (solo afecta al modo compatible) */
+    fun systemTouchFeedback(context: Context): Boolean = try {
+        android.provider.Settings.System.getInt(context.contentResolver, android.provider.Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) != 0
+    } catch (_: Exception) {
+        true
+    }
+
     /** Diagnóstico para Ajustes: qué motor hay y qué camino se usa. */
     fun describe(context: Context): String {
         val v = vib(context) ?: return "no vibrator"
@@ -118,22 +125,18 @@ object Haptics {
         if (!v.hasVibrator()) return false
         return try {
             val e = effect(v, level, kind)
-            // Como vibración TÁCTIL: con el móvil en silencio o la vibración
-            // de notificaciones apagada sigue sonando (manda el ajuste
-            // «Respuesta táctil» del sistema)
-            lastPath = when {
-                Build.VERSION.SDK_INT >= 30 && supportsPrimitives(v) -> "primitivas"
-                Build.VERSION.SDK_INT >= 29 -> "efecto predefinido"
-                else -> "pulso"
-            }
+            // Como vibración de JUEGO/multimedia, no «táctil»: la táctil la
+            // apaga el ajuste «Respuesta táctil» del sistema (muchos móviles
+            // lo traen apagado o el usuario lo quita) y el mando se quedaba
+            // mudo. La multimedia solo la apaga «Vibración multimedia»
             if (Build.VERSION.SDK_INT >= 33) {
-                v.vibrate(e, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH))
+                v.vibrate(e, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_MEDIA))
             } else {
                 @Suppress("DEPRECATION")
                 v.vibrate(
                     e,
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_GAME)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )

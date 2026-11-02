@@ -34,6 +34,9 @@ object Kbm {
     const val SRC_PAD = 0
     const val SRC_FREE = 1
 
+    /** El dedo que mantiene A o B en modo ratón (arrastrar pulsando). */
+    const val SRC_BTN = 2
+
     private const val TICK_MS = 8L
 
     @Volatile
@@ -45,7 +48,7 @@ object Kbm {
             if (value == Backend.APP || value == Backend.BT) wake() else stopTicker()
         }
 
-    private val touch = FloatArray(4)
+    private val touch = FloatArray(6)
 
     @Volatile
     private var yaw = 0f
@@ -69,7 +72,7 @@ object Kbm {
         if (backend == Backend.POINTER) {
             touch[src * 2] = vx
             touch[src * 2 + 1] = vy
-            PointerTrackpad.setVelocity(touch[0] + touch[2], touch[1] + touch[3])
+            PointerTrackpad.setVelocity(touch[0] + touch[2] + touch[4], touch[1] + touch[3] + touch[5])
             return
         }
         touch[src * 2] = vx
@@ -86,6 +89,40 @@ object Kbm {
         yaw = yawRate
         pitch = pitchRate
         if (yawRate != 0f || pitchRate != 0f) wake()
+    }
+
+    private var nudgeX = 0f
+    private var nudgeY = 0f
+
+    /** Movimiento directo en dp de dedo (ya con su sensibilidad): arrastrar con A o B pulsados. */
+    fun nudge(dxDp: Float, dyDp: Float) {
+        if (dxDp == 0f && dyDp == 0f) return
+        if (backend == Backend.APP || backend == Backend.BT) {
+            synchronized(lock) {
+                nudgeX += dxDp
+                nudgeY += dyDp
+            }
+            wake()
+        }
+    }
+
+    /** ¿Hay un clic mantenido ahora mismo (izquierdo o derecho)? */
+    val clickHeld: Boolean get() = synchronized(lock) { heldButtons[0] || heldButtons[1] }
+
+    /** Atajo de teclado: pulsa [keys] en orden y las suelta al revés (Alt+Tab, Win+D…). */
+    fun combo(vararg keys: String): Boolean {
+        if (!keysAvailable) return false
+        for (k in keys) key(k, true)
+        for (k in keys.reversed()) key(k, false)
+        return true
+    }
+
+    /** Rueda con Ctrl pulsado: el zoom de casi cualquier programa. */
+    fun zoom(units: Int) {
+        if (units == 0 || !keysAvailable) return
+        key("ControlLeft", true)
+        wheel(units)
+        key("ControlLeft", false)
     }
 
     /** Botón del ratón: 0 izquierdo, 1 derecho, 2 central. */
@@ -246,8 +283,14 @@ object Kbm {
         lastTickNs = now
         // El giro ya llega con la precisión aplicada ([GyroAim]); los dedos, aquí
         val fine = Precision.factor
-        accX += (touch[0] + touch[2]) * fine * dtMs * PX_PER_DP - yaw * dtMs / 1000f * PX_PER_RAD
-        accY += (touch[1] + touch[3]) * fine * dtMs * PX_PER_DP - pitch * dtMs / 1000f * PX_PER_RAD
+        val (nx, ny) = synchronized(lock) {
+            val n = nudgeX to nudgeY
+            nudgeX = 0f
+            nudgeY = 0f
+            n
+        }
+        accX += ((touch[0] + touch[2] + touch[4]) * dtMs + nx) * fine * PX_PER_DP - yaw * dtMs / 1000f * PX_PER_RAD
+        accY += ((touch[1] + touch[3] + touch[5]) * dtMs + ny) * fine * PX_PER_DP - pitch * dtMs / 1000f * PX_PER_RAD
         val dx = accX.toInt()
         val dy = accY.toInt()
         if (dx != 0 || dy != 0) {

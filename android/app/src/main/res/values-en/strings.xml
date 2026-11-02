@@ -601,7 +601,7 @@
     <string name="ed_mouse_right">Right click</string>
     <string name="ed_keyboard">Keyboard</string>
     <string name="ed_mode_toggle">Pad / mouse switch</string>
-    <string name="mousepad_help">In mouse mode: one finger moves the cursor; a tap is a click and two quick taps a double click; a two-finger tap is a right click (three fingers, middle click); holding the finger still for a moment grabs (drags tabs or windows until you lift it); dragging with two fingers scrolls. In controller mode it turns the camera.</string>
+    <string name="mousepad_help">In mouse mode: one finger moves the cursor; tap = click; two taps = double click; double tap without lifting (or holding still) = grab and drag; two fingers: tap = right click, slide = scroll, pinch = zoom; three fingers: tap = middle click, swipe = task view, desktop or switch window. In controller mode it turns the camera.</string>
     <string name="mouse_settings_title">Mouse mode</string>
     <string name="mouse_settings_sub">With the pad / mouse switch (or from the pad menu) the PC turns into mouse mode: A is left click and B right click. It also works with PepoTech\'s original receiver</string>
     <string name="mouse_gyro">Move the mouse with the gyroscope</string>
@@ -723,7 +723,33 @@
     <string name="settings_sec_wii">Wii and Wii U</string>
     <string name="settings_sec_app">Connection and app</string>
     <string name="hint_ok">Got it</string>
-    <string name="hint_pad_mouse">Mouse mode: A is left click and B right click. On the touchpad, tap = click, two fingers = right click, hold still = grab and drag.</string>
+    <string name="hint_pad_mouse">Mouse mode: A is left click and B right click (hold them and slide to drag). In empty areas and on the touchpad: tap = click, double tap = double click, double tap and hold = grab, two fingers = right click and scroll.</string>
     <string name="hint_editor">Drag to move and pinch to resize. Snap lines controls up; Undo reverts the last change and Mirror makes it left-handed.</string>
     <string name="hint_pointer_modes">Top right you choose how the cursor moves: by pointing, with your finger or both. Hold an icon to see what it does.</string>
+    <string name="settings_sec_appearance_sub">Theme, accent colour and sounds</string>
+    <string name="settings_sec_controls_sub">Sticks, camera, gyro, volume buttons and layouts</string>
+    <string name="settings_sec_pointer_sub">Sensor, pointer trackpad and gestures</string>
+    <string name="settings_sec_vibration_sub">Button and game vibration</string>
+    <string name="settings_sec_wii_sub">Nunchuk, Wii U GamePad and sides</string>
+    <string name="settings_sec_app_sub">Notices, updates, another PC and diagnostics</string>
+    <string name="settings_override_note">These are the general settings. Whatever you set inside each mode (the universal controller ⚙, the pointer settings) takes priority over them. Phone-aiming sensitivity is set in the receiver window on the PC.</string>
+    <string name="preset_title">New profile</string>
+    <string name="preset_sub">Which layout do you start from? You can change it afterwards.</string>
+    <string name="preset_xbox">Xbox</string>
+    <string name="preset_xbox_sub">A bottom, B right, X left and Y top</string>
+    <string name="preset_nintendo">Nintendo</string>
+    <string name="preset_nintendo_sub">Switch labels: B bottom, A right, Y left and X top</string>
+    <string name="preset_playstation">PlayStation</string>
+    <string name="preset_playstation_sub">✕ bottom, ○ right, □ left and △ top</string>
+    <string name="preset_touchpad">Touchpad</string>
+    <string name="preset_touchpad_sub">A big touchpad with the clicks, keyboard and keys. Starts in mouse mode</string>
+    <string name="ed_face_style">Button labels</string>
+    <string name="ed_face_style_note">Only the names change: each button still sends the one in its position (the bottom one is always Xbox A for the PC).</string>
+    <string name="pointer_settings_title">Pointer settings</string>
+    <string name="pointer_settings_hint">How the cursor moves with your finger: mode, sensitivity, inertia and gestures. Takes priority over the general settings.</string>
+    <string name="orientation_hint">Locks the screen in its current orientation so it does not rotate when you tilt the phone. Tap again to release it.</string>
+    <string name="gestures_title">Multi-finger gestures</string>
+    <string name="gestures_sub">Pinch = zoom; three fingers up = task view, down = desktop, sideways = switch window (needs keys: RevolutionMote+ receiver or Bluetooth)</string>
+    <string name="diag_system_touch">System touch feedback</string>
+    <string name="diag_compat">Compatible mode</string>
 </resources>

@@ -35,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -236,8 +237,12 @@ internal fun SettingsSection(
     @StringRes title: Int,
     query: String,
     counter: SettingsMatchCounter,
+    open: Int?,
     build: SettingsSectionBuilder.() -> Unit
 ) {
+    // Sin búsqueda solo se pinta la sección abierta (la lista de secciones
+    // la pinta la pantalla, como el menú de Ajustes de un iPhone)
+    if (query.isBlank() && open != title) return
     val context = LocalContext.current
     val items = SettingsSectionBuilder().apply(build).items
     val q = searchNorm(query.trim())
@@ -249,13 +254,60 @@ internal fun SettingsSection(
     }
     if (shown.isEmpty()) return
     counter.count += shown.size
-    Text(
+    if (q.isNotEmpty()) Text(
         sectionName.uppercase(),
         style = MaterialTheme.typography.labelLarge.copy(color = PepoColors.Blue, letterSpacing = androidx.compose.ui.unit.TextUnit(1.2f, androidx.compose.ui.unit.TextUnitType.Sp)),
         modifier = Modifier.padding(top = 18.dp, bottom = 8.dp, start = 4.dp)
     )
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         for ((ids, content) in shown) androidx.compose.runtime.key(ids.joinToString()) { content() }
+    }
+}
+
+/** Las secciones de Ajustes, en orden: título, icono y de qué va. */
+internal val SETTINGS_SECTIONS = listOf(
+    Triple(R.string.settings_sec_appearance, R.drawable.ms_palette, R.string.settings_sec_appearance_sub),
+    Triple(R.string.settings_sec_controls, R.drawable.ms_sports_esports, R.string.settings_sec_controls_sub),
+    Triple(R.string.settings_sec_pointer, R.drawable.ms_my_location, R.string.settings_sec_pointer_sub),
+    Triple(R.string.settings_sec_vibration, R.drawable.ms_vibration, R.string.settings_sec_vibration_sub),
+    Triple(R.string.settings_sec_wii, R.drawable.ms_videogame_asset, R.string.settings_sec_wii_sub),
+    Triple(R.string.settings_sec_app, R.drawable.ms_wifi, R.string.settings_sec_app_sub)
+)
+
+/**
+ * El menú de Ajustes, como el de un iPhone: una tarjeta con una fila por
+ * sección (icono en su cuadradito de color, título, de qué va y «›»).
+ */
+@Composable
+internal fun SettingsRootList(onOpen: (Int) -> Unit) {
+    Card(
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
+        border = BorderStroke(1.5.dp, PepoColors.CardBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier.padding(top = 8.dp)
+    ) {
+        SETTINGS_SECTIONS.forEachIndexed { i, (title, icon, sub) ->
+            if (i > 0) androidx.compose.material3.HorizontalDivider(Modifier.padding(start = 64.dp), color = PepoColors.CardBorder)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpen(title) }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    Modifier.size(36.dp).background(PepoColors.Blue, androidx.compose.foundation.shape.RoundedCornerShape(9.dp)),
+                    contentAlignment = Alignment.Center
+                ) { dev.pepotech.pepomote.ui.components.Ico(icon, PepoColors.OnAccent, 22.dp) }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(sub), style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                }
+                dev.pepotech.pepomote.ui.components.Ico(R.drawable.ms_chevron_right, PepoColors.TextDim, 22.dp)
+            }
+        }
     }
 }
 
@@ -408,6 +460,9 @@ internal fun DiagEntryCard(onDiag: () -> Unit) {
 fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> Unit = {}) {
     val context = LocalContext.current
     var query by remember { mutableStateOf("") }
+    // Sección abierta (null = el menú con todas)
+    var open by rememberSaveable { mutableStateOf<Int?>(null) }
+    androidx.activity.compose.BackHandler(enabled = open != null) { open = null }
     var kbClick by remember { mutableStateOf(AppPrefs.keyboardClickFirst(context)) }
     var volB by remember { mutableStateOf(AppPrefs.volDownIsB(context)) }
     var volUpAction by remember { mutableStateOf(AppPrefs.volUpAction(context)) }
@@ -456,15 +511,28 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
             .verticalScroll(rememberScrollState())
     ) {
         Spacer(Modifier.height(24.dp))
-        Text(stringResource(R.string.channel_settings), style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(12.dp))
-        SettingsSearchField(query) { query = it }
-        Spacer(Modifier.height(8.dp))
+        if (open != null && query.isBlank()) {
+            // Dentro de una sección: «‹ Ajustes» para volver y su título
+            TextButton(onClick = { open = null }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp)) {
+                dev.pepotech.pepomote.ui.components.Ico(R.drawable.ms_chevron_left, PepoColors.Blue, 22.dp)
+                Text(stringResource(R.string.channel_settings), color = PepoColors.Blue, style = MaterialTheme.typography.bodyLarge)
+            }
+            Text(stringResource(open!!), style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.height(12.dp))
+        } else {
+            Text(stringResource(R.string.channel_settings), style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.height(12.dp))
+            SettingsSearchField(query) { query = it }
+            Spacer(Modifier.height(8.dp))
+            if (query.isBlank()) {
+                SettingsRootList(onOpen = { open = it })
+            }
+        }
         val counter = remember { SettingsMatchCounter() }
         counter.count = 0
         // Las secciones, en orden; con algo en el buscador solo quedan los
         // ajustes cuyo título o explicación lo contienen
-        SettingsSection(R.string.settings_sec_appearance, query, counter) {
+        SettingsSection(R.string.settings_sec_appearance, query, counter, open) {
             SettingItem(listOf(R.string.accent_title, R.string.accent_sub, R.string.theme_title, R.string.theme_sub, R.string.theme_light, R.string.theme_dark, R.string.theme_oled)) {
             // Tema: sistema, claro, oscuro u OLED (negro puro)
             val themeMode by ThemeMode.state.collectAsState()
@@ -532,7 +600,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
             // la interfaz (deslizar manda); el valor guardado no se toca
             }
         }
-        SettingsSection(R.string.settings_sec_controls, query, counter) {
+        SettingsSection(R.string.settings_sec_controls, query, counter, open) {
             SettingItem(listOf(R.string.right_stick_title, R.string.right_stick_sub, R.string.mode_stick, R.string.mode_trackpad, R.string.ed_deadzone, R.string.ed_deadzone_sub, R.string.anti_deadzone_title, R.string.anti_deadzone_sub)) {
             Card(
                 shape = MaterialTheme.shapes.medium,
@@ -818,7 +886,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
             }
             }
         }
-        SettingsSection(R.string.settings_sec_pointer, query, counter) {
+        SettingsSection(R.string.settings_sec_pointer, query, counter, open) {
             SettingItem(listOf(R.string.motion_title, R.string.motion_sub)) {
             // Sensor del puntero: giroscopio o acelerómetro (móviles sin giroscopio real)
             MotionSourceCard()
@@ -934,7 +1002,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
             // Nunchuk en el mismo móvil (Dolphin): stick, C y Z con el móvil de lado
             }
         }
-        SettingsSection(R.string.settings_sec_vibration, query, counter) {
+        SettingsSection(R.string.settings_sec_vibration, query, counter, open) {
             SettingItem(listOf(R.string.haptic_title, R.string.haptic_sub, R.string.haptic_subtle, R.string.haptic_crisp, R.string.haptic_strong, R.string.haptic_system_title, R.string.haptic_system_sub, R.string.haptic_test)) {
             // Vibración de los botones: clic nítido tipo microswitch, con su fuerza
             Card(
@@ -984,7 +1052,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
             GameRumbleCard()
             }
         }
-        SettingsSection(R.string.settings_sec_wii, query, counter) {
+        SettingsSection(R.string.settings_sec_wii, query, counter, open) {
             SettingItem(listOf(R.string.nunchuk_own_title, R.string.nunchuk_own_sub)) {
             Card(
                 shape = MaterialTheme.shapes.medium,
@@ -1125,7 +1193,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
             // Avisos del receptor sobre el mando al cambiar de modo
             }
         }
-        SettingsSection(R.string.settings_sec_app, query, counter) {
+        SettingsSection(R.string.settings_sec_app, query, counter, open) {
             SettingItem(listOf(R.string.notices_title, R.string.notices_sub)) {
             Card(
                 shape = MaterialTheme.shapes.medium,
@@ -1213,9 +1281,10 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
         if (query.isNotBlank() && counter.count == 0) {
             Text(stringResource(R.string.settings_search_none), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 24.dp))
         }
+        if (open == null) {
         Spacer(Modifier.height(14.dp))
         Text(
-            stringResource(R.string.sens_note),
+            stringResource(R.string.settings_override_note),
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -1227,6 +1296,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
         )
         TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.back), color = PepoColors.TextDim)
+        }
         }
         Spacer(Modifier.height(16.dp))
     }
