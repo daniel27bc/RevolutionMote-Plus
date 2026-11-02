@@ -64,6 +64,7 @@ fun DiagScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val view = LocalView.current
     val link by LinkState.flow.collectAsState()
+    val pointerMode by PointerTrackpad.mode.collectAsState()
     var tick by remember { mutableLongStateOf(0L) }
     // Ritmos: diferencias por segundo de los contadores
     var pps by remember { mutableStateOf(0L) }
@@ -153,7 +154,7 @@ fun DiagScreen(onBack: () -> Unit) {
             Line(stringResource(R.string.diag_kbm_batches), "$kbs/s")
             Line(stringResource(R.string.diag_kbm_events), Diag.kbmEvents.get().toString())
             Line(stringResource(R.string.diag_ticker), stringResource(if (Kbm.ticking) R.string.diag_on else R.string.diag_sleeping))
-            Line(stringResource(R.string.diag_pointer_pad), when (PointerTrackpad.mode.value) {
+            Line(stringResource(R.string.diag_pointer_pad), when (pointerMode) {
                 PointerTrackpad.ON -> stringResource(R.string.pointer_mode_touch)
                 PointerTrackpad.BOTH -> stringResource(R.string.pointer_mode_both)
                 else -> stringResource(R.string.pointer_mode_aim)
