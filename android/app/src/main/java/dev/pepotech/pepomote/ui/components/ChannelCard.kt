@@ -170,20 +170,17 @@ private fun DrawScope.drawNunchukGlyph(body: Color, ink: Color) {
     drawCircle(detail, w * 0.035f, o(w * 0.5f, h * 0.48f))
 }
 
-/** Un delfín saltando (dibujo propio). */
+/** Un delfín saltando (dibujo propio, en una caja de 100). */
 private fun DrawScope.drawDolphinGlyph(fill: Color, eye: Color) {
     val path = androidx.compose.ui.graphics.vector.PathParser().parsePathString(
-        "M44,24.5 C41.5,24.8 39.6,24 38.6,22.6 C37,17.5 32,14 26,13.2 L22.5,6.5 C21.2,9.5 20,12 18.6,13.6 " +
-            "C13,15.5 9,20.5 7.5,27 L3,29.5 C5.5,31 6.8,32.6 7.2,35.2 C8.5,33 10.2,31.8 12.6,31.6 L10.4,29.8 " +
-            "C13.5,22 20,18.5 27,18.6 C32,18.7 36.5,21.5 39,25.4 C40.6,26.6 42.6,26.4 44,24.5 Z " +
-            "M26,19.2 L23,25.5 L30,19.6 Z"
+        "M93,41 C89,39 85,38 82,37 C80,31 74,26 66,24 C61,23 57,23 54,23.5 C50,17 45,12 39,9 C41,14 42,19 41,25 C31,30 23,39 18,51 C16,56 15,60 14,63 C10,60 6,58 2,58 C6,63 9,67 11,72 C10,76 9,80 7,84 C12,82 17,78 20,74 C24,64 31,55 41,49 C49,44 57,42 65,41.5 C73,41.5 79,42.5 84,43.5 C87,44 90,43.5 93,41 Z M59,42 C57,48 54,53 49,56 C56,55 62,50 66,41.5 Z"
     ).toPath()
-    // El dibujo ocupa x 3..44, y 6.5..35: se escala a lo ancho y se centra
-    val k = size.minDimension / 41f
+    // El dibujo ocupa x 2..93, y 9..84: se escala a lo ancho y se centra
+    val k = size.minDimension / 93f
     scale(k, k, pivot = androidx.compose.ui.geometry.Offset.Zero) {
-        translate(-3f, -6.5f + (41f - 28.5f) / 2f) {
+        translate(-2f, -9f + (91f - 75f) / 2f) {
             drawPath(path, fill)
-            drawCircle(eye, 1.2f, o(35.2f, 18.6f))
+            drawCircle(eye, 2.2f, o(76f, 33f))
         }
     }
 }
