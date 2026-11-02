@@ -147,7 +147,7 @@ fun HomeScreen(
                     title = stringResource(R.string.channel_server),
                     subtitle = stringResource(if (serverRunning) R.string.server_running_short else R.string.channel_server_sub),
                     glyph = ChannelGlyph.Server,
-                    accent = PepoColors.Blue,
+                    accent = Color(0xFF43A047),
                     onClick = onServer
                 )
             }
@@ -194,7 +194,7 @@ fun HomeScreen(
                     title = stringResource(R.string.channel_retroarch),
                     subtitle = stringResource(if (androidReceiver) R.string.channel_retroarch_android_sub else R.string.channel_retroarch_sub),
                     glyph = ChannelGlyph.Invader,
-                    accent = Color(0xFF9AA0A6),
+                    accent = Color(0xFF8E5BE8),
                     onClick = onRetroArch
                 )
             }
@@ -235,7 +235,7 @@ fun HomeScreen(
                     title = stringResource(R.string.channel_server),
                     subtitle = stringResource(if (serverRunning) R.string.server_running_short else R.string.channel_server_sub),
                     glyph = ChannelGlyph.Server,
-                    accent = PepoColors.Blue,
+                    accent = Color(0xFF43A047),
                     onClick = onServer
                 )
             }
