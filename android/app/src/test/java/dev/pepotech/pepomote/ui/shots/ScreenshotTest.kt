@@ -196,6 +196,7 @@ class ScreenshotTest {
         }
     }
 
+    @androidx.compose.runtime.Composable
     private fun home() = dev.pepotech.pepomote.ui.screens.HomeScreen(
         status = dev.pepotech.pepomote.ui.screens.HomeStatus(dev.pepotech.pepomote.ui.screens.HomeTone.On, "Conectado a TorreDaniel"),
         langLabel = "ES", langSwitchHint = "", onToggleLang = {},
