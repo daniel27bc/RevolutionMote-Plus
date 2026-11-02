@@ -70,6 +70,7 @@ import dev.pepotech.pepomote.net.PairStore
 import dev.pepotech.pepomote.service.LinkForegroundService
 import dev.pepotech.pepomote.service.LinkState
 import dev.pepotech.pepomote.service.UiLink
+import dev.pepotech.pepomote.service.alive
 import dev.pepotech.pepomote.ui.components.Ico
 import dev.pepotech.pepomote.ui.theme.PepoColors
 
