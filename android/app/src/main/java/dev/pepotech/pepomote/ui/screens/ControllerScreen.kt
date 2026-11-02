@@ -187,11 +187,8 @@ fun ControllerScreen(link: UiLink, showChips: Boolean, onDisconnect: () -> Unit)
                     Column(Modifier.weight(1f)) {
                         when (link) {
                             is UiLink.Connected -> {
-                                Text(
-                                    if (link.slot > 0) stringResource(R.string.pc_player, link.pcName, link.slot + 1)
-                                    else link.pcName,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
+                                // Una sola línea pequeña: PC · modo · latencia (el
+                                // mando es lo importante, no la cabecera)
                                 val modeText = when {
                                     isWiiUAsWiimote(link) -> stringResource(R.string.wiiu_as_wiimote)
                                     link.mode == LinkState.MODE_CEMU -> stringResource(R.string.mode_wiiu)
@@ -201,12 +198,17 @@ fun ControllerScreen(link: UiLink, showChips: Boolean, onDisconnect: () -> Unit)
                                     link.slot > 0 -> stringResource(R.string.pointer_player1_points)
                                     else -> stringResource(R.string.mode_pointer)
                                 }
+                                val pc = if (link.slot > 0) stringResource(R.string.pc_player, link.pcName, link.slot + 1) else link.pcName
                                 Text(
                                     buildString {
+                                        append(pc)
+                                        append(" · ")
                                         append(modeText)
                                         link.rttMs?.let { append(" · ${"%.0f".format(it)} ms") }
                                     },
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
                             }
 

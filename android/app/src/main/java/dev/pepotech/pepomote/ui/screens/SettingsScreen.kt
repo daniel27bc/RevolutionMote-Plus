@@ -264,6 +264,66 @@ internal fun SettingsSection(
     }
 }
 
+/** Vibración personalizada: fuerza, tipo de golpe, duración y tic al soltar (se nota al moverlos). */
+@Composable
+internal fun HapticCustomEditor() {
+    val context = LocalContext.current
+    val view = LocalView.current
+    var c by remember { mutableStateOf(AppPrefs.hapticCustom(context)) }
+    fun set(n: Haptics.Custom, feel: Boolean = true) {
+        c = n
+        AppPrefs.setHapticCustom(context, n)
+        if (feel) Haptics.preview(view, Haptics.CUSTOM)
+    }
+    Spacer(Modifier.height(10.dp))
+    LabeledSlider(stringResource(R.string.haptic_strength), c.strength, 0.05f..1f, "${(c.strength * 100).toInt()}%") {
+        set(c.copy(strength = it), feel = false)
+    }
+    TextButton(onClick = { Haptics.preview(view, Haptics.CUSTOM) }) {
+        IconLabel(R.drawable.ms_vibration, stringResource(R.string.haptic_test), PepoColors.Blue)
+    }
+    Text(stringResource(R.string.haptic_shape), style = MaterialTheme.typography.titleSmall)
+    Text(stringResource(R.string.haptic_shape_sub), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
+    Spacer(Modifier.height(6.dp))
+    ChipFlow {
+        for ((shape, label) in listOf(
+            Haptics.Shape.CLICK to R.string.haptic_shape_click,
+            Haptics.Shape.TICK to R.string.haptic_shape_tick,
+            Haptics.Shape.THUD to R.string.haptic_shape_thud,
+            Haptics.Shape.PULSE to R.string.haptic_shape_pulse
+        )) {
+            ModeChip(stringResource(label), selected = c.shape == shape, dense = true) { set(c.copy(shape = shape)) }
+        }
+    }
+    if (c.shape == Haptics.Shape.PULSE) {
+        LabeledSlider(stringResource(R.string.haptic_duration), c.pulseMs.toFloat(), 4f..60f, "${c.pulseMs} ms") {
+            set(c.copy(pulseMs = it.toInt()), feel = false)
+        }
+    }
+    SwitchRow(stringResource(R.string.haptic_release), c.releaseTick, stringResource(R.string.haptic_release_sub)) {
+        set(c.copy(releaseTick = it))
+    }
+}
+
+/** Qué controles vibran: de serie, botones y cruceta; sticks y touchpad, no. */
+@Composable
+internal fun HapticSourcesEditor() {
+    val context = LocalContext.current
+    Text(stringResource(R.string.haptic_sources), style = MaterialTheme.typography.titleSmall)
+    for ((src, label) in listOf(
+        Haptics.Source.BUTTON to R.string.haptic_src_buttons,
+        Haptics.Source.DPAD to R.string.haptic_src_dpad,
+        Haptics.Source.STICK to R.string.haptic_src_sticks,
+        Haptics.Source.TOUCHPAD to R.string.haptic_src_touchpad
+    )) {
+        var on by remember(src) { mutableStateOf(AppPrefs.hapticSource(context, src)) }
+        SwitchRow(stringResource(label), on) {
+            on = it
+            AppPrefs.setHapticSource(context, src, it)
+        }
+    }
+}
+
 /** Las secciones de Ajustes, en orden: título, icono y de qué va. */
 internal val SETTINGS_SECTIONS = listOf(
     Triple(R.string.settings_sec_appearance, R.drawable.ms_palette, R.string.settings_sec_appearance_sub),
@@ -601,6 +661,22 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
             }
         }
         SettingsSection(R.string.settings_sec_controls, query, counter, open) {
+            SettingItem(listOf(R.string.floating_title, R.string.floating_sub)) {
+                var floating by remember { mutableStateOf(AppPrefs.floatingSticksDefault) }
+                Card(
+                    shape = MaterialTheme.shapes.medium,
+                    colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
+                    border = BorderStroke(1.5.dp, PepoColors.CardBorder),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                        SwitchRow(stringResource(R.string.floating_title), floating, stringResource(R.string.floating_sub)) {
+                            floating = it
+                            AppPrefs.setFloatingSticks(context, it)
+                        }
+                    }
+                }
+            }
             SettingItem(listOf(R.string.right_stick_title, R.string.right_stick_sub, R.string.mode_stick, R.string.mode_trackpad, R.string.ed_deadzone, R.string.ed_deadzone_sub, R.string.anti_deadzone_title, R.string.anti_deadzone_sub)) {
             Card(
                 shape = MaterialTheme.shapes.medium,
@@ -1020,7 +1096,8 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
                             R.string.haptic_off to Haptics.OFF,
                             R.string.haptic_subtle to Haptics.SUBTLE,
                             R.string.haptic_crisp to Haptics.CRISP,
-                            R.string.haptic_strong to Haptics.STRONG
+                            R.string.haptic_strong to Haptics.STRONG,
+                            R.string.haptic_custom to Haptics.CUSTOM
                         )) {
                             ModeChip(stringResource(label), selected = hapticLevel == lvl, dense = true) {
                                 hapticLevel = lvl
@@ -1029,6 +1106,9 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
                             }
                         }
                     }
+                    if (hapticLevel == Haptics.CUSTOM) HapticCustomEditor()
+                    Spacer(Modifier.height(12.dp))
+                    HapticSourcesEditor()
                     Spacer(Modifier.height(8.dp))
                     SwitchRow(
                         stringResource(R.string.haptic_system_title),

@@ -31,6 +31,28 @@ object Haptics {
     const val CRISP = 2
     const val STRONG = 3
 
+    /** Personalizada: fuerza, tipo de golpe y duración a gusto ([Custom]). */
+    const val CUSTOM = 4
+
+    /** Qué control pide la vibración: cada uno se enciende o apaga aparte. */
+    enum class Source(val key: String, val default: Boolean) {
+        BUTTON("buttons", true),
+        DPAD("dpad", true),
+        STICK("sticks", false),
+        TOUCHPAD("touchpad", false)
+    }
+
+    /** Tipo de golpe de la vibración personalizada. */
+    enum class Shape { CLICK, TICK, THUD, PULSE }
+
+    /** Vibración personalizada: [strength] 0..1, [shape], [pulseMs] (solo PULSE) y tic al soltar. */
+    data class Custom(
+        val strength: Float = 0.7f,
+        val shape: Shape = Shape.CLICK,
+        val pulseMs: Int = 14,
+        val releaseTick: Boolean = true
+    )
+
     @Volatile
     private var vibrator: Vibrator? = null
 
@@ -41,11 +63,12 @@ object Haptics {
     @Volatile
     internal var emitted = 0
 
-    fun tap(view: View?, constant: Int) {
+    fun tap(view: View?, constant: Int, source: Source = Source.BUTTON) {
         if (view == null) return Diag.hapticSkipped("sin vista")
         if (GameRumble.isOn) return Diag.hapticSkipped("vibra el juego")
         val level = AppPrefs.hapticLevel(view.context)
         if (level == OFF) return Diag.hapticSkipped("apagada en Ajustes")
+        if (!AppPrefs.hapticSource(view.context, source)) return Diag.hapticSkipped("apagada para ${source.key}")
         emitted++
         // Modo compatible: la vibración táctil del sistema, la de toda la vida
         if (AppPrefs.hapticSystem(view.context)) {
@@ -69,11 +92,13 @@ object Haptics {
     @Volatile
     private var lastPath = ""
 
-    /** Tic al soltar (solo con Nítida o Fuerte). */
-    fun release(view: View?) {
+    /** Tic al soltar (Media y Fuerte; en la personalizada, si se quiere). */
+    fun release(view: View?, source: Source = Source.BUTTON) {
         if (GameRumble.isOn || view == null) return
         val level = AppPrefs.hapticLevel(view.context)
         if (level < CRISP || AppPrefs.hapticSystem(view.context)) return
+        if (level == CUSTOM && !AppPrefs.hapticCustom(view.context).releaseTick) return
+        if (!AppPrefs.hapticSource(view.context, source)) return
         play(view.context, level, Kind.RELEASE)
     }
 
@@ -121,6 +146,7 @@ object Haptics {
     }
 
     private fun play(context: Context, level: Int, kind: Kind): Boolean {
+        appContext = context.applicationContext
         val v = vib(context) ?: return false
         if (!v.hasVibrator()) return false
         return try {
@@ -147,35 +173,62 @@ object Haptics {
         }
     }
 
+    @Volatile
+    private var appContext: Context? = null
+
     private fun effect(v: Vibrator, level: Int, kind: Kind): VibrationEffect {
+        // Fuerza claramente distinta en cada nivel (antes Sutil y Nítida se
+        // parecían mucho en muchos motores)
+        val custom = if (level == CUSTOM) appContext?.let { AppPrefs.hapticCustom(it) } ?: Custom() else null
         val strength = when (level) {
-            SUBTLE -> 0.35f
-            CRISP -> 0.7f
+            SUBTLE -> 0.3f
+            CRISP -> 0.62f
+            CUSTOM -> custom!!.strength.coerceIn(0.05f, 1f)
             else -> 1f
         }
+        val shape = custom?.shape ?: Shape.CLICK
+        val release = kind == Kind.RELEASE
+        val scale = (if (release) strength * 0.5f else strength).coerceIn(0.02f, 1f)
+        // Pulso a medida: siempre un golpe con su duración y fuerza
+        if (shape == Shape.PULSE && v.hasAmplitudeControl()) {
+            val ms = if (release) (custom!!.pulseMs / 2).coerceAtLeast(4) else custom!!.pulseMs.coerceIn(4, 60)
+            return VibrationEffect.createOneShot(ms.toLong(), (255 * scale).toInt().coerceIn(1, 255))
+        }
         if (Build.VERSION.SDK_INT >= 30 && supportsPrimitives(v)) {
-            val (prim, scale) = when (kind) {
-                Kind.CLICK -> VibrationEffect.Composition.PRIMITIVE_CLICK to strength
-                Kind.TICK -> VibrationEffect.Composition.PRIMITIVE_TICK to strength
-                Kind.RELEASE -> VibrationEffect.Composition.PRIMITIVE_TICK to strength * 0.5f
+            val prim = when {
+                release || kind == Kind.TICK -> VibrationEffect.Composition.PRIMITIVE_TICK
+                shape == Shape.TICK -> VibrationEffect.Composition.PRIMITIVE_TICK
+                shape == Shape.THUD && Build.VERSION.SDK_INT >= 31 && v.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_THUD) ->
+                    VibrationEffect.Composition.PRIMITIVE_THUD
+                else -> VibrationEffect.Composition.PRIMITIVE_CLICK
             }
-            return VibrationEffect.startComposition().addPrimitive(prim, scale.coerceIn(0f, 1f)).compose()
+            return VibrationEffect.startComposition().addPrimitive(prim, scale).compose()
+        }
+        // Sin primitivas pero con control de fuerza: un golpe corto a esa fuerza
+        if (v.hasAmplitudeControl()) {
+            val ms = when {
+                release -> 6L
+                kind == Kind.TICK || shape == Shape.TICK -> 8L
+                shape == Shape.THUD -> 22L
+                else -> 13L
+            }
+            return VibrationEffect.createOneShot(ms, (255 * scale).toInt().coerceIn(1, 255))
         }
         if (Build.VERSION.SDK_INT >= 29) {
             val id = when {
-                kind == Kind.CLICK && level == STRONG -> VibrationEffect.EFFECT_HEAVY_CLICK
-                kind == Kind.CLICK && level == CRISP -> VibrationEffect.EFFECT_CLICK
+                release || kind == Kind.TICK -> VibrationEffect.EFFECT_TICK
+                strength >= 0.9f -> VibrationEffect.EFFECT_HEAVY_CLICK
+                strength >= 0.5f -> VibrationEffect.EFFECT_CLICK
                 else -> VibrationEffect.EFFECT_TICK
             }
             return VibrationEffect.createPredefined(id)
         }
-        val ms = when (kind) {
-            Kind.CLICK -> if (level == STRONG) 16L else 12L
-            Kind.TICK -> 8L
-            Kind.RELEASE -> 6L
+        val ms = when {
+            release -> 6L
+            kind == Kind.TICK -> 8L
+            else -> (8 + 10 * strength).toLong()
         }
-        val amp = if (v.hasAmplitudeControl()) (255 * strength * (if (kind == Kind.CLICK) 1f else 0.5f)).toInt().coerceIn(1, 255) else VibrationEffect.DEFAULT_AMPLITUDE
-        return VibrationEffect.createOneShot(ms, amp)
+        return VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE)
     }
 
     private fun supportsPrimitives(v: Vibrator): Boolean {

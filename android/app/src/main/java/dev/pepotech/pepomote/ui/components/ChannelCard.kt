@@ -22,11 +22,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import dev.pepotech.pepomote.ui.theme.PepoColors
 
 // Glifos propios, dibujados a mano — nada de iconografía ajena.
-enum class ChannelGlyph { Qr, Pad, Pointer, Stick, GamePad, Switch, Gear, Server, Retro, Keyboard }
+enum class ChannelGlyph { Qr, Pad, Pointer, Stick, GamePad, Switch, Gear, Server, Retro, Keyboard, Wiimote, Nunchuk, Dolphin, Xbox, Invader }
 
 /** `wide`: tarjeta apaisada a todo el ancho (glifo a la izquierda, textos al lado). */
 @Composable
@@ -36,8 +39,12 @@ fun ChannelCard(
     glyph: ChannelGlyph,
     accent: Color = PepoColors.Blue,
     wide: Boolean = false,
+    /** Icono de Material Symbols en vez del glifo dibujado (el engranaje de Ajustes). */
+    icon: Int? = null,
     onClick: () -> Unit = {}
 ) {
+    val ink = PepoColors.Text
+    val card = PepoColors.Card
     Card(
         onClick = onClick,
         modifier = if (wide) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().aspectRatio(1f),
@@ -53,7 +60,7 @@ fun ChannelCard(
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Canvas(modifier = Modifier.size(40.dp)) { drawGlyph(glyph, accent) }
+                if (icon != null) Ico(icon, accent, 40.dp) else Canvas(modifier = Modifier.size(40.dp)) { drawGlyph(glyph, accent, ink, card) }
                 Spacer(Modifier.width(16.dp))
                 Column {
                     Text(title, style = MaterialTheme.typography.titleMedium)
@@ -68,33 +75,173 @@ fun ChannelCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Canvas(modifier = Modifier.size(52.dp).padding(bottom = 4.dp)) {
-                    drawGlyph(glyph, accent)
+                if (icon != null) {
+                    Ico(icon, accent, 52.dp, Modifier.padding(bottom = 4.dp))
+                } else {
+                    Canvas(modifier = Modifier.size(52.dp).padding(bottom = 4.dp)) {
+                        drawGlyph(glyph, accent, ink, card)
+                    }
                 }
-                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(title, style = MaterialTheme.typography.titleMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2
+                    maxLines = 2,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
         }
     }
 }
 
-private fun DrawScope.drawGlyph(glyph: ChannelGlyph, accent: Color) {
+private fun DrawScope.drawGlyph(glyph: ChannelGlyph, accent: Color, ink: Color, card: Color) {
     when (glyph) {
+        ChannelGlyph.Wiimote -> drawWiimoteGlyph(accent, ink)
+        ChannelGlyph.Nunchuk -> drawNunchukGlyph(accent, ink)
+        ChannelGlyph.Dolphin -> drawDolphinGlyph(accent, card)
+        ChannelGlyph.Xbox -> drawXboxGlyph(accent, card)
+        ChannelGlyph.Invader -> drawInvaderGlyph(accent)
         ChannelGlyph.Qr -> drawQrGlyph(accent)
         ChannelGlyph.Pad -> drawPadGlyph(accent)
         ChannelGlyph.Pointer -> drawPointerGlyph(accent)
         ChannelGlyph.Stick -> drawStickGlyph(accent)
         ChannelGlyph.GamePad -> drawGamePadGlyph(accent)
-        ChannelGlyph.Switch -> drawSwitchGlyph(accent)
+        ChannelGlyph.Switch -> drawSwitchSplitGlyph()
         ChannelGlyph.Gear -> drawGearGlyph(accent)
         ChannelGlyph.Server -> drawServerGlyph(accent)
         ChannelGlyph.Retro -> drawRetroGlyph(accent)
         ChannelGlyph.Keyboard -> drawKeyboardGlyph(accent)
     }
+}
+
+private fun o(x: Float, y: Float) = androidx.compose.ui.geometry.Offset(x, y)
+private fun sz(x: Float, y: Float) = androidx.compose.ui.geometry.Size(x, y)
+private fun cr(r: Float) = androidx.compose.ui.geometry.CornerRadius(r)
+
+/**
+ * Mando de Wii de frente: cuerpo alargado del color [body] (blanco en el
+ * tema claro, negro en el oscuro) con su contorno, cruceta, A, −/HOME/+ y
+ * los botones 1 y 2.
+ */
+private fun DrawScope.drawWiimoteGlyph(body: Color, ink: Color) {
+    val w = size.width
+    val h = size.height
+    val bw = w * 0.36f
+    val left = (w - bw) / 2f
+    val detail = if (body.luminance() > 0.5f) Color(0xFF8A939B) else Color(0xFF9AA4AD)
+    drawRoundRect(body, o(left, h * 0.03f), sz(bw, h * 0.94f), cr(bw * 0.4f))
+    drawRoundRect(ink.copy(alpha = 0.55f), o(left, h * 0.03f), sz(bw, h * 0.94f), cr(bw * 0.4f), style = Stroke(w * 0.035f))
+    val cx = w / 2f
+    // Cruceta
+    drawRoundRect(detail, o(cx - w * 0.045f, h * 0.11f), sz(w * 0.09f, h * 0.2f), cr(w * 0.015f))
+    drawRoundRect(detail, o(cx - w * 0.1f, h * 0.165f), sz(w * 0.2f, h * 0.09f), cr(w * 0.015f))
+    // A
+    drawCircle(detail, w * 0.07f, o(cx, h * 0.42f))
+    // − HOME +
+    for (dx in listOf(-0.09f, 0f, 0.09f)) drawCircle(detail, w * 0.025f, o(cx + w * dx, h * 0.6f))
+    // 1 y 2
+    drawCircle(detail, w * 0.045f, o(cx, h * 0.74f))
+    drawCircle(detail, w * 0.045f, o(cx, h * 0.86f))
+}
+
+/** Nunchuk: cuerpo de gota del color [body], el stick arriba y C / Z. */
+private fun DrawScope.drawNunchukGlyph(body: Color, ink: Color) {
+    val w = size.width
+    val h = size.height
+    val detail = if (body.luminance() > 0.5f) Color(0xFF8A939B) else Color(0xFF9AA4AD)
+    val path = androidx.compose.ui.graphics.Path().apply {
+        moveTo(w * 0.5f, h * 0.04f)
+        cubicTo(w * 0.8f, h * 0.04f, w * 0.82f, h * 0.3f, w * 0.74f, h * 0.5f)
+        cubicTo(w * 0.66f, h * 0.7f, w * 0.64f, h * 0.96f, w * 0.5f, h * 0.96f)
+        cubicTo(w * 0.36f, h * 0.96f, w * 0.34f, h * 0.7f, w * 0.26f, h * 0.5f)
+        cubicTo(w * 0.18f, h * 0.3f, w * 0.2f, h * 0.04f, w * 0.5f, h * 0.04f)
+        close()
+    }
+    drawPath(path, body)
+    drawPath(path, ink.copy(alpha = 0.55f), style = Stroke(w * 0.035f))
+    drawCircle(detail, w * 0.13f, o(w * 0.5f, h * 0.24f))
+    drawCircle(body, w * 0.07f, o(w * 0.5f, h * 0.24f))
+    drawCircle(detail, w * 0.035f, o(w * 0.5f, h * 0.48f))
+}
+
+/** Un delfín saltando (dibujo propio). */
+private fun DrawScope.drawDolphinGlyph(fill: Color, eye: Color) {
+    val path = androidx.compose.ui.graphics.vector.PathParser().parsePathString(
+        "M44,24.5 C41.5,24.8 39.6,24 38.6,22.6 C37,17.5 32,14 26,13.2 L22.5,6.5 C21.2,9.5 20,12 18.6,13.6 " +
+            "C13,15.5 9,20.5 7.5,27 L3,29.5 C5.5,31 6.8,32.6 7.2,35.2 C8.5,33 10.2,31.8 12.6,31.6 L10.4,29.8 " +
+            "C13.5,22 20,18.5 27,18.6 C32,18.7 36.5,21.5 39,25.4 C40.6,26.6 42.6,26.4 44,24.5 Z " +
+            "M26,19.2 L23,25.5 L30,19.6 Z"
+    ).toPath()
+    val k = size.minDimension / 48f
+    scale(k, k, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+        translate(0f, 2f) {
+            drawPath(path, fill)
+            drawCircle(eye, 1.2f, o(35.2f, 18.6f))
+        }
+    }
+}
+
+/** Mando de estilo Xbox: cuerpo con asas, dos sticks a distinta altura y cuatro botones. */
+private fun DrawScope.drawXboxGlyph(fill: Color, hole: Color) {
+    val w = size.width
+    val h = size.height
+    val body = androidx.compose.ui.graphics.Path().apply {
+        moveTo(w * 0.3f, h * 0.24f)
+        lineTo(w * 0.7f, h * 0.24f)
+        cubicTo(w * 0.86f, h * 0.24f, w * 0.94f, h * 0.36f, w * 0.97f, h * 0.56f)
+        cubicTo(w * 1.0f, h * 0.76f, w * 0.94f, h * 0.84f, w * 0.86f, h * 0.84f)
+        cubicTo(w * 0.78f, h * 0.84f, w * 0.74f, h * 0.7f, w * 0.66f, h * 0.66f)
+        lineTo(w * 0.34f, h * 0.66f)
+        cubicTo(w * 0.26f, h * 0.7f, w * 0.22f, h * 0.84f, w * 0.14f, h * 0.84f)
+        cubicTo(w * 0.06f, h * 0.84f, w * 0.0f, h * 0.76f, w * 0.03f, h * 0.56f)
+        cubicTo(w * 0.06f, h * 0.36f, w * 0.14f, h * 0.24f, w * 0.3f, h * 0.24f)
+        close()
+    }
+    drawPath(body, fill)
+    // Stick izquierdo arriba, derecho abajo (como en Xbox)
+    drawCircle(hole, w * 0.065f, o(w * 0.24f, h * 0.42f))
+    drawCircle(hole, w * 0.065f, o(w * 0.62f, h * 0.56f))
+    // Cruceta
+    drawRect(hole, o(w * 0.355f, h * 0.48f), sz(w * 0.03f, h * 0.12f))
+    drawRect(hole, o(w * 0.31f, h * 0.525f), sz(w * 0.12f, h * 0.03f))
+    // A B X Y
+    for ((dx, dy) in listOf(0f to -1f, 0f to 1f, -1f to 0f, 1f to 0f)) {
+        drawCircle(hole, w * 0.028f, o(w * 0.77f + dx * w * 0.06f, h * 0.42f + dy * w * 0.06f))
+    }
+}
+
+/** Marcianito de píxeles (lo retro), dibujo propio. */
+private fun DrawScope.drawInvaderGlyph(fill: Color) {
+    val rows = listOf(
+        "..X.....X..",
+        "...X...X...",
+        "..XXXXXXX..",
+        ".XX.XXX.XX.",
+        "XXXXXXXXXXX",
+        "X.XXXXXXX.X",
+        "X.X.....X.X",
+        "...XX.XX..."
+    )
+    val cell = size.width / 12f
+    val top = (size.height - cell * rows.size) / 2f
+    val left = (size.width - cell * 11) / 2f
+    for ((r, line) in rows.withIndex()) for ((c, ch) in line.withIndex()) {
+        if (ch == 'X') drawRect(fill, o(left + c * cell, top + r * cell), sz(cell + 0.5f, cell + 0.5f))
+    }
+}
+
+/** Joy-Con: rojo a la izquierda y azul a la derecha (los colores de siempre). */
+private fun DrawScope.drawSwitchSplitGlyph() {
+    val w = size.width
+    val h = size.height
+    val red = Color(0xFFE60012)
+    val blue = Color(0xFF00B4E0)
+    drawRoundRect(red, o(w * 0.14f, h * 0.08f), sz(w * 0.3f, h * 0.84f), cr(w * 0.12f))
+    drawRoundRect(blue, o(w * 0.56f, h * 0.08f), sz(w * 0.3f, h * 0.84f), cr(w * 0.12f))
+    drawRect(red, o(w * 0.3f, h * 0.08f), sz(w * 0.14f, h * 0.84f))
+    drawRect(blue, o(w * 0.56f, h * 0.08f), sz(w * 0.14f, h * 0.84f))
+    drawCircle(Color(0xFF2B2B2B), w * 0.065f, o(w * 0.3f, h * 0.32f))
+    drawCircle(Color(0xFF2B2B2B), w * 0.065f, o(w * 0.7f, h * 0.62f))
 }
 
 /** Teclado (a la izquierda, algo más pequeño) y un ratón a su derecha. */
@@ -104,10 +251,7 @@ private fun DrawScope.drawKeyboardGlyph(accent: Color) {
     val stroke = w * 0.06f
     val kbW = w * 0.68f
     val kbH = w * 0.44f
-    val top = h * 0.36f
-    fun o(x: Float, y: Float) = androidx.compose.ui.geometry.Offset(x, y)
-    fun sz(x: Float, y: Float) = androidx.compose.ui.geometry.Size(x, y)
-    fun cr(r: Float) = androidx.compose.ui.geometry.CornerRadius(r)
+    val top = h * 0.38f
     drawRoundRect(accent, o(stroke / 2f, top + stroke / 2f), sz(kbW - stroke, kbH - stroke), cr(w * 0.08f), style = Stroke(width = stroke))
     val key = w * 0.075f
     for (row in 0..1) {
@@ -119,12 +263,12 @@ private fun DrawScope.drawKeyboardGlyph(accent: Color) {
     // Ratón: cuerpo ovalado, la raya entre los botones y el cable
     val mx = w * 0.74f
     val mw = w * 0.24f
-    val mTop = h * 0.30f
+    val mTop = h * 0.34f
     val mh = w * 0.4f
     drawRoundRect(accent, o(mx, mTop), sz(mw, mh), cr(mw / 2f), style = Stroke(width = stroke))
     drawLine(accent, o(mx + mw / 2f, mTop + stroke), o(mx + mw / 2f, mTop + mh * 0.38f), strokeWidth = stroke * 0.8f)
     drawLine(accent, o(mx + stroke * 0.6f, mTop + mh * 0.4f), o(mx + mw - stroke * 0.6f, mTop + mh * 0.4f), strokeWidth = stroke * 0.8f)
-    drawLine(accent, o(mx + mw / 2f, mTop), o(mx + mw / 2f, h * 0.14f), strokeWidth = stroke * 0.8f)
+    drawLine(accent, o(mx + mw / 2f, mTop), o(mx + mw / 2f, h * 0.18f), strokeWidth = stroke * 0.8f)
 }
 
 /** Mando clásico apaisado: cuerpo, cruceta a la izquierda y dos botones a la derecha. */

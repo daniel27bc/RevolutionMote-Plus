@@ -945,7 +945,19 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     onGyroToggle = { setGyro(gyroCfg.copy(enabled = !gyroCfg.enabled)) },
                     onPadSettings = { showMenu = false; showPadSettings = true },
                     onEdit = { showMenu = false; startEditing(null) },
-                    onDismiss = { showMenu = false }
+                    onDismiss = { showMenu = false },
+                    side = sideSaved,
+                    // Izquierda → derecha → según el sensor → izquierda…
+                    onSide = {
+                        GamePadSide.save(
+                            context,
+                            when (sideSaved) {
+                                dev.pepotech.pepomote.service.LandscapeSide.Left -> dev.pepotech.pepomote.service.LandscapeSide.Right
+                                dev.pepotech.pepomote.service.LandscapeSide.Right -> dev.pepotech.pepomote.service.LandscapeSide.Sensor
+                                else -> dev.pepotech.pepomote.service.LandscapeSide.Left
+                            }
+                        )
+                    }
                 )
             }
 

@@ -125,7 +125,9 @@ data class PadElement(
     /** Trackpad: cuánto sigue girando al soltar (0 = sin inercia, 1 = casi sin frenar). */
     val inertia: Float = 0f,
     /** Tecla del teclado (solo [ElementKind.KEY]). */
-    val key: String = ""
+    val key: String = "",
+    /** Stick flotante: el centro aparece donde cae el pulgar. */
+    val floating: Boolean = true
 ) {
     /** Único dentro de un perfil: un tipo de control, un bit o una tecla no se repiten. */
     val id: String get() = when (kind) {
@@ -408,6 +410,7 @@ object PadProfileJson {
                 put("turbo", e.turbo)
                 put("inertia", e.inertia.toDouble())
                 if (e.key.isNotEmpty()) put("key", e.key)
+                if (!e.floating) put("float", false)
             })
         })
     }
@@ -432,7 +435,8 @@ object PadProfileJson {
                     trackpad = j.optBoolean("trackpad", false),
                     turbo = j.optBoolean("turbo", false),
                     inertia = j.optDouble("inertia", 0.0).toFloat(),
-                    key = j.optString("key", "")
+                    key = j.optString("key", ""),
+                    floating = j.optBoolean("float", true)
                 )
             )
         }

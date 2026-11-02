@@ -7,7 +7,7 @@
     <string name="home_subtitle">Your phone, a controller for your PC or Android</string>
     <string name="channel_connect">Connect</string>
     <string name="channel_connect_sub">QR and nearby devices</string>
-    <string name="channel_controller">Controller</string>
+    <string name="channel_controller">Wii Remote</string>
     <string name="channel_controller_sub">Pointer and buttons</string>
     <string name="channel_dolphin">Dolphin</string>
     <string name="channel_dolphin_sub">Play real Wii games</string>
@@ -529,10 +529,10 @@
     <string name="pad_aim_hold_sub">Gyro aiming: motion aims only while you hold the aim trigger</string>
     <string name="pad_aim_scale_title">Motion sensitivity</string>
     <string name="haptic_title">Button vibration</string>
-    <string name="haptic_sub">A short, crisp click like a real button. “Crisp” and “Strong” also tick on release</string>
+    <string name="haptic_sub">A short crisp click, like a real button. Medium and Strong also tick on release; in Custom you choose strength and type.</string>
     <string name="haptic_off">Off</string>
-    <string name="haptic_subtle">Subtle</string>
-    <string name="haptic_crisp">Crisp</string>
+    <string name="haptic_subtle">Soft</string>
+    <string name="haptic_crisp">Medium</string>
     <string name="haptic_strong">Strong</string>
     <string name="physical_pad_title">Connected physical controller</string>
     <string name="physical_pad_sub">A USB, Bluetooth or telescopic controller (Kishi, Backbone, GameSir…) sends its buttons and sticks to the PC through the app, together with the phone\'s gyroscope</string>
@@ -752,4 +752,24 @@
     <string name="gestures_sub">Pinch = zoom; three fingers up = task view, down = desktop, sideways = switch window (needs keys: RevolutionMote+ receiver or Bluetooth)</string>
     <string name="diag_system_touch">System touch feedback</string>
     <string name="diag_compat">Compatible mode</string>
+    <string name="haptic_custom">Custom</string>
+    <string name="haptic_strength">Strength</string>
+    <string name="haptic_shape">Hit type</string>
+    <string name="haptic_shape_sub">How it feels: a crisp button click, a light tick, a deeper thud or a pulse with the length you want</string>
+    <string name="haptic_shape_click">Crisp click</string>
+    <string name="haptic_shape_tick">Light tick</string>
+    <string name="haptic_shape_thud">Deep thud</string>
+    <string name="haptic_shape_pulse">Pulse</string>
+    <string name="haptic_duration">Pulse length</string>
+    <string name="haptic_release">Tick on release</string>
+    <string name="haptic_release_sub">A second soft tap when you lift your finger, like a real button bouncing back</string>
+    <string name="haptic_sources">What vibrates</string>
+    <string name="haptic_src_buttons">Buttons</string>
+    <string name="haptic_src_dpad">D-pad</string>
+    <string name="haptic_src_sticks">Sticks</string>
+    <string name="haptic_src_touchpad">Touchpad</string>
+    <string name="floating_title">Floating sticks</string>
+    <string name="floating_sub">The stick appears wherever you rest your thumb inside its area, no need to look for it (like mobile games). Off, the stick stays fixed.</string>
+    <string name="side_menu_title">Controller side</string>
+    <string name="side_menu_hint">Flips the landscape controller (left or right). This is the first-time question: change it here whenever you like.</string>
 </resources>

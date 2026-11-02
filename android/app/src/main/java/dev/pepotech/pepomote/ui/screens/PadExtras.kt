@@ -224,7 +224,7 @@ internal fun PointerModeSwitch(modifier: Modifier = Modifier) {
                 val name = stringResource(label)
                 Box(
                     Modifier
-                        .height(32.dp)
+                        .height(28.dp)
                         .padding(horizontal = 1.dp)
                         .background(if (selected) PepoColors.Blue else androidx.compose.ui.graphics.Color.Transparent, seg)
                         .combinedClickable(
@@ -241,10 +241,10 @@ internal fun PointerModeSwitch(modifier: Modifier = Modifier) {
                             contentDescription = name
                             this.selected = selected
                         }
-                        .padding(horizontal = 9.dp),
+                        .padding(horizontal = 7.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    PointerModeIcon(m, if (selected) PepoColors.OnAccent else PepoColors.TextDim, 20.dp)
+                    PointerModeIcon(m, if (selected) PepoColors.OnAccent else PepoColors.TextDim, 18.dp)
                 }
             }
         }
@@ -322,7 +322,7 @@ internal fun HintIconButton(
     var hint by remember { mutableStateOf(false) }
     Box(
         Modifier
-            .size(40.dp)
+            .size(36.dp)
             .combinedClickable(
                 onClickLabel = title,
                 onLongClick = {
@@ -334,7 +334,7 @@ internal fun HintIconButton(
             .semantics { contentDescription = title },
         contentAlignment = Alignment.Center
     ) {
-        Ico(icon, tint, 22.dp)
+        Ico(icon, tint, 20.dp)
         if (hint) HintPopup(title, desc) { hint = false }
     }
 }
@@ -360,8 +360,23 @@ internal fun PointerQuickControls(link: dev.pepotech.pepomote.service.UiLink, mo
                 stringResource(R.string.pointer_settings_title), stringResource(R.string.pointer_settings_hint)
             ) { settings = true }
         }
+        val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        if (landscape) {
+            val side by dev.pepotech.pepomote.service.NunchukSide.saved.collectAsState()
+            HintIconButton(
+                R.drawable.ms_swap_horiz, PepoColors.TextDim,
+                stringResource(R.string.side_menu_title), stringResource(R.string.side_menu_hint)
+            ) {
+                dev.pepotech.pepomote.service.NunchukSide.save(
+                    context,
+                    if (side == dev.pepotech.pepomote.service.LandscapeSide.Right) dev.pepotech.pepomote.service.LandscapeSide.Left
+                    else dev.pepotech.pepomote.service.LandscapeSide.Right
+                )
+            }
+        }
         HintIconButton(
-            if (locked) R.drawable.ms_lock_fill1 else R.drawable.ms_screen_rotation,
+            if (locked) R.drawable.ms_lock_fill1 else R.drawable.ms_lock_open,
             if (locked) PepoColors.Warn else PepoColors.TextDim,
             stringResource(if (locked) R.string.orientation_unlock else R.string.orientation_lock),
             stringResource(R.string.orientation_hint)

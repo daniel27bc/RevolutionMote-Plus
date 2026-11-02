@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import dev.pepotech.pepomote.control.AppPrefs
 import dev.pepotech.pepomote.control.Haptics
 import dev.pepotech.pepomote.control.StickMap
 import dev.pepotech.pepomote.ui.theme.PepoColors
@@ -47,15 +48,30 @@ fun AnalogStick(
     deadzone: Float = StickMap.DEAD_ZONE,
     antiDeadzone: Float = 0f,
     sensitivity: Float = 1f,
+    /**
+     * Flotante (como en los juegos de móvil): toda la caja es zona del
+     * stick y su centro aparece donde cae el pulgar, sin tener que buscarlo.
+     * Apagado: el stick fijo de siempre.
+     */
+    floating: Boolean = AppPrefs.floatingSticksDefault,
     onStick: (x: Int, y: Int) -> Unit
 ) {
     val view = LocalView.current
     val dz by rememberUpdatedState(deadzone)
     val adz by rememberUpdatedState(antiDeadzone)
     val sens by rememberUpdatedState(sensitivity)
-    val knobDp = sizeDp * 0.46f
+    val float by rememberUpdatedState(floating)
+    // Flotante: la base es más pequeña que la zona, para poder moverse dentro
+    val baseDp = if (floating) sizeDp * 0.68f else sizeDp
+    val knobDp = baseDp * 0.46f
     var active by remember { mutableStateOf(false) }
     var knob by remember { mutableStateOf(Offset.Zero) } // desplazamiento del pomo, px
+    var origin by remember { mutableStateOf(Offset.Zero) } // desplazamiento de la base (flotante), px
+    val baseShown by animateOffsetAsState(
+        targetValue = if (active) origin else Offset.Zero,
+        animationSpec = if (active) snap() else spring(stiffness = Spring.StiffnessMediumLow),
+        label = "base"
+    )
     // Bajo el dedo va directo (sin retraso); al soltar, muelle al centro
     val shown by animateOffsetAsState(
         targetValue = if (active) knob else Offset.Zero,
@@ -66,14 +82,17 @@ fun AnalogStick(
     Box(
         modifier = Modifier
             .size(sizeDp)
-            .background(PepoColors.Card, CircleShape)
-            .border(1.5.dp, if (active) PepoColors.Glow else PepoColors.CardBorder, CircleShape)
-            .pointerInput(sizeDp) {
+            .then(
+                if (floating) Modifier.border(1.dp, PepoColors.CardBorder.copy(alpha = 0.5f), CircleShape)
+                else Modifier
+            )
+            .pointerInput(sizeDp, floating) {
                 var centered = true
                 awaitEachGesture {
                     // Geometría por gesto: siempre la del layout actual
-                    val center = Offset(size.width / 2f, size.height / 2f)
-                    val travel = (size.width - knobDp.toPx()) / 2f // recorrido del pomo
+                    val boxCenter = Offset(size.width / 2f, size.height / 2f)
+                    var center = boxCenter
+                    val travel = (baseDp.toPx() - knobDp.toPx()) / 2f // recorrido del pomo
                     fun move(pos: Offset) {
                         val d = pos - center
                         val len = d.getDistance()
@@ -81,13 +100,18 @@ fun AnalogStick(
                         val (x, y) = StickMap.map(d.x, d.y, travel, dz, adz, sens)
                         val atCenter = x == 0 && y == 0
                         if (centered && !atCenter) {
-                            Haptics.tap(view, HapticFeedbackConstants.CLOCK_TICK)
+                            Haptics.tap(view, HapticFeedbackConstants.CLOCK_TICK, Haptics.Source.STICK)
                         }
                         centered = atCenter
                         onStick(x, y)
                     }
                     val down = awaitFirstDown()
                     down.consume()
+                    if (float) {
+                        // El centro, donde ha caído el pulgar
+                        center = down.position
+                        origin = down.position - boxCenter
+                    }
                     active = true
                     move(down.position)
                     drag(down.id) { change ->
@@ -102,6 +126,14 @@ fun AnalogStick(
             },
         contentAlignment = Alignment.Center
     ) {
+      Box(
+        Modifier
+            .offset { IntOffset(baseShown.x.roundToInt(), baseShown.y.roundToInt()) }
+            .size(baseDp)
+            .background(PepoColors.Card, CircleShape)
+            .border(1.5.dp, if (active) PepoColors.Glow else PepoColors.CardBorder, CircleShape),
+        contentAlignment = Alignment.Center
+      ) {
         // Marcas de los cuatro ejes: orientan el pulgar sin mirar
         for ((ax, ay) in listOf(0f to -1f, 0f to 1f, -1f to 0f, 1f to 0f)) {
             Box(
@@ -125,5 +157,6 @@ fun AnalogStick(
                     .background(PepoColors.Glow, CircleShape)
             )
         }
+      }
     }
 }

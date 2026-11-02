@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -124,6 +125,8 @@ fun HomeScreen(
         // Tres filas de pares: Conectar | Mando, Dolphin | Wii U, Nunchuk | Ajustes
         // En vertical, dos columnas; apaisado (o tablet) caben más y las
         // tarjetas no se estiran hasta ser cajas enormes
+        // El mando y el Nunchuk de Wii: blancos en el tema claro, negros en el oscuro
+        val wiiBody = if (dev.pepotech.pepomote.ui.theme.LocalPepoColors.current.isDark) Color(0xFF1B1E21) else Color.White
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 168.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -152,8 +155,8 @@ fun HomeScreen(
                 ChannelCard(
                     title = stringResource(R.string.channel_controller),
                     subtitle = stringResource(R.string.channel_controller_sub),
-                    glyph = ChannelGlyph.Pad,
-                    accent = PepoColors.Blue,
+                    glyph = ChannelGlyph.Wiimote,
+                    accent = wiiBody,
                     onClick = onController
                 )
             }
@@ -161,8 +164,8 @@ fun HomeScreen(
                 ChannelCard(
                     title = stringResource(R.string.channel_dolphin),
                     subtitle = stringResource(R.string.channel_dolphin_sub),
-                    glyph = ChannelGlyph.Pointer,
-                    accent = PepoColors.Ok,
+                    glyph = ChannelGlyph.Dolphin,
+                    accent = Color(0xFF1E88E5),
                     onClick = onDolphin
                 )
             }
@@ -172,7 +175,7 @@ fun HomeScreen(
                     title = stringResource(R.string.channel_wiiu),
                     subtitle = stringResource(R.string.channel_wiiu_sub),
                     glyph = ChannelGlyph.GamePad,
-                    accent = PepoColors.Ok,
+                    accent = Color(0xFF009AC7),
                     onClick = onWiiU
                 )
             }
@@ -190,8 +193,8 @@ fun HomeScreen(
                 ChannelCard(
                     title = stringResource(R.string.channel_retroarch),
                     subtitle = stringResource(if (androidReceiver) R.string.channel_retroarch_android_sub else R.string.channel_retroarch_sub),
-                    glyph = ChannelGlyph.Retro,
-                    accent = PepoColors.Warn,
+                    glyph = ChannelGlyph.Invader,
+                    accent = Color(0xFF9AA0A6),
                     onClick = onRetroArch
                 )
             }
@@ -201,7 +204,7 @@ fun HomeScreen(
                 ChannelCard(
                     title = stringResource(R.string.channel_gamepad),
                     subtitle = stringResource(R.string.channel_gamepad_sub),
-                    glyph = ChannelGlyph.GamePad,
+                    glyph = ChannelGlyph.Xbox,
                     accent = PepoColors.Blue,
                     onClick = onGamepad
                 )
@@ -213,7 +216,7 @@ fun HomeScreen(
                     title = stringResource(R.string.channel_kbm),
                     subtitle = stringResource(R.string.channel_kbm_sub),
                     glyph = ChannelGlyph.Keyboard,
-                    accent = PepoColors.Blue,
+                    accent = Color(0xFFF2B705),
                     onClick = onKbm
                 )
             }
@@ -222,8 +225,8 @@ fun HomeScreen(
                 ChannelCard(
                     title = stringResource(R.string.channel_nunchuk),
                     subtitle = stringResource(R.string.channel_nunchuk_sub),
-                    glyph = ChannelGlyph.Stick,
-                    accent = PepoColors.Ok,
+                    glyph = ChannelGlyph.Nunchuk,
+                    accent = wiiBody,
                     onClick = onNunchuk
                 )
             }
@@ -242,6 +245,7 @@ fun HomeScreen(
                     subtitle = stringResource(R.string.channel_settings_sub),
                     glyph = ChannelGlyph.Gear,
                     accent = PepoColors.TextDim,
+                    icon = R.drawable.ms_settings,
                     onClick = onNewPairing
                 )
             }

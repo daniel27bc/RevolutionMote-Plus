@@ -172,7 +172,7 @@ fun CButtons(sizeDp: Dp, onStick: (x: Int, y: Int) -> Unit) {
                         awaitEachGesture {
                             val first = awaitFirstDown()
                             first.consume()
-                            Haptics.tap(view, HapticFeedbackConstants.CLOCK_TICK)
+                            Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP, Haptics.Source.BUTTON)
                             emit(held or bit)
                             waitForUpOrCancellation()
                             emit(held and bit.inv())

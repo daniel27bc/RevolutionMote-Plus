@@ -262,7 +262,7 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig,
             if (e.trackpad) {
                 RightStickTrackpad(bw, e.sensitivity, e.antiDeadzone, inertia = e.inertia, onStick = sink)
             } else {
-                AnalogStick(bw, e.deadzone, e.antiDeadzone, e.sensitivity, sink)
+                AnalogStick(bw, e.deadzone, e.antiDeadzone, e.sensitivity, e.floating, sink)
             }
         }
         ElementKind.DPAD -> PadCross(sizeDp = bw)
@@ -739,6 +739,9 @@ internal fun ElementSettingsDialog(
             Spacer(Modifier.height(10.dp))
             StickResponsePreview(element)
             if (!element.trackpad) {
+                SwitchRow(stringResource(R.string.floating_title), element.floating, stringResource(R.string.floating_sub)) {
+                    onChange(element.copy(floating = it))
+                }
                 LabeledSlider(
                     stringResource(R.string.ed_deadzone),
                     element.deadzone, 0f..0.5f,
@@ -1084,7 +1087,10 @@ internal fun PadMenuDialog(
     onGyroToggle: () -> Unit,
     onPadSettings: () -> Unit,
     onEdit: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** Lado del mando apaisado (la pregunta de la primera vez, que aquí se cambia). */
+    side: dev.pepotech.pepomote.service.LandscapeSide? = null,
+    onSide: () -> Unit = {}
 ) {
     EditorDialog(onDismiss) {
         Text(stringResource(R.string.pad_menu_title), style = MaterialTheme.typography.headlineSmall)
@@ -1105,6 +1111,19 @@ internal fun PadMenuDialog(
             if (locked) PepoColors.Warn else PepoColors.TextDim,
             onLock
         )
+        if (side != null) {
+            MenuRow(
+                R.drawable.ms_screen_rotation, stringResource(R.string.side_menu_title),
+                stringResource(
+                    when (side) {
+                        dev.pepotech.pepomote.service.LandscapeSide.Left -> R.string.side_left
+                        dev.pepotech.pepomote.service.LandscapeSide.Right -> R.string.side_right
+                        else -> R.string.side_sensor
+                    }
+                ),
+                PepoColors.Text, onSide
+            )
+        }
         MenuRow(R.drawable.ms_view_list, stringResource(R.string.ed_profiles), activeName ?: stringResource(R.string.ed_original), PepoColors.Text, onProfiles)
         if (gyroOn != null) {
             MenuRow(

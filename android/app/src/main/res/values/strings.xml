@@ -7,7 +7,7 @@
     <string name="home_subtitle">Tu móvil, mando de tu PC u otro Android</string>
     <string name="channel_connect">Conectar</string>
     <string name="channel_connect_sub">QR y dispositivos cercanos</string>
-    <string name="channel_controller">Mando</string>
+    <string name="channel_controller">Mando Wii</string>
     <string name="channel_controller_sub">Puntero y botones</string>
     <string name="channel_dolphin">Dolphin</string>
     <string name="channel_dolphin_sub">Juega a la Wii de verdad</string>
@@ -529,10 +529,10 @@
     <string name="pad_aim_hold_sub">Gyro aiming: el giro apunta solo mientras mantienes el gatillo de apuntar</string>
     <string name="pad_aim_scale_title">Sensibilidad del giro</string>
     <string name="haptic_title">Vibración de los botones</string>
-    <string name="haptic_sub">Un clic corto y seco, como un botón de verdad. «Nítida» y «Fuerte» también hacen un tic al soltar</string>
+    <string name="haptic_sub">Un clic corto y seco, como un botón de verdad. «Media» y «Fuerte» también hacen un tic al soltar; en «Personalizada» eliges fuerza y tipo.</string>
     <string name="haptic_off">Apagada</string>
-    <string name="haptic_subtle">Sutil</string>
-    <string name="haptic_crisp">Nítida</string>
+    <string name="haptic_subtle">Suave</string>
+    <string name="haptic_crisp">Media</string>
     <string name="haptic_strong">Fuerte</string>
     <string name="physical_pad_title">Mando físico conectado</string>
     <string name="physical_pad_sub">Un mando USB, Bluetooth o telescópico (Kishi, Backbone, GameSir…) manda sus botones y sticks al PC a través de la app, junto con el giroscopio del móvil</string>
@@ -753,4 +753,24 @@
     <string name="gestures_sub">Pellizcar = zoom; tres dedos arriba = vista de tareas, abajo = escritorio, a los lados = cambiar de ventana (necesita teclas: receptor de RevolutionMote+ o Bluetooth)</string>
     <string name="diag_system_touch">Respuesta táctil del sistema</string>
     <string name="diag_compat">Modo compatible</string>
+    <string name="haptic_custom">Personalizada</string>
+    <string name="haptic_strength">Fuerza</string>
+    <string name="haptic_shape">Tipo de golpe</string>
+    <string name="haptic_shape_sub">Cómo se siente: un clic seco de botón, un tic ligero, un golpe más grave o un pulso con la duración que quieras</string>
+    <string name="haptic_shape_click">Clic seco</string>
+    <string name="haptic_shape_tick">Tic ligero</string>
+    <string name="haptic_shape_thud">Golpe grave</string>
+    <string name="haptic_shape_pulse">Pulso</string>
+    <string name="haptic_duration">Duración del pulso</string>
+    <string name="haptic_release">Tic al soltar</string>
+    <string name="haptic_release_sub">Un segundo toque suave al levantar el dedo, como el rebote de un botón de verdad</string>
+    <string name="haptic_sources">Qué vibra</string>
+    <string name="haptic_src_buttons">Botones</string>
+    <string name="haptic_src_dpad">Cruceta</string>
+    <string name="haptic_src_sticks">Sticks</string>
+    <string name="haptic_src_touchpad">Touchpad</string>
+    <string name="floating_title">Sticks flotantes</string>
+    <string name="floating_sub">El stick aparece donde apoyas el pulgar dentro de su zona, sin tener que buscarlo (como en los juegos de móvil). Apagado, el stick queda fijo.</string>
+    <string name="side_menu_title">Lado del mando</string>
+    <string name="side_menu_hint">Da la vuelta al mando apaisado (izquierda o derecha). Es la pregunta de la primera vez: aquí se cambia cuando quieras.</string>
 </resources>

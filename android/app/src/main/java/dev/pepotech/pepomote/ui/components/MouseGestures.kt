@@ -158,7 +158,7 @@ fun Modifier.mouseGestures(
     }
 
     fun click(index: Int, times: Int = 1) {
-        Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
+        Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP, Haptics.Source.TOUCHPAD)
         scope.launch {
             repeat(times) {
                 o.button(index, true)
@@ -201,7 +201,7 @@ fun Modifier.mouseGestures(
             fun startDrag() {
                 if (dragging) return
                 dragging = true
-                Haptics.tap(view, HapticFeedbackConstants.LONG_PRESS)
+                Haptics.tap(view, HapticFeedbackConstants.LONG_PRESS, Haptics.Source.TOUCHPAD)
                 o.button(0, true)
             }
 
@@ -234,7 +234,7 @@ fun Modifier.mouseGestures(
                             } else {
                                 if (swipeY > 0) SwipeGesture.DOWN else SwipeGesture.UP
                             }
-                            if (o.gesture(g)) Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
+                            if (o.gesture(g)) Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP, Haptics.Source.TOUCHPAD)
                             swiped = true
                         }
                     }
@@ -288,7 +288,7 @@ fun Modifier.mouseGestures(
             when {
                 dragging -> {
                     o.button(0, false)
-                    Haptics.release(view)
+                    Haptics.release(view, Haptics.Source.TOUCHPAD)
                 }
                 tap && fingers >= 3 -> click(2)
                 tap && fingers == 2 -> click(1)

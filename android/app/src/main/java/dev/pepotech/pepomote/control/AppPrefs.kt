@@ -217,11 +217,52 @@ object AppPrefs {
     /** Fuerza del clic háptico: [Haptics.OFF]..[Haptics.STRONG]; de serie, nítido. */
     fun hapticLevel(context: Context): Int =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt("hapticLevel", Haptics.CRISP).coerceIn(Haptics.OFF, Haptics.STRONG)
+            .getInt("hapticLevel", Haptics.CRISP).coerceIn(Haptics.OFF, Haptics.CUSTOM)
 
     fun setHapticLevel(context: Context, value: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putInt("hapticLevel", value.coerceIn(Haptics.OFF, Haptics.STRONG)).apply()
+            .edit().putInt("hapticLevel", value.coerceIn(Haptics.OFF, Haptics.CUSTOM)).apply()
+    }
+
+    /** ¿Vibra este tipo de control? De serie: botones y cruceta sí; sticks y touchpad no. */
+    fun hapticSource(context: Context, source: Haptics.Source): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("haptic_" + source.key, source.default)
+
+    fun setHapticSource(context: Context, source: Haptics.Source, on: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("haptic_" + source.key, on).apply()
+    }
+
+    /** La vibración personalizada. */
+    fun hapticCustom(context: Context): Haptics.Custom {
+        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return Haptics.Custom(
+            strength = p.getFloat("hapticCustomStrength", 0.7f),
+            shape = runCatching { Haptics.Shape.valueOf(p.getString("hapticCustomShape", "CLICK") ?: "CLICK") }.getOrDefault(Haptics.Shape.CLICK),
+            pulseMs = p.getInt("hapticCustomMs", 14),
+            releaseTick = p.getBoolean("hapticCustomRelease", true)
+        )
+    }
+
+    fun setHapticCustom(context: Context, c: Haptics.Custom) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putFloat("hapticCustomStrength", c.strength)
+            .putString("hapticCustomShape", c.shape.name)
+            .putInt("hapticCustomMs", c.pulseMs)
+            .putBoolean("hapticCustomRelease", c.releaseTick)
+            .apply()
+    }
+
+    /** Sticks flotantes (el centro aparece donde cae el pulgar). De serie, sí. */
+    @Volatile
+    var floatingSticksDefault: Boolean = true
+
+    fun loadFloatingSticks(context: Context) {
+        floatingSticksDefault = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("floatingSticks", true)
+    }
+
+    fun setFloatingSticks(context: Context, value: Boolean) {
+        floatingSticksDefault = value
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("floatingSticks", value).apply()
     }
 
     /** Vibración por el camino del sistema (performHapticFeedback) en vez del clic propio. */

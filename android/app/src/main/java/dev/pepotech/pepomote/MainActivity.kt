@@ -294,6 +294,7 @@ class MainActivity : ComponentActivity() {
         PointerTrackpad.loadEnabled(this)
         dev.pepotech.pepomote.ui.theme.ThemeMode.load(this)
         dev.pepotech.pepomote.ui.theme.AccentColor.load(this)
+        AppPrefs.loadFloatingSticks(this)
         OrientationLock.load(this)
         UpdateNotice.refresh(this)
         lifecycleScope.launch {

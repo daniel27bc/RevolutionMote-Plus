@@ -92,7 +92,7 @@ fun PadCross(sizeDp: Dp, sideways: Boolean = false) {
                             }
                             // Algo nuevo pulsado (no solo soltado): clic
                             if (bits and held.inv() != 0) {
-                                Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
+                                Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP, Haptics.Source.DPAD)
                                 UiSounds.blip()
                             }
                             held = bits
