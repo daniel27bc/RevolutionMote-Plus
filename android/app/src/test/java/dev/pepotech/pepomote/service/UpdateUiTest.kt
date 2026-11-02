@@ -42,7 +42,7 @@ class UpdateUiTest {
         compose.onNodeWithText("• Mejor conexión").assertIsDisplayed()
         compose.onNodeWithText("Descargar e instalar").assertDoesNotExist()
         compose.onNodeWithText("Instalar").assertDoesNotExist()
-        compose.onNodeWithText("PepoMote 1.11.0 instalada").assertIsDisplayed()
+        compose.onNodeWithText("RevolutionMote+ 1.11.0 instalada").assertIsDisplayed()
     }
     @Test fun progressCanBeCancelledAndDoesNotOfferDuplicateDownload() {
         var cancelled = false

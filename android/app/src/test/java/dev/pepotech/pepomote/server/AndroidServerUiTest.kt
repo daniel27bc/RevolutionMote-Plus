@@ -261,7 +261,7 @@ class AndroidServerUiTest {
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("2. Elige dónde jugar"))
         compose.waitUntil(5000) { compose.onAllNodesWithText("Configurar Dolphin").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Configurar Dolphin").performScrollTo().performClick()
-        compose.onNodeWithText("Conecta PepoMote con Dolphin").assertIsDisplayed()
+        compose.onNodeWithText("Conecta RevolutionMote+ con Dolphin").assertIsDisplayed()
         compose.onNodeWithText("1. Toca «Usar esta carpeta».", substring = true).assertIsDisplayed()
         capture("server-permission-guide-ui-test.png")
         compose.onNodeWithText("Ir al permiso").performClick()

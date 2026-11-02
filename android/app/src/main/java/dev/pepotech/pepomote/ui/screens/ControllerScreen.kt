@@ -41,6 +41,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.pointer.pointerInput
@@ -153,6 +154,13 @@ fun ControllerScreen(link: UiLink, showChips: Boolean, onDisconnect: () -> Unit)
         ) {
             // Modo puntero con «ratón con el dedo»: los huecos sin botones son un trackpad
             PointerPadUnderlay(link)
+            // La primera vez en modo puntero: dónde está el selector y cómo se lee
+            if ((link as? UiLink.Connected)?.mode == LinkState.MODE_POINTER) {
+                OneTimeHint(
+                    "pointer_modes", stringResource(R.string.hint_pointer_modes),
+                    Modifier.align(Alignment.TopCenter).padding(top = 56.dp).zIndex(2f)
+                )
+            }
             // En una tablet todo crece a la vez (UiScale; en cualquier móvil, 1),
             // la columna del mando se limita a 520·grow y las tiras la abrazan (en
             // vez de irse a los bordes de la pantalla); los huecos entre grupos se
@@ -234,9 +242,6 @@ fun ControllerScreen(link: UiLink, showChips: Boolean, onDisconnect: () -> Unit)
                     }
                 }
 
-                if ((link as? UiLink.Connected)?.mode == LinkState.MODE_POINTER) {
-                    OneTimeHint("pointer_modes", stringResource(R.string.hint_pointer_modes))
-                }
                 if (link is UiLink.Connected) {
                     // Chips de modo (Jugador 1 con el ajuste activo, y siempre dentro de
                     // Wii U) y, en Dolphin, el interruptor «Nunchuk» a la derecha de Wii U
@@ -254,7 +259,7 @@ fun ControllerScreen(link: UiLink, showChips: Boolean, onDisconnect: () -> Unit)
                             horizontalArrangement = Arrangement.spacedBy(if (dense) 8.dp else 10.dp, Alignment.CenterHorizontally),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            if (modeChips) ModeChips(current = link.mode, supportsCemu = link.supportsCemu, supportsSwitch = link.supportsSwitch, supportsRetroArch = link.supportsRetroArch, supportsGamepad = link.supportsGamepad, androidReceiver = link.platform == "android", dense = dense)
+                            if (modeChips) ModeChips(current = link.mode, supportsCemu = link.supportsCemu, supportsSwitch = link.supportsSwitch, supportsRetroArch = link.supportsRetroArch, supportsGamepad = link.supportsGamepad, androidReceiver = link.platform == "android", dense = dense, foldable = true)
                             if (nunchuk) NunchukChip(link, dense = dense, modifier = Modifier.padding(start = 4.dp))
                         }
                     }
@@ -460,11 +465,11 @@ internal fun modeLabel(mode: String): String = when (mode) {
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-internal fun ModeChips(current: String, supportsCemu: Boolean, supportsSwitch: Boolean = false, compact: Boolean = false, dense: Boolean = false, modifier: Modifier = Modifier, androidReceiver: Boolean = false, supportsRetroArch: Boolean = false, supportsGamepad: Boolean = false) {
+internal fun ModeChips(current: String, supportsCemu: Boolean, supportsSwitch: Boolean = false, compact: Boolean = false, dense: Boolean = false, modifier: Modifier = Modifier, androidReceiver: Boolean = false, supportsRetroArch: Boolean = false, supportsGamepad: Boolean = false, foldable: Boolean = false) {
     // En vertical el selector se pliega: plegado solo se ve el modo actual y
     // una flecha; se recuerda cómo lo dejaste
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    var open by remember { mutableStateOf(compact || !dev.pepotech.pepomote.control.AppPrefs.modeChipsFolded(ctx)) }
+    var open by remember { mutableStateOf(!foldable || !dev.pepotech.pepomote.control.AppPrefs.modeChipsFolded(ctx)) }
     val fold: (Boolean) -> Unit = { o ->
         open = o
         dev.pepotech.pepomote.control.AppPrefs.setModeChipsFolded(ctx, !o)
@@ -528,14 +533,16 @@ internal fun ModeChips(current: String, supportsCemu: Boolean, supportsSwitch: B
     if (compact) Row(modifier, horizontalArrangement = Arrangement.spacedBy(gap)) { chips() }
     else FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(gap), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         chips()
-        val hint = stringResource(R.string.mode_chips_collapse)
-        Box(
-            Modifier
-                .size(36.dp)
-                .clickable(onClickLabel = hint) { fold(false) }
-                .semantics { contentDescription = hint },
-            contentAlignment = Alignment.Center
-        ) { dev.pepotech.pepomote.ui.components.Ico(R.drawable.ms_expand_less, PepoColors.TextDim, 22.dp) }
+        if (foldable) {
+            val hint = stringResource(R.string.mode_chips_collapse)
+            Box(
+                Modifier
+                    .size(36.dp)
+                    .clickable(onClickLabel = hint) { fold(false) }
+                    .semantics { contentDescription = hint },
+                contentAlignment = Alignment.Center
+            ) { dev.pepotech.pepomote.ui.components.Ico(R.drawable.ms_expand_less, PepoColors.TextDim, 22.dp) }
+        }
     }
 }
 
