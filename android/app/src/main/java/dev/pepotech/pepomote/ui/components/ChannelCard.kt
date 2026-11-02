@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,7 +48,12 @@ fun ChannelCard(
     val card = PepoColors.Card
     Card(
         onClick = onClick,
-        modifier = if (wide) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().aspectRatio(1f),
+        // Apaisado: tarjetas más bajas que anchas (cuadradas eran enormes)
+        modifier = if (wide) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().aspectRatio(
+            if (androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            ) 1.55f else 1f
+        ),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
         border = BorderStroke(1.5.dp, PepoColors.CardBorder),
@@ -70,8 +76,8 @@ fun ChannelCard(
         } else {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp),
+                    .fillMaxSize()
+                    .padding(14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -172,9 +178,10 @@ private fun DrawScope.drawDolphinGlyph(fill: Color, eye: Color) {
             "C13.5,22 20,18.5 27,18.6 C32,18.7 36.5,21.5 39,25.4 C40.6,26.6 42.6,26.4 44,24.5 Z " +
             "M26,19.2 L23,25.5 L30,19.6 Z"
     ).toPath()
-    val k = size.minDimension / 48f
+    // El dibujo ocupa x 3..44, y 6.5..35: se escala a lo ancho y se centra
+    val k = size.minDimension / 41f
     scale(k, k, pivot = androidx.compose.ui.geometry.Offset.Zero) {
-        translate(0f, 2f) {
+        translate(-3f, -6.5f + (41f - 28.5f) / 2f) {
             drawPath(path, fill)
             drawCircle(eye, 1.2f, o(35.2f, 18.6f))
         }
