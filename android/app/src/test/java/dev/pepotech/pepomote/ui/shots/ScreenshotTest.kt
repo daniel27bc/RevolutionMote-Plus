@@ -195,4 +195,18 @@ class ScreenshotTest {
             )
         }
     }
+
+    private fun home() = dev.pepotech.pepomote.ui.screens.HomeScreen(
+        status = dev.pepotech.pepomote.ui.screens.HomeStatus(dev.pepotech.pepomote.ui.screens.HomeTone.On, "Conectado a TorreDaniel"),
+        langLabel = "ES", langSwitchHint = "", onToggleLang = {},
+        onConnect = {}, onController = {}, onDolphin = {}, onWiiU = {}, onSwitch = {}, onNunchuk = {}, onNewPairing = {}
+    )
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h1300dp-port-xhdpi")
+    fun inicioOscuro() = shot("14_inicio") { home() }
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h1300dp-port-xhdpi")
+    fun inicioClaro() = shot("15_inicio_claro", dark = false) { home() }
+
+    @Test fun inicioApaisado() = shot("16_inicio_apaisado") { home() }
 }
