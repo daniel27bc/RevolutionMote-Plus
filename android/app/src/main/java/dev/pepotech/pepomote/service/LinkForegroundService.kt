@@ -326,6 +326,7 @@ class LinkForegroundService : Service() {
                         }
                     }
                     LinkState.sendText = { t -> if (ok.textInput) control?.sendText(t) }
+                    LinkState.sendKbm = if (ok.supportsKbm) ({ ev -> control?.sendKbm(ev) }) else null
                     LinkState.sendNunchuk = { own -> control?.sendNunchuk(own) }
                     LinkState.sendScreenOnly = { on ->
                         if ((LinkState.flow.value as? UiLink.Connected)?.mode == LinkState.MODE_CEMU) control?.sendScreenOnly(on)
@@ -351,6 +352,7 @@ class LinkForegroundService : Service() {
                             platform = ok.platform,
                             textInput = ok.textInput,
                             supportsTilt = ok.supportsTilt,
+                            supportsKbm = ok.supportsKbm,
                             supportsRetroArch = ok.supportsRetroArch,
                             supportsGamepad = ok.supportsGamepad,
                             rumble = ok.rumble
@@ -669,6 +671,7 @@ class LinkForegroundService : Service() {
         LinkState.sendMode = null
         LinkState.sendPad = null
         LinkState.sendText = null
+        LinkState.sendKbm = null
         LinkState.sendNunchuk = null
         LinkState.sendScreenOnly = null
         LinkState.sendHotkey = null

@@ -78,6 +78,31 @@ pub enum KeyCode {
     Char(char),
 }
 
+/// Las teclas con nombre que entiende cualquier backend (las de [`KeyCode`]).
+pub fn key_by_name(name: &str) -> Option<KeyCode> {
+    Some(match name {
+        "ArrowUp" => KeyCode::ArrowUp,
+        "ArrowDown" => KeyCode::ArrowDown,
+        "ArrowLeft" => KeyCode::ArrowLeft,
+        "ArrowRight" => KeyCode::ArrowRight,
+        "Enter" | "NumpadEnter" => KeyCode::Enter,
+        "Escape" => KeyCode::Escape,
+        "Backspace" => KeyCode::Backspace,
+        "Space" => KeyCode::Space,
+        "ShiftLeft" | "ShiftRight" => KeyCode::Shift,
+        _ => {
+            let b = name.as_bytes();
+            if b.len() == 4 && name.starts_with("Key") && b[3].is_ascii_uppercase() {
+                KeyCode::Char((b[3] as char).to_ascii_lowercase())
+            } else if b.len() == 6 && name.starts_with("Digit") && b[5].is_ascii_digit() {
+                KeyCode::Char(b[5] as char)
+            } else {
+                return None;
+            }
+        }
+    })
+}
+
 /// Texto → pulsaciones (tecla, con Shift) de nuestro teclado virtual. Lo que
 /// no tiene tecla ASCII se queda fuera: `text_ops` lo marca como `Unicode` y
 /// cada backend decide si sabe producirlo (y si no, lo dice).
@@ -92,6 +117,27 @@ pub fn text_keys(text: &str) -> Vec<(KeyCode, bool)> {
 }
 
 pub trait Injector: Send {
+    /// Botón del ratón por índice (0 izquierdo, 1 derecho, 2 central). De
+    /// serie, el central no hace nada (Windows lo implementa).
+    fn button_index(&mut self, idx: u8, down: bool) {
+        match idx {
+            0 => self.button(MouseButton::Left, down),
+            1 => self.button(MouseButton::Right, down),
+            _ => {}
+        }
+    }
+    /// Tecla por nombre (`KeyboardEvent.code` de la web: «KeyW», «Enter»…).
+    /// De serie, las que ya conoce [`KeyCode`]; Windows sabe todas las de un
+    /// teclado normal. Devuelve false si no sabe esa tecla.
+    fn key_named(&mut self, name: &str, down: bool) -> bool {
+        match key_by_name(name) {
+            Some(k) => {
+                self.key(k, down);
+                true
+            }
+            None => false,
+        }
+    }
     fn move_rel(&mut self, dx: i32, dy: i32);
     /// Coordenadas normalizadas 0..1 sobre la pantalla primaria.
     fn move_abs(&mut self, nx: f32, ny: f32);

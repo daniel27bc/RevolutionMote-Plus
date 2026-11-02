@@ -106,6 +106,16 @@ class ScreenshotTest {
         }
     }
 
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun tecladoYRaton() {
+        AppPrefs.setKbmTransport(compose.activity, "app")
+        shot("12_teclado_raton") { dev.pepotech.pepomote.ui.screens.KbmScreen(onBack = {}, onPair = {}) }
+        AppPrefs.setKbmTransport(compose.activity, "")
+    }
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h900dp-port-xhdpi")
+    fun elegirConexion() = shot("13_elegir_conexion") { dev.pepotech.pepomote.ui.screens.KbmScreen(onBack = {}, onPair = {}) }
+
     @Test fun lienzoEditando() = shot("03_lienzo_editando") {
         CustomPadCanvas(profile(), layout, editing = true, onElementChange = { _, _ -> }, onGear = {})
     }

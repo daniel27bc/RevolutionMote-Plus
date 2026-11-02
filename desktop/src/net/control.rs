@@ -9,7 +9,7 @@ use crate::pairing::PairingInfo;
 use crate::screen::ScreenHub;
 use crate::retroarch::RetroPadKind;
 use crate::input::text_plan;
-use crate::state::{pad_state, PadState, player_number, LinkStatus, Mode, PendingText, PlayerInfo, Role, SharedState, SwitchPad, MAX_TEXT_QUEUE};
+use crate::state::{pad_state, PadState, player_number, KbmEvent, LinkStatus, Mode, PendingText, PlayerInfo, Role, SharedState, SwitchPad, MAX_KBM_QUEUE, MAX_TEXT_QUEUE};
 use rand::Rng;
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
@@ -312,6 +312,9 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
                         // Este receptor entiende el apuntado por inclinación
                         // (INPUT flags bit4): el móvil solo lo pide si lo ve aquí
                         "tilt":true, "frame_rotation":true,
+                        // RevolutionMote+: teclado y ratón a la vez que el mando
+                        // (mensaje `kbm`)
+                        "kbm":true,
                         // Vibración de los juegos: si este PC puede mandarla
                         // (ready / driver / denied / unsupported), para la
                         // línea de Ajustes del móvil
@@ -529,6 +532,19 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
                     }
                 }
             }
+            Some("kbm") => {
+                // Teclado y ratón (RevolutionMote+): lote de eventos
+                // [["mv",dx,dy], ["btn",0..2,down], ["wh",n], ["key","KeyW",down], ["rel"]]
+                if let Some(evs) = msg["ev"].as_array() {
+                    let parsed: Vec<KbmEvent> = evs.iter().filter_map(parse_kbm).collect();
+                    if !parsed.is_empty() {
+                        let mut s = shared.lock_tolerant();
+                        if s.kbm_queue.len() + parsed.len() <= MAX_KBM_QUEUE {
+                            s.kbm_queue.extend(parsed);
+                        }
+                    }
+                }
+            }
             Some("config") => {
                 let _ = send(&writer, &msg);
             }
@@ -536,6 +552,9 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
             _ => {}
         }
     }
+
+    // Lo que este móvil dejara pulsado en el teclado o el ratón se suelta
+    shared.lock_tolerant().kbm_queue.push(KbmEvent::ReleaseAll);
 
     // Limpieza de ESTA sesión. Si otra conexión del mismo móvil ya la
     // desalojó, la plaza es suya: no tocar nada.
@@ -582,4 +601,42 @@ fn send(w: &Writer, v: &Value) -> std::io::Result<()> {
     s.push('\n');
     let mut w = w.lock().unwrap_or_else(|e| e.into_inner());
     w.write_all(s.as_bytes())
+}
+
+/// Un evento del mensaje `kbm` (ver arriba); None si no se entiende.
+fn parse_kbm(v: &serde_json::Value) -> Option<KbmEvent> {
+    let a = v.as_array()?;
+    let clamp = |x: &serde_json::Value, lim: i64| x.as_i64().map(|n| n.clamp(-lim, lim) as i32);
+    match a.first()?.as_str()? {
+        "mv" => Some(KbmEvent::Move(clamp(a.get(1)?, 4000)?, clamp(a.get(2)?, 4000)?)),
+        "btn" => {
+            let b = a.get(1)?.as_u64()?;
+            (b <= 2).then_some(KbmEvent::Button(b as u8, a.get(2)?.as_bool()?))
+        }
+        "wh" => Some(KbmEvent::Wheel(clamp(a.get(1)?, 12000)?)),
+        "key" => {
+            let name = a.get(1)?.as_str()?;
+            (!name.is_empty() && name.len() <= 24).then(|| KbmEvent::Key(name.to_owned(), a.get(2).and_then(|d| d.as_bool()).unwrap_or(false)))
+        }
+        "rel" => Some(KbmEvent::ReleaseAll),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod kbm_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn eventos_kbm() {
+        assert_eq!(parse_kbm(&json!(["mv", 5, -3])), Some(KbmEvent::Move(5, -3)));
+        assert_eq!(parse_kbm(&json!(["mv", 99999, 0])), Some(KbmEvent::Move(4000, 0)));
+        assert_eq!(parse_kbm(&json!(["btn", 1, true])), Some(KbmEvent::Button(1, true)));
+        assert_eq!(parse_kbm(&json!(["btn", 7, true])), None);
+        assert_eq!(parse_kbm(&json!(["wh", -120])), Some(KbmEvent::Wheel(-120)));
+        assert_eq!(parse_kbm(&json!(["key", "KeyW", true])), Some(KbmEvent::Key("KeyW".into(), true)));
+        assert_eq!(parse_kbm(&json!(["rel"])), Some(KbmEvent::ReleaseAll));
+        assert_eq!(parse_kbm(&json!(["???"])), None);
+    }
 }

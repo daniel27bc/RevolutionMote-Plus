@@ -17,7 +17,10 @@ enum class ElementKind {
     KEYBOARD,
 
     /** Cambia entre mando y ratón (como el botón de los juegos). */
-    MODE_TOGGLE
+    MODE_TOGGLE,
+
+    /** Una tecla del teclado ([PadElement.key]: «KeyW», «Escape»…). Varias a la vez. */
+    KEY
 }
 
 /**
@@ -114,10 +117,16 @@ data class PadElement(
     val trackpad: Boolean = false,
     val turbo: Boolean = false,
     /** Trackpad: cuánto sigue girando al soltar (0 = sin inercia, 1 = casi sin frenar). */
-    val inertia: Float = 0f
+    val inertia: Float = 0f,
+    /** Tecla del teclado (solo [ElementKind.KEY]). */
+    val key: String = ""
 ) {
-    /** Único dentro de un perfil: un tipo de control o un bit no se repiten. */
-    val id: String get() = if (kind == ElementKind.BUTTON) "btn_$bit" else kind.name
+    /** Único dentro de un perfil: un tipo de control, un bit o una tecla no se repiten. */
+    val id: String get() = when (kind) {
+        ElementKind.BUTTON -> "btn_$bit"
+        ElementKind.KEY -> "key_$key"
+        else -> kind.name
+    }
 
     val isStick: Boolean get() = kind == ElementKind.STICK_L || kind == ElementKind.STICK_R
 }
@@ -141,6 +150,24 @@ data class PadProfile(
 
 /** Lo que se puede añadir al diseño: un tipo de control o un botón suelto. */
 data class AddOption(val kind: ElementKind, val bit: Int = 0)
+
+/** Teclas que se pueden poner en el mando (nombre `KeyboardEvent.code` → rótulo). */
+object PadKeys {
+    val ALL: List<Pair<String, String>> = listOf(
+        "Escape" to "Esc", "Tab" to "Tab", "Enter" to "Intro", "Space" to "Espacio", "Backspace" to "Borrar",
+        "ShiftLeft" to "Shift", "ControlLeft" to "Ctrl", "AltLeft" to "Alt", "MetaLeft" to "Win",
+        "KeyW" to "W", "KeyA" to "A", "KeyS" to "S", "KeyD" to "D", "KeyE" to "E", "KeyQ" to "Q",
+        "KeyR" to "R", "KeyF" to "F", "KeyG" to "G", "KeyC" to "C", "KeyV" to "V", "KeyZ" to "Z",
+        "KeyX" to "X", "KeyM" to "M", "KeyI" to "I", "KeyP" to "P",
+        "Digit1" to "1", "Digit2" to "2", "Digit3" to "3", "Digit4" to "4", "Digit5" to "5",
+        "ArrowUp" to "↑", "ArrowDown" to "↓", "ArrowLeft" to "←", "ArrowRight" to "→",
+        "F1" to "F1", "F2" to "F2", "F3" to "F3", "F4" to "F4", "F5" to "F5", "F6" to "F6",
+        "F7" to "F7", "F8" to "F8", "F9" to "F9", "F10" to "F10", "F11" to "F11", "F12" to "F12",
+        "Delete" to "Supr", "Home" to "Inicio", "End" to "Fin", "PageUp" to "RePág", "PageDown" to "AvPág"
+    )
+
+    fun label(name: String): String = ALL.firstOrNull { it.first == name }?.second ?: name
+}
 
 /**
  * Reglas y valores de fábrica del diseño personalizado. Puro (JSON aparte):
@@ -191,6 +218,8 @@ object PadProfiles {
         )) {
             if (k !in kinds) out += AddOption(k)
         }
+        // Teclas: siempre se puede poner otra (la primera libre de la lista)
+        out += AddOption(ElementKind.KEY)
         if (ElementKind.FACE !in kinds && faceBits.isNotEmpty() && faceBits.none { it in used }) {
             out += AddOption(ElementKind.FACE)
         }
@@ -205,6 +234,12 @@ object PadProfiles {
     }
 
     /** Un control nuevo, en el centro y con su tamaño típico. */
+    /** La primera tecla de la lista que aún no está en el diseño. */
+    fun freeKey(profile: PadProfile): String {
+        val used = profile.elements.filter { it.kind == ElementKind.KEY }.map { it.key }.toSet()
+        return PadKeys.ALL.firstOrNull { it.first !in used }?.first ?: "Escape"
+    }
+
     fun newElement(option: AddOption): PadElement = when (option.kind) {
         ElementKind.STICK_L, ElementKind.STICK_R -> PadElement(option.kind, 0.5f, 0.5f, 0.42f)
         ElementKind.DPAD -> PadElement(option.kind, 0.5f, 0.5f, 0.36f)
@@ -212,6 +247,7 @@ object PadProfiles {
         ElementKind.GYRO, ElementKind.MODE_TOGGLE, ElementKind.KEYBOARD,
         ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT -> PadElement(option.kind, 0.5f, 0.5f, 0.15f)
         ElementKind.MOUSE_PAD -> PadElement(option.kind, 0.5f, 0.5f, 0.45f, pill = true)
+        ElementKind.KEY -> PadElement(option.kind, 0.5f, 0.5f, 0.13f, key = "Escape")
         ElementKind.BUTTON -> PadElement(
             ElementKind.BUTTON, 0.5f, 0.5f,
             0.13f,
@@ -296,6 +332,7 @@ object PadProfileJson {
                 put("trackpad", e.trackpad)
                 put("turbo", e.turbo)
                 put("inertia", e.inertia.toDouble())
+                if (e.key.isNotEmpty()) put("key", e.key)
             })
         })
     }
@@ -319,7 +356,8 @@ object PadProfileJson {
                     sensitivity = j.optDouble("sens", 1.0).toFloat(),
                     trackpad = j.optBoolean("trackpad", false),
                     turbo = j.optBoolean("turbo", false),
-                    inertia = j.optDouble("inertia", 0.0).toFloat()
+                    inertia = j.optDouble("inertia", 0.0).toFloat(),
+                    key = j.optString("key", "")
                 )
             )
         }

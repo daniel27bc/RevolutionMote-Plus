@@ -212,6 +212,14 @@ object AppPrefs {
             .edit().putString("globalLook", PadProfileJson.lookToJson(value).toString()).apply()
     }
 
+    /** Teclado y ratón: por dónde va de serie ("app", "bt"; vacío = preguntar). */
+    fun kbmTransport(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("kbmTransport", "") ?: ""
+
+    fun setKbmTransport(context: Context, value: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("kbmTransport", value).apply()
+    }
+
     /** Modo ratón del diseño original (los perfiles llevan el suyo). */
     fun globalMouse(context: Context): MouseConfig =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("globalMouse", null)

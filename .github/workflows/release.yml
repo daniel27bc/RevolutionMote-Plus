@@ -11,7 +11,22 @@ on:
   workflow_dispatch:
 
 jobs:
+  # El receptor del PC con teclado y ratón (Windows), para adjuntarlo
+  receptor-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Compilar el receptor
+        working-directory: desktop
+        run: cargo build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: receptor-windows
+          path: desktop/target/release/PepoMote.exe
+
   release:
+    needs: receptor-windows
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -48,12 +63,17 @@ jobs:
             ./gradlew assembleDebug --no-daemon
             cp app/build/outputs/apk/debug/app-debug.apk ../RevolutionMote-Plus-${TAG}.apk
           fi
+      - uses: actions/download-artifact@v4
+        with:
+          name: receptor-windows
+          path: receptor
       - name: Publicar release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cp receptor/PepoMote.exe "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe"
           NOTES=docs/releases/${TAG}.md
           [ -f "$NOTES" ] || NOTES=/dev/null
-          gh release create "$TAG" "RevolutionMote-Plus-${TAG}.apk" --target "$GITHUB_SHA" \
+          gh release create "$TAG" "RevolutionMote-Plus-${TAG}.apk" "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe" --target "$GITHUB_SHA" \
             --title "RevolutionMote+ ${TAG}" --notes-file "$NOTES" \
-            || gh release upload "$TAG" "RevolutionMote-Plus-${TAG}.apk" --clobber
+            || gh release upload "$TAG" "RevolutionMote-Plus-${TAG}.apk" "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe" --clobber

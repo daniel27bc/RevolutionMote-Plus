@@ -139,6 +139,7 @@ pub fn run(
     // Si su sesión muere o el modo deja de ser puntero con A/B/tecla
     // sostenidos, hay que soltarlos: si no, el clic queda atascado en el SO.
     let mut held = OsHeld::default();
+    let mut kbm_held = KbmHeld::default();
     // Volumen mantenido: la repetición en curso (nace y muere con `held`)
     let mut repeat: Option<Repeat> = None;
     // El motor de puntero pertenece al Jugador 1: se resetea si cambia su
@@ -258,6 +259,15 @@ pub fn run(
                         super::notify_all(unavailable);
                     }
                 }
+            }
+        }
+
+        // Teclado y ratón del móvil (RevolutionMote+): se aplican aquí, con
+        // el inyector; lo pulsado se recuerda para soltarlo si el móvil se va
+        let kbm = std::mem::take(&mut shared.lock_tolerant().kbm_queue);
+        if !kbm.is_empty() {
+            if let Some(inj) = injector.as_deref_mut() {
+                kbm_apply(inj, &mut kbm_held, kbm);
             }
         }
 
@@ -968,4 +978,64 @@ mod tests {
         repeat_tick(&mut rep, held.bits, &mut inj, t0 + ms(770));
         assert_eq!(&inj.keys[n..], &[(KeyCode::VolumeDown, false), (KeyCode::VolumeDown, true)]);
     }
+}
+
+/// Teclas y botones que el teclado/ratón del móvil tiene pulsados ahora.
+#[derive(Default)]
+struct KbmHeld {
+    keys: std::collections::HashSet<String>,
+    buttons: [bool; 3],
+}
+
+fn kbm_apply(inj: &mut dyn input::Injector, held: &mut KbmHeld, events: Vec<crate::state::KbmEvent>) {
+    use crate::state::KbmEvent;
+    // Los movimientos seguidos se funden en uno (menos llamadas al SO)
+    let (mut mx, mut my) = (0i32, 0i32);
+    let flush = |inj: &mut dyn input::Injector, mx: &mut i32, my: &mut i32| {
+        if *mx != 0 || *my != 0 {
+            inj.move_rel(*mx, *my);
+            *mx = 0;
+            *my = 0;
+        }
+    };
+    for ev in events {
+        match ev {
+            KbmEvent::Move(dx, dy) => {
+                mx += dx;
+                my += dy;
+            }
+            KbmEvent::Button(b, down) => {
+                flush(inj, &mut mx, &mut my);
+                held.buttons[b as usize] = down;
+                inj.button_index(b, down);
+            }
+            KbmEvent::Wheel(n) => {
+                flush(inj, &mut mx, &mut my);
+                inj.wheel(n);
+            }
+            KbmEvent::Key(name, down) => {
+                flush(inj, &mut mx, &mut my);
+                if inj.key_named(&name, down) {
+                    if down {
+                        held.keys.insert(name);
+                    } else {
+                        held.keys.remove(&name);
+                    }
+                }
+            }
+            KbmEvent::ReleaseAll => {
+                flush(inj, &mut mx, &mut my);
+                for name in std::mem::take(&mut held.keys) {
+                    inj.key_named(&name, false);
+                }
+                for b in 0..3u8 {
+                    if held.buttons[b as usize] {
+                        held.buttons[b as usize] = false;
+                        inj.button_index(b, false);
+                    }
+                }
+            }
+        }
+    }
+    flush(inj, &mut mx, &mut my);
 }

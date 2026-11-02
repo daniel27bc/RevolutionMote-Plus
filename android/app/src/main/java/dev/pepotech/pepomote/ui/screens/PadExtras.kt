@@ -57,6 +57,7 @@ import dev.pepotech.pepomote.control.PointerTrackpad
 import dev.pepotech.pepomote.control.GyroActivation
 import dev.pepotech.pepomote.control.GyroAim
 import dev.pepotech.pepomote.control.GyroConfig
+import dev.pepotech.pepomote.control.Kbm
 import dev.pepotech.pepomote.control.Haptics
 import dev.pepotech.pepomote.control.LookConfig
 import dev.pepotech.pepomote.control.LookZone
@@ -135,6 +136,24 @@ internal fun PointerTrackpadLayer(
             antiDeadzone = 0f,
             inertia = inert,
             onVelocity = { vx, vy -> PointerTrackpad.setVelocity(vx, vy) }
+        ) { _, _ -> }
+    )
+}
+
+/**
+ * Mando universal en modo ratón: los huecos libres mueven el cursor ([Kbm]),
+ * con la sensibilidad de los touchpads y su inercia.
+ */
+@Composable
+internal fun MouseFreeLayer(modifier: Modifier, sensitivity: Float, inertia: Float) {
+    val sens by rememberUpdatedState(sensitivity)
+    DisposableEffect(Unit) { onDispose { Kbm.setTouch(Kbm.SRC_FREE, 0f, 0f) } }
+    Box(
+        modifier.trackpadInput(
+            sensitivity = 1f,
+            antiDeadzone = 0f,
+            inertia = inertia,
+            onVelocity = { vx, vy -> Kbm.setTouch(Kbm.SRC_FREE, vx * sens, vy * sens) }
         ) { _, _ -> }
     )
 }
@@ -468,7 +487,7 @@ internal fun MousePad(
 
     fun out(vx: Float, vy: Float) {
         if (mouseNow) {
-            PointerTrackpad.setVelocity(vx * sens, vy * sens)
+            Kbm.setTouch(Kbm.SRC_PAD, vx * sens, vy * sens)
         } else {
             val (x, y) = dev.pepotech.pepomote.control.TrackpadEngine.fromVelocity(vx, vy, sens, adz)
             ButtonState.setStick2From(ButtonState.SRC_LOOK, x, y)
@@ -476,7 +495,7 @@ internal fun MousePad(
     }
     fun stop() {
         m[0] = 0f; m[1] = 0f
-        PointerTrackpad.setVelocity(0f, 0f)
+        Kbm.setTouch(Kbm.SRC_PAD, 0f, 0f)
         ButtonState.setStick2From(ButtonState.SRC_LOOK, 0, 0)
     }
     DisposableEffect(Unit) { onDispose { stop() } }
@@ -532,7 +551,7 @@ internal fun MousePad(
                                 scrollAcc += dy
                                 val step = scrollAcc.toInt()
                                 if (step != 0) {
-                                    ButtonState.addScroll(-step)
+                                    Kbm.wheel(-step * 4)
                                     scrollAcc -= step
                                 }
                             }
@@ -552,12 +571,12 @@ internal fun MousePad(
                     val dur = android.os.SystemClock.uptimeMillis() - t0
                     // Toque corto sin moverse: clic (dos dedos = derecho)
                     if (mouseNow && dur < 260 && travel < 10f) {
-                        val bit = if (fingers >= 2) ButtonState.B else ButtonState.A
+                        val btn = if (fingers >= 2) 1 else 0
                         Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
                         scope.launch {
-                            ButtonState.set(bit, true)
+                            Kbm.button(btn, true)
                             kotlinx.coroutines.delay(45)
-                            ButtonState.set(bit, false)
+                            Kbm.button(btn, false)
                         }
                     }
                     val moving = android.os.SystemClock.uptimeMillis() - lastMove[0] < 60 && kotlin.math.hypot(m[0], m[1]) > 0.02f

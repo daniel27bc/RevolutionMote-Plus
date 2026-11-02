@@ -59,6 +59,8 @@ class ControlClient(
          * se envía nunca (lo descartarían).
          */
         val supportsTilt: Boolean = false,
+        /** RevolutionMote+: el receptor entiende teclado y ratón (`ok.kbm`, mensaje `kbm`). */
+        val supportsKbm: Boolean = false,
         /** `ok.modes` contiene "retroarch": el receptor del PC entiende RetroArch. */
         val supportsRetroArch: Boolean = false,
         val supportsFrameRotation: Boolean = false,
@@ -182,6 +184,7 @@ class ControlClient(
                                 pairToken = sequenceOf(msg.optString("pair_token"), msg.optString("token"))
                                     .firstOrNull { it.isNotBlank() && it.length <= 512 },
                                 supportsTilt = msg.optBoolean("tilt", false),
+                                supportsKbm = confirmedPlatform != ReceiverCapabilities.ANDROID && msg.optBoolean("kbm", false),
                                 supportsFrameRotation = msg.optBoolean("frame_rotation", false),
                                 supportsRetroArch = supportsMode(msg, "retroarch"),
                                 supportsGamepad = supportsMode(msg, "gamepad"),
@@ -284,6 +287,9 @@ class ControlClient(
      * antiguo lo ignora como mensaje desconocido.
      */
     fun sendText(text: String) = sendLine(TextInput.encode(text))
+
+    /** Teclado y ratón (receptor RevolutionMote+): un lote de eventos `kbm`. */
+    fun sendKbm(events: org.json.JSONArray) = sendJson(JSONObject().put("m", "kbm").put("ev", events))
 
     private fun sendJson(obj: JSONObject) = sendLine(obj.toString())
 

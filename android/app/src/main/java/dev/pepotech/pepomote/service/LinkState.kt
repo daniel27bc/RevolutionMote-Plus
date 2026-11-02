@@ -48,6 +48,8 @@ sealed class UiLink {
         val textInput: Boolean = true,
         /** El receptor entiende el apuntado por inclinación (`ok.tilt`); false en receptores anteriores. */
         val supportsTilt: Boolean = false,
+        /** RevolutionMote+: el receptor del PC hace de teclado y ratón a la vez que de mando. */
+        val supportsKbm: Boolean = false,
         /** `ok.modes` contains "retroarch" (PC receiver with the RetroArch network gamepad). */
         val supportsRetroArch: Boolean = false,
         /** `ok.modes` trae "gamepad": el receptor del PC puede hacer de mando de Xbox. */
@@ -125,6 +127,11 @@ object LinkState {
 
     fun setPadMouse(on: Boolean) {
         if (_padMouse.value == on) return
+        // Receptor de RevolutionMote+: ratón y mando a la vez, el modo no cambia
+        if ((_flow.value as? UiLink.Connected)?.supportsKbm == true) {
+            _padMouse.value = on
+            return
+        }
         ButtonState.reset()
         if (on) {
             _padMouse.value = true
@@ -165,6 +172,10 @@ object LinkState {
      */
     @Volatile
     var sendText: ((String) -> Unit)? = null
+
+    /** Lote de eventos de teclado y ratón al receptor (solo si lo entiende). */
+    @Volatile
+    var sendKbm: ((org.json.JSONArray) -> Unit)? = null
 
     /** Nunchuk en el mismo móvil (modo Dolphin): pedirlo o quitarlo; el eco lo confirma. */
     @Volatile

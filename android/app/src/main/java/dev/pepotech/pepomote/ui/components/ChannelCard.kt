@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import dev.pepotech.pepomote.ui.theme.PepoColors
 
 // Glifos propios, dibujados a mano — nada de iconografía ajena.
-enum class ChannelGlyph { Qr, Pad, Pointer, Stick, GamePad, Switch, Gear, Server, Retro }
+enum class ChannelGlyph { Qr, Pad, Pointer, Stick, GamePad, Switch, Gear, Server, Retro, Keyboard }
 
 /** `wide`: tarjeta apaisada a todo el ancho (glifo a la izquierda, textos al lado). */
 @Composable
@@ -93,7 +93,40 @@ private fun DrawScope.drawGlyph(glyph: ChannelGlyph, accent: Color) {
         ChannelGlyph.Gear -> drawGearGlyph(accent)
         ChannelGlyph.Server -> drawServerGlyph(accent)
         ChannelGlyph.Retro -> drawRetroGlyph(accent)
+        ChannelGlyph.Keyboard -> drawKeyboardGlyph(accent)
     }
+}
+
+/** Teclado apaisado: contorno, tres filas de teclas y la barra espaciadora. */
+private fun DrawScope.drawKeyboardGlyph(accent: Color) {
+    val w = size.width
+    val stroke = w * 0.07f
+    val bodyH = w * 0.56f
+    val top = (size.height - bodyH) / 2f
+    drawRoundRect(
+        color = accent,
+        topLeft = androidx.compose.ui.geometry.Offset(stroke / 2f, top + stroke / 2f),
+        size = androidx.compose.ui.geometry.Size(w - stroke, bodyH - stroke),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.1f),
+        style = Stroke(width = stroke)
+    )
+    val key = w * 0.09f
+    for (row in 0..1) {
+        for (col in 0..5) {
+            drawRoundRect(
+                color = accent,
+                topLeft = androidx.compose.ui.geometry.Offset(w * 0.14f + col * w * 0.125f, top + bodyH * (0.22f + row * 0.22f)),
+                size = androidx.compose.ui.geometry.Size(key, key),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.02f)
+            )
+        }
+    }
+    drawRoundRect(
+        color = accent,
+        topLeft = androidx.compose.ui.geometry.Offset(w * 0.27f, top + bodyH * 0.68f),
+        size = androidx.compose.ui.geometry.Size(w * 0.46f, key),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.02f)
+    )
 }
 
 /** Mando clásico apaisado: cuerpo, cruceta a la izquierda y dos botones a la derecha. */

@@ -652,6 +652,27 @@ pub struct PendingText {
     pub slot: u8,
 }
 
+/// Teclado y ratón desde el móvil (RevolutionMote+, mensaje `kbm`): ratón
+/// relativo, botones, rueda y teclas por nombre (`KeyboardEvent.code` de la
+/// web: «KeyW», «ShiftLeft», «F5»…). Los aplica el hilo de telemetría, que es
+/// el dueño del inyector, en la misma vuelta en la que vacía el texto.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum KbmEvent {
+    /// Ratón relativo, en píxeles.
+    Move(i32, i32),
+    /// Botón del ratón: 0 izquierdo, 1 derecho, 2 central.
+    Button(u8, bool),
+    /// Rueda en 1/120 de muesca (positivo = hacia delante).
+    Wheel(i32),
+    Key(String, bool),
+    /// Soltar todo lo que este móvil tenga pulsado (se va, cambia de modo).
+    ReleaseAll,
+}
+
+/// Eventos de teclado y ratón en cola como mucho (un móvil que se atasque no
+/// puede llenar la memoria; los movimientos se funden antes de llegar aquí).
+pub const MAX_KBM_QUEUE: usize = 1024;
+
 /// Mensajes de texto en cola como mucho. El hilo de telemetría la vacía en
 /// la misma vuelta en la que mueve el puntero: sin tope, un móvil podría
 /// dejarlo tecleando indefinidamente.
@@ -705,6 +726,8 @@ pub struct Shared {
     /// pantalla de Cemu, o la ventana con el foco en los demás modos) y que
     /// el inyector del SO aún no ha escrito.
     pub text_queue: Vec<PendingText>,
+    /// Teclado y ratón pendientes de aplicar (mensaje `kbm`).
+    pub kbm_queue: Vec<KbmEvent>,
     pub last_error: Option<String>,
     /// `last_error` es un error de inyección (lo limpia el inyector al
     /// recuperarse, no una conexión nueva).
@@ -772,6 +795,7 @@ impl Shared {
             retroarch_live: crate::retroarch::Live::default(),
             retroarch_game: None,
             text_queue: Vec::new(),
+            kbm_queue: Vec::new(),
             last_error: None,
             injection_error: false,
             firewall: None,

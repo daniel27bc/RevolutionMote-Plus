@@ -138,7 +138,7 @@ object GyroAim {
             field = value
             mx = 0f
             my = 0f
-            PointerTrackpad.setGyro(0f, 0f)
+            Kbm.setGyro(0f, 0f)
         }
 
     @Volatile
@@ -153,7 +153,7 @@ object GyroAim {
     private fun mouseSample(rotation: Int) {
         val m = mouseConfig
         if (!m.gyro) {
-            PointerTrackpad.setGyro(0f, 0f)
+            Kbm.setGyro(0f, 0f)
             return
         }
         val (yaw, pitch) = playerSpace(g[0], g[1], g[2], ux, uy, uz)
@@ -162,7 +162,7 @@ object GyroAim {
         my += (pitch - my) * alpha
         val still = hypot(mx, my) < MOUSE_REST
         val py = if (m.invertY) -my else my
-        if (still) PointerTrackpad.setGyro(0f, 0f) else PointerTrackpad.setGyro(mx * m.gyroSens, py * m.gyroSens)
+        if (still) Kbm.setGyro(0f, 0f) else Kbm.setGyro(mx * m.gyroSens, py * m.gyroSens)
     }
 
     private fun zero() {

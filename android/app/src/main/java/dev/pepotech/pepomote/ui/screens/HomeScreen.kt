@@ -65,7 +65,8 @@ fun HomeScreen(
     /** Tarjeta RetroArch (receptor de PC y servidor Android). */
     onRetroArch: () -> Unit = {},
     /** Tarjeta «Mando universal» (solo receptor de PC). */
-    onGamepad: () -> Unit = {}
+    onGamepad: () -> Unit = {},
+    onKbm: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -200,6 +201,17 @@ fun HomeScreen(
                     glyph = ChannelGlyph.GamePad,
                     accent = PepoColors.Blue,
                     onClick = onGamepad
+                )
+            }
+            // Teclado y ratón: por la app (receptor de RevolutionMote+) o por
+            // Bluetooth (cualquier equipo, sin instalar nada)
+            item {
+                ChannelCard(
+                    title = stringResource(R.string.channel_kbm),
+                    subtitle = stringResource(R.string.channel_kbm_sub),
+                    glyph = ChannelGlyph.Keyboard,
+                    accent = PepoColors.Blue,
+                    onClick = onKbm
                 )
             }
             // Con Dolphin: el segundo móvil, en la otra mano

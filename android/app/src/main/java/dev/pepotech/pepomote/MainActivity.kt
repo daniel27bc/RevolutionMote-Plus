@@ -36,6 +36,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.pepotech.pepomote.ui.components.OrientationLockButton
+import dev.pepotech.pepomote.ui.screens.KbmScreen
 import dev.pepotech.pepomote.ui.screens.PointerTrackpadChip
 import dev.pepotech.pepomote.control.PointerTrackpad
 import androidx.compose.foundation.layout.Row
@@ -108,7 +109,7 @@ import dev.pepotech.pepomote.ui.components.UpdateHost
  * layouts Wii o Nunchuk) la decide [Route] a partir del enlace y de la
  * intención pendiente del usuario.
  */
-internal enum class Screen { Onboarding, Home, Pair, Controller, Nunchuk, Settings, Server }
+internal enum class Screen { Onboarding, Home, Pair, Controller, Nunchuk, Settings, Server, Kbm }
 
 class MainActivity : ComponentActivity() {
 
@@ -638,6 +639,7 @@ private fun Root(activity: MainActivity) {
                 onSwitch = { activity.openController(LinkState.MODE_SWITCH, dolphinOnly = false) },
                 onRetroArch = { activity.openController(LinkState.MODE_RETROARCH, dolphinOnly = false) },
                 onGamepad = { activity.openController(LinkState.MODE_GAMEPAD, dolphinOnly = false) },
+                onKbm = { activity.currentScreen = Screen.Kbm },
                 onNunchuk = { activity.openNunchuk() },
                 onNewPairing = { activity.currentScreen = Screen.Settings },
                 onServer = { activity.openServer() },
@@ -648,6 +650,14 @@ private fun Root(activity: MainActivity) {
                 onDismissUpdate = { v -> UpdateNotice.dismiss(context, v) }
             )
         }
+
+        Screen.Kbm -> KbmScreen(
+            onBack = { activity.currentScreen = Screen.Home },
+            onPair = {
+                activity.linkRole = LinkState.ROLE_WIIMOTE
+                activity.openPair()
+            }
+        )
 
         Screen.Pair -> {
             val saved = remember(activity.pairVersion) { PairStore.all(context) }

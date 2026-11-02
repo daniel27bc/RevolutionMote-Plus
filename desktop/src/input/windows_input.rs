@@ -1,6 +1,10 @@
 use super::text_plan::{win_text_plan, WinKey};
 use super::{Injector, KeyCode, MouseButton, TypeReport};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
+    MapVirtualKeyW, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_SCANCODE, MAPVK_VK_TO_VSC, MOUSEEVENTF_MIDDLEDOWN,
+    MOUSEEVENTF_MIDDLEUP,
+};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_KEYUP,
     MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MOVE,
     MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_VIRTUALDESK, MOUSEEVENTF_WHEEL,
@@ -252,6 +256,42 @@ impl Injector for WinInjector {
         self.send_mouse(0, 0, 0, flags);
     }
 
+    fn button_index(&mut self, idx: u8, down: bool) {
+        match idx {
+            0 => self.button(MouseButton::Left, down),
+            1 => self.button(MouseButton::Right, down),
+            2 => self.send_mouse(0, 0, 0, if down { MOUSEEVENTF_MIDDLEDOWN } else { MOUSEEVENTF_MIDDLEUP }),
+            _ => {}
+        }
+    }
+
+    /// Teclas por nombre con su CÓDIGO DE ESCANEO (KEYEVENTF_SCANCODE): los
+    /// juegos (DirectInput, Raw Input) leen el escaneo, no la tecla virtual,
+    /// así que WASD, Ctrl o F5 llegan como de un teclado de verdad.
+    fn key_named(&mut self, name: &str, down: bool) -> bool {
+        let Some((vk, extended)) = win_vk_by_name(name) else { return false };
+        let scan = unsafe { MapVirtualKeyW(vk as u32, MAPVK_VK_TO_VSC) } as u16;
+        if scan == 0 {
+            self.send_key(VIRTUAL_KEY(vk), down);
+            return true;
+        }
+        let mut flags = KEYEVENTF_SCANCODE;
+        if extended {
+            flags |= KEYEVENTF_EXTENDEDKEY;
+        }
+        if !down {
+            flags |= KEYEVENTF_KEYUP;
+        }
+        let input = INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0), wScan: scan, dwFlags: flags, time: 0, dwExtraInfo: 0 },
+            },
+        };
+        unsafe { SendInput(&[input], std::mem::size_of::<INPUT>() as i32) };
+        true
+    }
+
     fn key(&mut self, key: KeyCode, down: bool) {
         let vk = match key {
             KeyCode::ArrowUp => VK_UP,
@@ -371,4 +411,69 @@ mod tests {
         assert_eq!(activation_mode(Some(" Legacy ")), ActivationMode::Legacy);
         assert_eq!(activation_mode(Some("modern")), ActivationMode::Modern);
     }
+}
+
+/// Tecla virtual de Windows (y si es «extendida») por su nombre
+/// `KeyboardEvent.code`. Posiciones de un teclado QWERTY (como en la web).
+fn win_vk_by_name(name: &str) -> Option<(u16, bool)> {
+    let b = name.as_bytes();
+    if b.len() == 4 && name.starts_with("Key") && b[3].is_ascii_uppercase() {
+        return Some((b[3] as u16, false));
+    }
+    if b.len() == 6 && name.starts_with("Digit") && b[5].is_ascii_digit() {
+        return Some((b[5] as u16, false));
+    }
+    if let Some(n) = name.strip_prefix('F').and_then(|n| n.parse::<u16>().ok()) {
+        if (1..=24).contains(&n) {
+            return Some((0x70 + n - 1, false));
+        }
+    }
+    if let Some(n) = name.strip_prefix("Numpad").and_then(|n| n.parse::<u16>().ok()) {
+        if n <= 9 {
+            return Some((0x60 + n, false));
+        }
+    }
+    Some(match name {
+        "Escape" => (0x1B, false),
+        "Tab" => (0x09, false),
+        "CapsLock" => (0x14, false),
+        "ShiftLeft" => (0xA0, false),
+        "ShiftRight" => (0xA1, false),
+        "ControlLeft" => (0xA2, false),
+        "ControlRight" => (0xA3, true),
+        "AltLeft" => (0xA4, false),
+        "AltRight" => (0xA5, true),
+        "MetaLeft" => (0x5B, true),
+        "MetaRight" => (0x5C, true),
+        "ContextMenu" => (0x5D, true),
+        "Space" => (0x20, false),
+        "Enter" => (0x0D, false),
+        "NumpadEnter" => (0x0D, true),
+        "Backspace" => (0x08, false),
+        "Delete" => (0x2E, true),
+        "Insert" => (0x2D, true),
+        "Home" => (0x24, true),
+        "End" => (0x23, true),
+        "PageUp" => (0x21, true),
+        "PageDown" => (0x22, true),
+        "ArrowUp" => (0x26, true),
+        "ArrowDown" => (0x28, true),
+        "ArrowLeft" => (0x25, true),
+        "ArrowRight" => (0x27, true),
+        "PrintScreen" => (0x2C, true),
+        "Pause" => (0x13, false),
+        "Minus" => (0xBD, false),
+        "Equal" => (0xBB, false),
+        "BracketLeft" => (0xDB, false),
+        "BracketRight" => (0xDD, false),
+        "Backslash" => (0xDC, false),
+        "Semicolon" => (0xBA, false),
+        "Quote" => (0xDE, false),
+        "Backquote" => (0xC0, false),
+        "Comma" => (0xBC, false),
+        "Period" => (0xBE, false),
+        "Slash" => (0xBF, false),
+        "IntlBackslash" => (0xE2, false),
+        _ => return None,
+    })
 }

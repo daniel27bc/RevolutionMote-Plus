@@ -45,6 +45,7 @@ import androidx.compose.material3.TextButton
 import dev.pepotech.pepomote.control.AddOption
 import dev.pepotech.pepomote.control.ElementKind
 import dev.pepotech.pepomote.control.GyroAim
+import dev.pepotech.pepomote.control.Kbm
 import dev.pepotech.pepomote.control.OrientationLock
 import dev.pepotech.pepomote.control.GyroConfig
 import dev.pepotech.pepomote.control.LookConfig
@@ -180,7 +181,10 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     val intent by LinkState.intent.collectAsState()
     // Modo ratón (mando universal): el receptor en modo puntero, esta pantalla sigue
     val padMouse by LinkState.padMouse.collectAsState()
-    val mouseMode = padMouse && connected?.mode == LinkState.MODE_POINTER
+    // Con el receptor de RevolutionMote+ el modo ratón no cambia el modo del PC
+    val mouseMode = padMouse && (connected?.supportsKbm == true || connected?.mode == LinkState.MODE_POINTER)
+    // Modo ratón por el modo puntero del PC (receptor de PepoTech)
+    val pointerMouse = mouseMode && connected?.mode == LinkState.MODE_POINTER
     val wantedMode = if (padMouse) LinkState.MODE_GAMEPAD else Route.displayMode(link, intent)
     val switchPad = wantedMode == LinkState.MODE_SWITCH
     // RetroArch: el mismo mando apaisado con etiquetas de RetroPad (L2/R2,
@@ -223,10 +227,10 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
 
     // Solo con el modo confirmado el motor emite como GamePad; si el modo se
     // va (eco de otro modo, Mando de Wii) o se sale, vuelve lo de antes.
-    DisposableEffect(engine, operative, wantedMode, connected?.pad, mouseMode) {
+    DisposableEffect(engine, operative, wantedMode, connected?.pad, pointerMouse) {
         ButtonState.reset()
         // En modo ratón los paquetes son los del puntero (los de siempre)
-        if (engine != null && operative && !mouseMode) {
+        if (engine != null && operative && !pointerMouse) {
             val prevKind = engine.kind
             val prevRotation = engine.rotation
             engine.rotation = rotation
@@ -257,7 +261,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     // apuntar con el giro se calcula aquí ([GyroAim]) y llega como stick
     // derecho. Solo con el modo confirmado: sin el eco los paquetes todavía
     // alimentan lo de antes (el puntero) y el giro a cero le congelaría el cursor
-    SideEffect { engine?.padAim = !(xboxPad && operative && !mouseMode) }
+    SideEffect { engine?.padAim = !(xboxPad && operative && !pointerMouse) }
     // Al salir vuelve encendido, que es lo que esperan los demás modos
     DisposableEffect(engine) { onDispose { engine?.padAim = true } }
 
@@ -334,13 +338,24 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
         GyroAim.config = gyroCfg
         GyroAim.mouseConfig = mouseCfg
         GyroAim.mouse = mouseMode
-        PointerTrackpad.sensitivity = mouseCfg.padSens
     }
-    // Modo ratón: el cursor siempre en relativo (giro y touchpads calculados
-    // aquí), así el puntero no se descentra con el uso
-    DisposableEffect(mouseMode) {
-        PointerTrackpad.active = mouseMode
-        onDispose { PointerTrackpad.active = false }
+    // Teclado y ratón: con el receptor de RevolutionMote+ van por el canal de
+    // control a la vez que el mando (y las teclas sueltas siempre); con el de
+    // PepoTech, el modo ratón pasa el PC a puntero. El cursor siempre en
+    // relativo (giro y touchpads calculados aquí): no se descentra
+    val kbmCapable = connected?.supportsKbm == true && operative
+    DisposableEffect(mouseMode, kbmCapable) {
+        Kbm.backend = when {
+            kbmCapable -> Kbm.Backend.APP
+            mouseMode -> Kbm.Backend.POINTER
+            else -> Kbm.Backend.NONE
+        }
+        PointerTrackpad.sensitivity = 1f
+        PointerTrackpad.active = mouseMode && !kbmCapable
+        onDispose {
+            PointerTrackpad.active = false
+            Kbm.backend = Kbm.Backend.NONE
+        }
     }
     DisposableEffect(Unit) { onDispose { GyroAim.mouse = false } }
     DisposableEffect(engine, gyroLive) {
@@ -445,7 +460,8 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
         mouseMode = mouseMode,
         mouse = mouseCfg,
         onKeyboard = { if (Route.showsKeyboard(link)) keyboardOpen = true },
-        onToggleMouse = { LinkState.setPadMouse(!padMouse) }
+        onToggleMouse = { LinkState.setPadMouse(!padMouse) },
+        keysAvailable = connected?.supportsKbm == true && operative
     )
     CompositionLocalProvider(LocalPressRegistry provides press, LocalPadActions provides padActions) {
         BoxWithConstraints(
@@ -530,7 +546,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     if (shown != null) {
                         key(layout.id) {
                             if (mouseMode && lookCfg.zone != LookZone.OFF) {
-                                PointerTrackpadLayer(Modifier.matchParentSize(), manageActive = false, inertia = mouseCfg.inertia)
+                                MouseFreeLayer(Modifier.matchParentSize(), mouseCfg.padSens, mouseCfg.inertia)
                             }
                             CustomPadCanvas(
                                 lookEnabled = !mouseMode,
@@ -545,7 +561,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     } else {
                     // Cámara en el espacio libre, debajo de los controles
                     if (mouseMode && lookCfg.zone != LookZone.OFF) {
-                        PointerTrackpadLayer(Modifier.matchParentSize(), manageActive = false, inertia = mouseCfg.inertia)
+                        MouseFreeLayer(Modifier.matchParentSize(), mouseCfg.padSens, mouseCfg.inertia)
                     }
                     else if (customAllowed) LookSurface(lookCfg, Modifier.matchParentSize())
                     // Cada plantilla es un trazado nuevo: ningún botón hereda el bit de otro
@@ -925,7 +941,8 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         options = PadProfiles.addable(d, layout.faceBits()),
                         layout = layout,
                         onPick = {
-                            draft = d.add(PadProfiles.newElement(it))
+                            val el = PadProfiles.newElement(it)
+                            draft = d.add(if (el.kind == ElementKind.KEY) el.copy(key = PadProfiles.freeKey(d)) else el)
                             showAdd = false
                         },
                         onDismiss = { showAdd = false }

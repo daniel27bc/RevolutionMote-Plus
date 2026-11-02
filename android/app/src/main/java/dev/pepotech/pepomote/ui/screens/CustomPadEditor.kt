@@ -78,6 +78,8 @@ import dev.pepotech.pepomote.control.AddOption
 import dev.pepotech.pepomote.control.ButtonState
 import dev.pepotech.pepomote.control.ElementKind
 import dev.pepotech.pepomote.control.GyroConfig
+import dev.pepotech.pepomote.control.Kbm
+import dev.pepotech.pepomote.control.PadKeys
 import dev.pepotech.pepomote.control.Haptics
 import dev.pepotech.pepomote.control.PadElement
 import dev.pepotech.pepomote.control.PadProfile
@@ -144,6 +146,7 @@ internal fun elementTitle(kind: ElementKind, bit: Int, layout: RetroLayout): Str
     ElementKind.MOUSE_RIGHT -> stringResource(R.string.ed_mouse_right)
     ElementKind.KEYBOARD -> stringResource(R.string.ed_keyboard)
     ElementKind.MODE_TOGGLE -> stringResource(R.string.ed_mode_toggle)
+    ElementKind.KEY -> stringResource(R.string.ed_key)
     ElementKind.BUTTON -> stringResource(R.string.ed_button, buttonLabel(bit, layout))
 }
 
@@ -232,14 +235,18 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig,
         ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT -> {
             val act = LocalPadActions.current
             val left = e.kind == ElementKind.MOUSE_LEFT
-            // En modo puntero el receptor hace A = clic izquierdo y B = derecho
-            val bit = if (left) ButtonState.A else ButtonState.B
             IconPadButton(
                 bw,
                 if (left) R.drawable.ms_left_click else R.drawable.ms_right_click,
                 stringResource(if (left) R.string.mouse_left_short else R.string.mouse_right_short),
                 enabled = act.mouseMode
-            ) { down -> ButtonState.set(bit, down) }
+            ) { down -> Kbm.button(if (left) 0 else 1, down) }
+        }
+        ElementKind.KEY -> {
+            val act = LocalPadActions.current
+            IconPadButton(bw, R.drawable.ms_keyboard, PadKeys.label(e.key), enabled = act.keysAvailable) { down ->
+                Kbm.key(e.key, down)
+            }
         }
         ElementKind.KEYBOARD -> {
             val act = LocalPadActions.current
@@ -350,7 +357,8 @@ private fun EditFrame(
     val latest by rememberUpdatedState(element)
     val change by rememberUpdatedState(onChange)
     val round = element.kind in setOf(
-        ElementKind.GYRO, ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT, ElementKind.KEYBOARD, ElementKind.MODE_TOGGLE
+        ElementKind.GYRO, ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT, ElementKind.KEYBOARD, ElementKind.MODE_TOGGLE,
+        ElementKind.KEY
     )
     val shape = if (element.kind == ElementKind.BUTTON && !element.pill || round || element.isStick && !element.trackpad) {
         CircleShape
@@ -454,7 +462,9 @@ internal data class PadActions(
     val mouseMode: Boolean = false,
     val mouse: dev.pepotech.pepomote.control.MouseConfig = dev.pepotech.pepomote.control.MouseConfig(),
     val onKeyboard: () -> Unit = {},
-    val onToggleMouse: () -> Unit = {}
+    val onToggleMouse: () -> Unit = {},
+    /** Hay teclas sueltas (receptor RevolutionMote+ o Bluetooth). */
+    val keysAvailable: Boolean = false
 )
 
 internal val LocalPadActions = androidx.compose.runtime.staticCompositionLocalOf { PadActions() }
@@ -544,6 +554,18 @@ internal fun ElementSettingsDialog(
             "${(element.size * 100).roundToInt()}%"
         ) { onChange(element.copy(size = it)) }
 
+        if (element.kind == ElementKind.KEY) {
+            Text(stringResource(R.string.ed_key_pick), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.ed_key_note), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
+            Spacer(Modifier.height(6.dp))
+            val used = profile.elements.filter { it.kind == ElementKind.KEY && it.id != element.id }.map { it.key }.toSet()
+            ChipFlow {
+                for ((name, label) in PadKeys.ALL) {
+                    if (name in used) continue
+                    ModeChip(label, selected = name == element.key, dense = true) { onChange(element.copy(key = name)) }
+                }
+            }
+        }
         if (element.kind == ElementKind.MOUSE_PAD) {
             Text(stringResource(R.string.mousepad_help), style = MaterialTheme.typography.bodyMedium, color = PepoColors.TextDim)
             LabeledSlider(
