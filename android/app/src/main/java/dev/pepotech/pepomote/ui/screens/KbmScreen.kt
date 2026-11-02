@@ -275,7 +275,7 @@ private fun KbmStatus(
             Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBluetoothVisible) { IconLabel(R.drawable.ms_bluetooth, stringResource(R.string.kbm_bt_visible), PepoColors.Blue) }
                 for (d in BtHid.bonded().take(4)) {
-                    val name = runCatching { d.name }.getOrNull() ?: d.address
+                    val name = BtHid.nameOf(d)
                     TextButton(onClick = { BtHid.connect(d) }) { Text(name, color = PepoColors.Text, maxLines = 1) }
                 }
             }

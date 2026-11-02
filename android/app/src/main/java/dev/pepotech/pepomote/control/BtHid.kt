@@ -170,6 +170,13 @@ object BtHid {
         emptyList()
     }
 
+    /** Nombre del equipo (o su dirección si no se puede leer). */
+    fun nameOf(device: BluetoothDevice): String = try {
+        device.name ?: device.address
+    } catch (_: SecurityException) {
+        device.address
+    }
+
     fun connect(device: BluetoothDevice) {
         if (Build.VERSION.SDK_INT < 28) return
         try {
