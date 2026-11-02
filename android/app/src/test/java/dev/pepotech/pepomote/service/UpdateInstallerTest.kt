@@ -21,7 +21,7 @@ class UpdateInstallerTest {
     @Test fun inspectingOrCleaningMissingCacheDoesNotCreateDirectoriesOrThrow() {
         val cache = temporary.newFolder("cache")
         val context = object : ContextWrapper(RuntimeEnvironment.getApplication()) { override fun getCacheDir() = cache }
-        val release = UpdateManifest(UpdateCheck.Version(1,11,0), "", emptyMap(), UpdateAsset("PepoMote.apk", "", 1, "a".repeat(64)), "")
+        val release = UpdateManifest(UpdateCheck.Version(1,11,0), "", emptyMap(), UpdateAsset("RevolutionMote-Plus.apk", "", 1, "a".repeat(64)), "")
         val file = UpdateInstaller.file(context, release)
         assertFalse(File(cache, "updates").exists())
         File(cache, "updates").writeText("blocked directory")

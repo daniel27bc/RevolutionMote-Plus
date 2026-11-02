@@ -180,10 +180,12 @@ fun PepoMoteTheme(dark: Boolean? = null, content: @Composable () -> Unit) {
         system -> DarkPepo
         else -> LightPepo
     }
-    CompositionLocalProvider(LocalPepoColors provides palette) {
+    val accentId by AccentColor.state.collectAsState()
+    val accented = AccentColor.apply(palette, accentId)
+    CompositionLocalProvider(LocalPepoColors provides accented) {
         MaterialTheme(
-            colorScheme = pepoColorScheme(palette),
-            typography = pepoTypography(palette),
+            colorScheme = pepoColorScheme(accented),
+            typography = pepoTypography(accented),
             shapes = pepoShapes,
             content = content
         )
@@ -209,5 +211,58 @@ object ThemeMode {
         _state.value = mode
         context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
             .edit().putString("themeMode", mode).apply()
+    }
+}
+
+/**
+ * Color de acento (botones, interruptores, selección). Por defecto el rojo
+ * del logo de RevolutionMote+; el azul es el de toda la vida.
+ */
+object AccentColor {
+    class Option(val id: String, val color: Color)
+
+    const val DEFAULT = "red"
+    val ALL = listOf(
+        Option("red", Color(0xFFE5231B)),
+        Option("blue", Color(0xFF3FA9F5)),
+        Option("green", Color(0xFF3DAA5C)),
+        Option("purple", Color(0xFF8E5BE8)),
+        Option("orange", Color(0xFFF08A24)),
+        Option("pink", Color(0xFFE5408A)),
+        Option("teal", Color(0xFF15A3A3))
+    )
+
+    private const val PREFS = "app"
+    private val _state = kotlinx.coroutines.flow.MutableStateFlow(DEFAULT)
+    val state: kotlinx.coroutines.flow.StateFlow<String> = _state
+
+    fun load(context: android.content.Context) {
+        _state.value = context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .getString("accent", DEFAULT) ?: DEFAULT
+    }
+
+    fun set(context: android.content.Context, id: String) {
+        _state.value = id
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .edit().putString("accent", id).apply()
+    }
+
+    fun color(id: String): Color = (ALL.firstOrNull { it.id == id } ?: ALL[0]).color
+
+    private fun mix(a: Color, b: Color, t: Float) = Color(
+        red = a.red + (b.red - a.red) * t,
+        green = a.green + (b.green - a.green) * t,
+        blue = a.blue + (b.blue - a.blue) * t,
+        alpha = 1f
+    )
+
+    /** La paleta con el acento elegido (el brillo y el hover salen del mismo color). */
+    fun apply(p: PepoPalette, id: String): PepoPalette {
+        val c = color(id)
+        return p.copy(
+            blue = c,
+            blueHover = mix(c, Color.Black, 0.12f),
+            glow = if (p.isDark) mix(p.background, c, 0.28f) else mix(Color.White, c, 0.30f)
+        )
     }
 }

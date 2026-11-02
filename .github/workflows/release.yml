@@ -67,6 +67,30 @@ jobs:
         with:
           name: receptor-windows
           path: receptor
+      - name: update.json (aviso de versión nueva en la app)
+        run: |
+          cp "RevolutionMote-Plus-${TAG}.apk" RevolutionMote-Plus.apk
+          python3 - <<'PY'
+          import hashlib, json, os, datetime
+          tag = os.environ["TAG"]; v = tag.lstrip("v")
+          repo = os.environ["GITHUB_REPOSITORY"]
+          data = open("RevolutionMote-Plus.apk", "rb").read()
+          notes = {"es": ["Nueva versión de RevolutionMote+."], "en": ["New RevolutionMote+ version."]}
+          extra = f"docs/releases/{tag}.notes.json"
+          if os.path.exists(extra):
+              notes = json.load(open(extra, encoding="utf-8"))
+          m = {
+              "schema": 1, "version": v,
+              "published_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "release_url": f"https://github.com/{repo}/releases/tag/v{v}",
+              "notes": notes,
+              "assets": {"android-universal": {
+                  "name": "RevolutionMote-Plus.apk",
+                  "url": f"https://github.com/{repo}/releases/download/v{v}/RevolutionMote-Plus.apk",
+                  "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}},
+          }
+          json.dump(m, open("update.json", "w", encoding="utf-8"), ensure_ascii=False)
+          PY
       - name: Publicar release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -74,6 +98,6 @@ jobs:
           cp receptor/PepoMote.exe "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe"
           NOTES=docs/releases/${TAG}.md
           [ -f "$NOTES" ] || NOTES=/dev/null
-          gh release create "$TAG" "RevolutionMote-Plus-${TAG}.apk" "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe" --target "$GITHUB_SHA" \
+          gh release create "$TAG" "RevolutionMote-Plus-${TAG}.apk" "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe" RevolutionMote-Plus.apk update.json --target "$GITHUB_SHA" \
             --title "RevolutionMote+ ${TAG}" --notes-file "$NOTES" \
-            || gh release upload "$TAG" "RevolutionMote-Plus-${TAG}.apk" "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe" --clobber
+            || gh release upload "$TAG" "RevolutionMote-Plus-${TAG}.apk" "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe" RevolutionMote-Plus.apk update.json --clobber

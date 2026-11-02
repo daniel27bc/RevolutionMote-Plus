@@ -142,6 +142,34 @@ object AppPrefs {
             .edit().putBoolean("pointerTrackpad", value).apply()
     }
 
+    /** Imán de la cuadrícula en el editor de diseños. */
+    fun editorSnap(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("editorSnap", true)
+
+    fun setEditorSnap(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("editorSnap", value).apply()
+    }
+
+    /** Selector de modos (Puntero / Dolphin / Wii U…) plegado en vertical. */
+    fun modeChipsFolded(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("modeChipsFolded", true)
+
+    fun setModeChipsFolded(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("modeChipsFolded", value).apply()
+    }
+
+    /** 0 = solo apuntar, 1 = solo el dedo, 2 = los dos (antes era un sí/no). */
+    fun pointerTrackpadMode(context: Context): Int {
+        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return if (p.contains("pointerTrackpadMode")) p.getInt("pointerTrackpadMode", 0)
+        else if (p.getBoolean("pointerTrackpad", false)) 1 else 0
+    }
+
+    fun setPointerTrackpadMode(context: Context, value: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putInt("pointerTrackpadMode", value).apply()
+    }
+
     fun pointerTrackpadInertia(context: Context): Float =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getFloat("pointerTrackpadInertia", 0f)

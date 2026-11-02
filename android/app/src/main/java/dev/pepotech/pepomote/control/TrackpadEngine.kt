@@ -26,7 +26,7 @@ object TrackpadEngine {
     ): Pair<Int, Int> {
         val speed = hypot(vx, vy)
         if (speed < REST_SPEED) return 0 to 0
-        val sens = sensitivity.coerceIn(0.1f, 10f)
+        val sens = sensitivity.coerceIn(0.1f, 10f) * Precision.factor
         val mag = min(1f, speed * sens / FULL_SPEED)
         val adz = antiDeadzone.coerceIn(0f, 0.9f)
         val power = adz + mag * (1f - adz)

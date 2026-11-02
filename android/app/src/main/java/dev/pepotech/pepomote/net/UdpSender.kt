@@ -84,6 +84,7 @@ class UdpSender(
     fun send(data: ByteArray) {
         try {
             socket.send(DatagramPacket(data, data.size))
+            dev.pepotech.pepomote.control.Diag.packets.incrementAndGet()
         } catch (_: Exception) {
         }
     }

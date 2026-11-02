@@ -116,8 +116,9 @@ object GyroAim {
         val yaw = if (c.swapAxes) pitch0 else yaw0
         val pitch = if (c.swapAxes) yaw0 else pitch0
         val portrait = rotation == Frame.ROTATION_0 || rotation == Frame.ROTATION_180
-        var tx = -yaw * (if (portrait) c.sensXPortrait else c.sensX) / FULL_RATE
-        var ty = pitch * (if (portrait) c.sensYPortrait else c.sensY) / FULL_RATE
+        val fine = Precision.factor
+        var tx = -yaw * (if (portrait) c.sensXPortrait else c.sensX) * fine / FULL_RATE
+        var ty = pitch * (if (portrait) c.sensYPortrait else c.sensY) * fine / FULL_RATE
         if (c.invertX) tx = -tx
         if (c.invertY) ty = -ty
         val alpha = (1f - c.smoothing).coerceIn(0.1f, 1f)
@@ -162,7 +163,17 @@ object GyroAim {
         my += (pitch - my) * alpha
         val still = hypot(mx, my) < MOUSE_REST
         val py = if (m.invertY) -my else my
-        if (still) Kbm.setGyro(0f, 0f) else Kbm.setGyro(mx * m.gyroSens, py * m.gyroSens)
+        val fine = Precision.factor
+        if (still) Kbm.setGyro(0f, 0f) else Kbm.setGyro(mx * m.gyroSens * fine, py * m.gyroSens * fine)
+    }
+
+    /** Recentrar: olvida el suavizado (la cámara deja de arrastrar el giro anterior). */
+    fun recenter() {
+        sx = 0f
+        sy = 0f
+        mx = 0f
+        my = 0f
+        zero()
     }
 
     private fun zero() {

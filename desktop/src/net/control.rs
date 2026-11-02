@@ -619,6 +619,7 @@ fn parse_kbm(v: &serde_json::Value) -> Option<KbmEvent> {
             (!name.is_empty() && name.len() <= 24).then(|| KbmEvent::Key(name.to_owned(), a.get(2).and_then(|d| d.as_bool()).unwrap_or(false)))
         }
         "rel" => Some(KbmEvent::ReleaseAll),
+        "ctr" => Some(KbmEvent::Center),
         _ => None,
     }
 }
@@ -637,6 +638,7 @@ mod kbm_tests {
         assert_eq!(parse_kbm(&json!(["wh", -120])), Some(KbmEvent::Wheel(-120)));
         assert_eq!(parse_kbm(&json!(["key", "KeyW", true])), Some(KbmEvent::Key("KeyW".into(), true)));
         assert_eq!(parse_kbm(&json!(["rel"])), Some(KbmEvent::ReleaseAll));
+        assert_eq!(parse_kbm(&json!(["ctr"])), Some(KbmEvent::Center));
         assert_eq!(parse_kbm(&json!(["???"])), None);
     }
 }

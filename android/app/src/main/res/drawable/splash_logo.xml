@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Logo de la pantalla de arranque: 240 dp con el dibujo dentro del círculo visible -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/rm_logo"
+    android:insetLeft="66dp" android:insetRight="66dp"
+    android:insetTop="68dp" android:insetBottom="68dp" />

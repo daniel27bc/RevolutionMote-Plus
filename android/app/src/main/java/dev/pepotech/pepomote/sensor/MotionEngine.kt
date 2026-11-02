@@ -275,6 +275,7 @@ class MotionEngine(
                 }
                 lastGyroNs = event.timestamp
                 for (i in 0..2) latestGyro[i] = event.values[i]
+                dev.pepotech.pepomote.control.Diag.gyro(event.values)
                 gyroListener?.invoke(event.values, accel, rotation, event.timestamp)
                 // Tope de 250 Hz del protocolo: móviles con gyro a 400-500 Hz
                 // saturan el Wi-Fi y provocan ráfagas/pérdidas (cursor errático)

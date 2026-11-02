@@ -64,26 +64,49 @@ object PointerTrackpad {
     private fun withPcDeadzone(rate: Float): Float =
         if (rate == 0f) 0f else rate + (if (rate > 0f) PC_DEADZONE else -PC_DEADZONE)
 
-    /** El ajuste del usuario (pantallas del mando de Wii): el trackpad de ratón sí o no. */
-    private val _enabled = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val enabled: kotlinx.coroutines.flow.StateFlow<Boolean> = _enabled
+    /** Solo apuntar con el móvil (lo de siempre). */
+    const val OFF = 0
+
+    /** Solo el dedo: mover el móvil no hace nada. */
+    const val ON = 1
+
+    /**
+     * Los dos a la vez: el móvil mueve el cursor en RELATIVO (como un ratón
+     * giroscópico, sin anclaje) y el dedo lo reubica cuando hace falta.
+     */
+    const val BOTH = 2
+
+    /** El ajuste del usuario (pantallas del mando de Wii): [OFF], [ON] o [BOTH]. */
+    private val _mode = kotlinx.coroutines.flow.MutableStateFlow(OFF)
+    val mode: kotlinx.coroutines.flow.StateFlow<Int> = _mode
+
+    /** Lo pone la capa táctil: con [BOTH], el giro real se suma al del dedo. */
+    @Volatile
+    var mixGyro: Boolean = false
 
     fun loadEnabled(context: android.content.Context) {
-        _enabled.value = AppPrefs.pointerTrackpad(context)
+        _mode.value = AppPrefs.pointerTrackpadMode(context)
     }
 
-    fun setEnabled(context: android.content.Context, on: Boolean) {
-        _enabled.value = on
-        AppPrefs.setPointerTrackpad(context, on)
+    fun setMode(context: android.content.Context, m: Int) {
+        _mode.value = m.coerceIn(OFF, BOTH)
+        AppPrefs.setPointerTrackpadMode(context, _mode.value)
     }
 
     internal fun toGyro(v: Float): Float {
         if (v == 0f) return 0f
-        return withPcDeadzone(-v * GAIN * sensitivity)
+        return withPcDeadzone(-v * GAIN * sensitivity * Precision.factor)
     }
 
     /** Escribe el giro sintético en [out] (marco del paquete). */
     fun fill(out: FloatArray) {
+        if (mixGyro) {
+            // [out] ya trae el giro real del móvil: el receptor lo integra
+            // en relativo y el dedo se le suma
+            out[0] += gx + gyroGx
+            out[2] += gz + gyroGz
+            return
+        }
         out[0] = gx + gyroGx
         out[1] = 0f
         out[2] = gz + gyroGz

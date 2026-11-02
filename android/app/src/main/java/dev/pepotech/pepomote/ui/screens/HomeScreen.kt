@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.pepotech.pepomote.R
 import dev.pepotech.pepomote.control.UpdateCheck
 import dev.pepotech.pepomote.ui.components.ChannelCard
@@ -78,7 +79,7 @@ fun HomeScreen(
     ) {
         Spacer(Modifier.height(28.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("PepoMote", style = MaterialTheme.typography.displayLarge, modifier = Modifier.weight(1f))
+            dev.pepotech.pepomote.ui.components.BrandTitle(Modifier.weight(1f), logo = 38.dp, fontSize = 26.sp)
             // Idioma: ES / EN (toca para cambiar)
             val pill = RoundedCornerShape(14.dp)
             Text(

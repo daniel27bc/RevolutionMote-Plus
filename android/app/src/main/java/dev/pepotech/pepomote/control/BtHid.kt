@@ -276,6 +276,9 @@ object BtHid {
      * unos pocos informes de teclado por vuelta, para que el texto no se
      * coma letras en equipos lentos.
      */
+    /** Quedan informes por mandar (el reloj de [Kbm] no puede dormirse). */
+    val pending: Boolean get() = outbox.isNotEmpty()
+
     fun pump() {
         if (Build.VERSION.SDK_INT < 28) return
         val h = hid ?: run { outbox.clear(); return }

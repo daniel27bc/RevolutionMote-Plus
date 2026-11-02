@@ -97,36 +97,34 @@ private fun DrawScope.drawGlyph(glyph: ChannelGlyph, accent: Color) {
     }
 }
 
-/** Teclado apaisado: contorno, tres filas de teclas y la barra espaciadora. */
+/** Teclado (a la izquierda, algo más pequeño) y un ratón a su derecha. */
 private fun DrawScope.drawKeyboardGlyph(accent: Color) {
     val w = size.width
-    val stroke = w * 0.07f
-    val bodyH = w * 0.56f
-    val top = (size.height - bodyH) / 2f
-    drawRoundRect(
-        color = accent,
-        topLeft = androidx.compose.ui.geometry.Offset(stroke / 2f, top + stroke / 2f),
-        size = androidx.compose.ui.geometry.Size(w - stroke, bodyH - stroke),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.1f),
-        style = Stroke(width = stroke)
-    )
-    val key = w * 0.09f
+    val h = size.height
+    val stroke = w * 0.06f
+    val kbW = w * 0.68f
+    val kbH = w * 0.44f
+    val top = h * 0.36f
+    val o = androidx.compose.ui.geometry.Offset
+    val sz = androidx.compose.ui.geometry.Size
+    val cr = androidx.compose.ui.geometry.CornerRadius
+    drawRoundRect(accent, o(stroke / 2f, top + stroke / 2f), sz(kbW - stroke, kbH - stroke), cr(w * 0.08f), style = Stroke(width = stroke))
+    val key = w * 0.075f
     for (row in 0..1) {
-        for (col in 0..5) {
-            drawRoundRect(
-                color = accent,
-                topLeft = androidx.compose.ui.geometry.Offset(w * 0.14f + col * w * 0.125f, top + bodyH * (0.22f + row * 0.22f)),
-                size = androidx.compose.ui.geometry.Size(key, key),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.02f)
-            )
+        for (col in 0..3) {
+            drawRoundRect(accent, o(w * 0.1f + col * w * 0.13f, top + kbH * (0.2f + row * 0.26f)), sz(key, key), cr(w * 0.015f))
         }
     }
-    drawRoundRect(
-        color = accent,
-        topLeft = androidx.compose.ui.geometry.Offset(w * 0.27f, top + bodyH * 0.68f),
-        size = androidx.compose.ui.geometry.Size(w * 0.46f, key),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.02f)
-    )
+    drawRoundRect(accent, o(w * 0.18f, top + kbH * 0.72f), sz(w * 0.32f, key * 0.9f), cr(w * 0.015f))
+    // Ratón: cuerpo ovalado, la raya entre los botones y el cable
+    val mx = w * 0.74f
+    val mw = w * 0.24f
+    val mTop = h * 0.30f
+    val mh = w * 0.4f
+    drawRoundRect(accent, o(mx, mTop), sz(mw, mh), cr(mw / 2f), style = Stroke(width = stroke))
+    drawLine(accent, o(mx + mw / 2f, mTop + stroke), o(mx + mw / 2f, mTop + mh * 0.38f), strokeWidth = stroke * 0.8f)
+    drawLine(accent, o(mx + stroke * 0.6f, mTop + mh * 0.4f), o(mx + mw - stroke * 0.6f, mTop + mh * 0.4f), strokeWidth = stroke * 0.8f)
+    drawLine(accent, o(mx + mw / 2f, mTop), o(mx + mw / 2f, h * 0.14f), strokeWidth = stroke * 0.8f)
 }
 
 /** Mando clásico apaisado: cuerpo, cruceta a la izquierda y dos botones a la derecha. */

@@ -375,11 +375,12 @@ private fun SpecialKeys() {
         sticky.clear()
     }
     val mods = listOf("ControlLeft" to "Ctrl", "AltLeft" to "Alt", "ShiftLeft" to "Shift", "MetaLeft" to "Win")
+    val lang = appLang()
     val keys = listOf(
-        "Escape" to "Esc", "Tab" to "Tab", "Enter" to "Intro", "Backspace" to "Borrar", "Delete" to "Supr",
-        "ArrowLeft" to "←", "ArrowUp" to "↑", "ArrowDown" to "↓", "ArrowRight" to "→",
-        "Home" to "Inicio", "End" to "Fin", "PageUp" to "RePág", "PageDown" to "AvPág"
-    ) + (1..12).map { "F$it" to "F$it" }
+        "Escape", "Tab", "Enter", "Backspace", "Delete",
+        "ArrowLeft", "ArrowUp", "ArrowDown", "ArrowRight",
+        "Home", "End", "PageUp", "PageDown"
+    ).map { it to dev.pepotech.pepomote.control.PadKeys.label(it, lang) } + (1..12).map { "F$it" to "F$it" }
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp)

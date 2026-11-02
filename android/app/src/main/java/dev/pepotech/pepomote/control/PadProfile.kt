@@ -20,7 +20,13 @@ enum class ElementKind {
     MODE_TOGGLE,
 
     /** Una tecla del teclado ([PadElement.key]: «KeyW», «Escape»…). Varias a la vez. */
-    KEY
+    KEY,
+
+    /** Mantener: giroscopio, trackpads y ratón más lentos para apuntar fino. */
+    PRECISION,
+
+    /** Tocar: el cursor al centro (modo ratón) o la cámara sin arrastre del giro. */
+    RECENTER
 }
 
 /**
@@ -166,7 +172,15 @@ object PadKeys {
         "Delete" to "Supr", "Home" to "Inicio", "End" to "Fin", "PageUp" to "RePág", "PageDown" to "AvPág"
     )
 
-    fun label(name: String): String = ALL.firstOrNull { it.first == name }?.second ?: name
+    /** Los rótulos que cambian en inglés (los demás son iguales). */
+    private val EN = mapOf(
+        "Enter" to "Enter", "Space" to "Space", "Backspace" to "Bksp", "Delete" to "Del",
+        "Home" to "Home", "End" to "End", "PageUp" to "PgUp", "PageDown" to "PgDn"
+    )
+
+    /** Rótulo de la tecla en el idioma de la app ([lang]: «es», «en»…). */
+    fun label(name: String, lang: String = "es"): String =
+        (if (lang != "es") EN[name] else null) ?: ALL.firstOrNull { it.first == name }?.second ?: name
 }
 
 /**
@@ -214,7 +228,7 @@ object PadProfiles {
         for (k in listOf(
             ElementKind.STICK_L, ElementKind.STICK_R, ElementKind.DPAD, ElementKind.GYRO,
             ElementKind.MODE_TOGGLE, ElementKind.MOUSE_PAD, ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT,
-            ElementKind.KEYBOARD
+            ElementKind.KEYBOARD, ElementKind.PRECISION, ElementKind.RECENTER
         )) {
             if (k !in kinds) out += AddOption(k)
         }
@@ -244,7 +258,7 @@ object PadProfiles {
         ElementKind.STICK_L, ElementKind.STICK_R -> PadElement(option.kind, 0.5f, 0.5f, 0.42f)
         ElementKind.DPAD -> PadElement(option.kind, 0.5f, 0.5f, 0.36f)
         ElementKind.FACE -> PadElement(option.kind, 0.5f, 0.5f, 0.42f)
-        ElementKind.GYRO, ElementKind.MODE_TOGGLE, ElementKind.KEYBOARD,
+        ElementKind.GYRO, ElementKind.MODE_TOGGLE, ElementKind.KEYBOARD, ElementKind.PRECISION, ElementKind.RECENTER,
         ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT -> PadElement(option.kind, 0.5f, 0.5f, 0.15f)
         ElementKind.MOUSE_PAD -> PadElement(option.kind, 0.5f, 0.5f, 0.45f, pill = true)
         ElementKind.KEY -> PadElement(option.kind, 0.5f, 0.5f, 0.13f, key = "Escape")

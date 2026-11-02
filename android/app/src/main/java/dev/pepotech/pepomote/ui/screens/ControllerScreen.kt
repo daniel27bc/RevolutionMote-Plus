@@ -217,6 +217,8 @@ fun ControllerScreen(link: UiLink, showChips: Boolean, onDisconnect: () -> Unit)
                             }
                         }
                     }
+                    // Arriba a la derecha, lejos de la B: candado y trackpad del puntero
+                    PointerQuickControls(link)
                     // Modo Wii U: texto para el teclado en pantalla de Cemu; en
                     // RetroArch, para su ventana. En modo puntero el botón NO va
                     // aquí arriba sino en el hueco de Home, al alcance del pulgar
@@ -456,6 +458,39 @@ internal fun modeLabel(mode: String): String = when (mode) {
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 internal fun ModeChips(current: String, supportsCemu: Boolean, supportsSwitch: Boolean = false, compact: Boolean = false, dense: Boolean = false, modifier: Modifier = Modifier, androidReceiver: Boolean = false, supportsRetroArch: Boolean = false, supportsGamepad: Boolean = false) {
+    // En vertical el selector se pliega: plegado solo se ve el modo actual y
+    // una flecha; se recuerda cómo lo dejaste
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var open by remember { mutableStateOf(compact || !dev.pepotech.pepomote.control.AppPrefs.modeChipsFolded(ctx)) }
+    val fold: (Boolean) -> Unit = { o ->
+        open = o
+        dev.pepotech.pepomote.control.AppPrefs.setModeChipsFolded(ctx, !o)
+    }
+    if (!open) {
+        val name = stringResource(
+            when (current) {
+                LinkState.MODE_DOLPHIN -> R.string.mode_dolphin
+                LinkState.MODE_CEMU -> R.string.mode_wiiu
+                LinkState.MODE_SWITCH -> if (androidReceiver) R.string.mode_eden else R.string.mode_switch
+                LinkState.MODE_RETROARCH -> R.string.mode_retroarch
+                LinkState.MODE_GAMEPAD -> R.string.mode_gamepad
+                else -> R.string.mode_pointer
+            }
+        )
+        val hint = stringResource(R.string.mode_chips_expand)
+        Row(
+            modifier
+                .background(PepoColors.Card, RoundedCornerShape(18.dp))
+                .border(1.5.dp, PepoColors.CardBorder, RoundedCornerShape(18.dp))
+                .clickable(onClickLabel = hint) { fold(true) }
+                .padding(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(name, style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.Text), maxLines = 1)
+            dev.pepotech.pepomote.ui.components.Ico(R.drawable.ms_expand_more, PepoColors.TextDim, 20.dp)
+        }
+        return
+    }
     val chips: @Composable () -> Unit = {
         if (!androidReceiver) ModeChip(stringResource(R.string.mode_pointer), selected = current == LinkState.MODE_POINTER, compact = compact, dense = dense) {
             LinkState.requestMode(LinkState.MODE_POINTER)
@@ -488,7 +523,17 @@ internal fun ModeChips(current: String, supportsCemu: Boolean, supportsSwitch: B
     }
     val gap = if (compact) 6.dp else if (dense) 8.dp else 10.dp
     if (compact) Row(modifier, horizontalArrangement = Arrangement.spacedBy(gap)) { chips() }
-    else FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(gap), verticalArrangement = Arrangement.spacedBy(6.dp)) { chips() }
+    else FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(gap), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        chips()
+        val hint = stringResource(R.string.mode_chips_collapse)
+        Box(
+            Modifier
+                .size(36.dp)
+                .clickable(onClickLabel = hint) { fold(false) }
+                .semantics { contentDescription = hint },
+            contentAlignment = Alignment.Center
+        ) { dev.pepotech.pepomote.ui.components.Ico(R.drawable.ms_expand_less, PepoColors.TextDim, 22.dp) }
+    }
 }
 
 /**

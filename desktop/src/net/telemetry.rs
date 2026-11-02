@@ -1023,6 +1023,11 @@ fn kbm_apply(inj: &mut dyn input::Injector, held: &mut KbmHeld, events: Vec<crat
                     }
                 }
             }
+            KbmEvent::Center => {
+                mx = 0;
+                my = 0;
+                inj.move_abs(0.5, 0.5);
+            }
             KbmEvent::ReleaseAll => {
                 flush(inj, &mut mx, &mut my);
                 for name in std::mem::take(&mut held.keys) {

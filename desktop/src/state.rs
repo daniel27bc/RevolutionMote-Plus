@@ -667,6 +667,8 @@ pub enum KbmEvent {
     Key(String, bool),
     /// Soltar todo lo que este móvil tenga pulsado (se va, cambia de modo).
     ReleaseAll,
+    /// Cursor al centro de la pantalla (botón «Recentrar» del móvil).
+    Center,
 }
 
 /// Eventos de teclado y ratón en cola como mucho (un móvil que se atasque no

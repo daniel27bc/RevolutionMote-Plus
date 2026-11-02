@@ -736,7 +736,7 @@ class LinkForegroundService : Service() {
             android.app.PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_pepomote_glyph)
+            .setSmallIcon(R.drawable.ic_rm_glyph)
             .setContentTitle("PepoMote")
             .setContentText(text)
             // Sin `ongoing`: en Android 13+ se puede deslizar (el servicio sigue);

@@ -59,6 +59,52 @@ object PadProfileStore {
         persist(context)
     }
 
+    /**
+     * Copia de seguridad: los perfiles en un JSON para guardar en un archivo
+     * o compartir (sobrevive a desinstalar la app). [only]: solo ese perfil.
+     */
+    fun exportJson(only: PadProfile? = null): String {
+        val arr = org.json.JSONArray()
+        for (p in only?.let { listOf(it) } ?: _profiles.value) arr.put(PadProfileJson.toJson(p))
+        return org.json.JSONObject()
+            .put("app", "RevolutionMote+")
+            .put("type", "pad-profiles")
+            .put("version", 1)
+            .put("profiles", arr)
+            .toString(2)
+    }
+
+    /**
+     * Importa perfiles de [text] (lo que sale de [exportJson], un perfil
+     * suelto o una lista). Un nombre que ya existe se guarda con otro nombre:
+     * nunca pisa nada. Devuelve cuántos se han importado (0 = no era válido).
+     */
+    fun importJson(context: Context, text: String): Int {
+        val parsed = try {
+            val t = text.trim()
+            val arr = when {
+                t.startsWith("[") -> org.json.JSONArray(t)
+                else -> {
+                    val o = org.json.JSONObject(t)
+                    o.optJSONArray("profiles") ?: org.json.JSONArray().put(o)
+                }
+            }
+            (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let { PadProfileJson.fromJson(it) } }
+        } catch (_: Exception) {
+            emptyList()
+        }
+        if (parsed.isEmpty()) return 0
+        val names = _profiles.value.map { it.name }.toMutableList()
+        val added = parsed.map { p ->
+            val name = PadProfiles.uniqueName(p.name, names)
+            names += name
+            p.copy(name = name)
+        }
+        _profiles.value = _profiles.value + added
+        persist(context)
+        return added.size
+    }
+
     private fun persist(context: Context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY_LIST, PadProfileJson.listToString(_profiles.value))

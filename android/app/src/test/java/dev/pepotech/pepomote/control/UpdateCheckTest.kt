@@ -31,11 +31,11 @@ class UpdateCheckTest {
 
     @Test
     fun laLocationDeGitHubDaLaVersion() {
-        val loc = "https://github.com/pepitolas13/PepoMote/releases/tag/v1.5.0"
+        val loc = "https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/v1.5.0"
         assertEquals(Version(1, 5, 0), UpdateCheck.versionFromLocation(loc))
         assertEquals(Version(1, 5, 0), UpdateCheck.versionFromLocation("$loc?x=1"))
         assertEquals(Version(1, 5, 0), UpdateCheck.versionFromLocation("$loc/"))
-        assertNull(UpdateCheck.versionFromLocation("https://github.com/pepitolas13/PepoMote/releases"))
+        assertNull(UpdateCheck.versionFromLocation("https://github.com/daniel27bc/RevolutionMote-Plus/releases"))
         assertNull(UpdateCheck.versionFromLocation(""))
         assertNull(UpdateCheck.versionFromLocation(null))
     }
@@ -66,7 +66,7 @@ class UpdateCheckTest {
     @Test
     fun laUrlDeLaRelease() {
         assertEquals(
-            "https://github.com/pepitolas13/PepoMote/releases/tag/v1.6.0",
+            "https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/v1.6.0",
             UpdateCheck.releaseUrl(Version(1, 6, 0))
         )
     }

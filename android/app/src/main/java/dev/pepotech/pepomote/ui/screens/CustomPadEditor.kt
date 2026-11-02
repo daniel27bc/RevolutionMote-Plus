@@ -102,6 +102,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/** Idioma con el que se está pintando la app (el de la configuración activa). */
+@Composable
+internal fun appLang(): String = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language
+
+/** Divisiones de la cuadrícula del imán en cada eje. */
+internal const val SNAP_STEPS = 24
+
+/** Coloca el centro de un control en la cuadrícula del imán. */
+internal fun snapElement(e: PadElement): PadElement = e.copy(
+    x = (kotlin.math.round(e.x * SNAP_STEPS) / SNAP_STEPS).coerceIn(0f, 1f),
+    y = (kotlin.math.round(e.y * SNAP_STEPS) / SNAP_STEPS).coerceIn(0f, 1f)
+)
+
 /** Ancho de una pastilla (gatillo/hombro) respecto a su alto. */
 private const val PILL_RATIO = 2.3f
 
@@ -147,6 +160,8 @@ internal fun elementTitle(kind: ElementKind, bit: Int, layout: RetroLayout): Str
     ElementKind.KEYBOARD -> stringResource(R.string.ed_keyboard)
     ElementKind.MODE_TOGGLE -> stringResource(R.string.ed_mode_toggle)
     ElementKind.KEY -> stringResource(R.string.ed_key)
+    ElementKind.PRECISION -> stringResource(R.string.ed_precision)
+    ElementKind.RECENTER -> stringResource(R.string.ed_recenter)
     ElementKind.BUTTON -> stringResource(R.string.ed_button, buttonLabel(bit, layout))
 }
 
@@ -163,11 +178,28 @@ internal fun CustomPadCanvas(
     onElementChange: (old: PadElement, new: PadElement) -> Unit,
     onGear: (PadElement) -> Unit,
     modifier: Modifier = Modifier,
-    lookEnabled: Boolean = true
+    lookEnabled: Boolean = true,
+    /** Empieza a moverse un control (para «Deshacer»). */
+    onGestureStart: () -> Unit = {},
+    /** Se suelta un control (para el imán de la cuadrícula). */
+    onGestureEnd: (PadElement) -> Unit = {},
+    snap: Boolean = false
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val w = maxWidth
         val h = maxHeight
+        // La cuadrícula del imán, solo mientras se edita
+        if (editing && snap) {
+            val line = PepoColors.CardBorder
+            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                for (i in 1 until SNAP_STEPS) {
+                    val x = size.width * i / SNAP_STEPS
+                    val y = size.height * i / SNAP_STEPS
+                    drawLine(line, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Offset(x, size.height), 1f)
+                    drawLine(line, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), 1f)
+                }
+            }
+        }
         // Cámara en el espacio libre: debajo de todo, así solo coge los
         // dedos que no caen en ningún control
         if (!editing && lookEnabled) LookSurface(profile.look, Modifier.matchParentSize())
@@ -192,7 +224,9 @@ internal fun CustomPadCanvas(
                     areaW = w,
                     areaH = h,
                     onChange = onElementChange,
-                    onGear = { onGear(e) }
+                    onGear = { onGear(e) },
+                    onStart = onGestureStart,
+                    onEnd = onGestureEnd
                 )
             }
         }
@@ -244,13 +278,32 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig,
         }
         ElementKind.KEY -> {
             val act = LocalPadActions.current
-            IconPadButton(bw, R.drawable.ms_keyboard, PadKeys.label(e.key), enabled = act.keysAvailable) { down ->
+            IconPadButton(bw, R.drawable.ms_keyboard, PadKeys.label(e.key, appLang()), enabled = act.keysAvailable) { down ->
                 Kbm.key(e.key, down)
             }
         }
         ElementKind.KEYBOARD -> {
             val act = LocalPadActions.current
             IconPadButton(bw, R.drawable.ms_keyboard, stringResource(R.string.keyboard_short)) { down -> if (down) act.onKeyboard() }
+        }
+        ElementKind.PRECISION -> {
+            var held by remember { mutableStateOf(false) }
+            DisposableEffect(Unit) { onDispose { dev.pepotech.pepomote.control.Precision.set(false) } }
+            IconPadButton(
+                bw, R.drawable.ms_center_focus_strong, stringResource(R.string.precision), highlighted = held
+            ) { down ->
+                held = down
+                dev.pepotech.pepomote.control.Precision.set(down)
+            }
+        }
+        ElementKind.RECENTER -> {
+            val act = LocalPadActions.current
+            IconPadButton(bw, R.drawable.ms_restart_alt, stringResource(R.string.recenter)) { down ->
+                if (down) {
+                    if (act.mouseMode) Kbm.center()
+                    dev.pepotech.pepomote.control.GyroAim.recenter()
+                }
+            }
         }
         ElementKind.MODE_TOGGLE -> {
             val act = LocalPadActions.current
@@ -332,7 +385,7 @@ private fun TurboButton(label: String, bit: Int, w: Dp, h: Dp, shape: Shape, tex
             modifier = Modifier.padding(horizontal = 3.dp)
         )
         Text(
-            "TURBO",
+            stringResource(R.string.turbo_tag),
             color = PepoColors.Warn,
             fontSize = 7.sp,
             fontWeight = FontWeight.Bold,
@@ -352,13 +405,17 @@ private fun EditFrame(
     areaW: Dp,
     areaH: Dp,
     onChange: (PadElement, PadElement) -> Unit,
-    onGear: () -> Unit
+    onGear: () -> Unit,
+    onStart: () -> Unit = {},
+    onEnd: (PadElement) -> Unit = {}
 ) {
     val latest by rememberUpdatedState(element)
     val change by rememberUpdatedState(onChange)
+    val start by rememberUpdatedState(onStart)
+    val end by rememberUpdatedState(onEnd)
     val round = element.kind in setOf(
         ElementKind.GYRO, ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT, ElementKind.KEYBOARD, ElementKind.MODE_TOGGLE,
-        ElementKind.KEY
+        ElementKind.KEY, ElementKind.PRECISION, ElementKind.RECENTER
     )
     val shape = if (element.kind == ElementKind.BUTTON && !element.pill || round || element.isStick && !element.trackpad) {
         CircleShape
@@ -373,18 +430,35 @@ private fun EditFrame(
             .size(boxW, boxH)
             .border(2.dp, PepoColors.Glow, shape)
             .background(PepoColors.Glow.copy(alpha = 0.10f), shape)
+            // Principio y fin del gesto (antes que el arrastre se los coma):
+            // «Deshacer» guarda el estado de antes y el imán coloca al soltar
+            .pointerInput(element.id) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    start()
+                    do {
+                        val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    } while (ev.changes.any { it.pressed })
+                    end(latest)
+                }
+            }
             .pointerInput(element.id) {
                 val wPx = areaW.toPx()
                 val hPx = areaH.toPx()
                 detectTransformGestures { _, pan, zoom, _ ->
                     val cur = latest
-                    val next = PadProfiles.clampElement(
+                    val moved = PadProfiles.clampElement(
                         cur.copy(
                             x = cur.x + pan.x / wPx,
                             y = cur.y + pan.y / hPx,
                             size = cur.size * zoom
                         )
                     )
+                    // El control entero dentro de la pantalla, no solo su centro
+                    val grow = moved.size / cur.size
+                    val hw = (boxW.toPx() * grow / 2f / wPx).coerceAtMost(0.5f)
+                    val hh = (boxH.toPx() * grow / 2f / hPx).coerceAtMost(0.5f)
+                    val next = moved.copy(x = moved.x.coerceIn(hw, 1f - hw), y = moved.y.coerceIn(hh, 1f - hh))
                     change(cur, next)
                 }
             }
@@ -415,7 +489,12 @@ internal fun EditorToolbar(
     onReset: () -> Unit,
     onCancel: () -> Unit,
     onSave: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    canUndo: Boolean = false,
+    onUndo: () -> Unit = {},
+    snap: Boolean = false,
+    onSnap: () -> Unit = {},
+    onMirror: () -> Unit = {}
 ) {
     Card(
         modifier = modifier.padding(top = 6.dp, start = 8.dp, end = 8.dp),
@@ -430,6 +509,13 @@ internal fun EditorToolbar(
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             TextButton(onClick = onAdd) { IconLabel(R.drawable.ms_add, stringResource(R.string.ed_add), PepoColors.Blue) }
+            TextButton(onClick = onUndo, enabled = canUndo) {
+                IconLabel(R.drawable.ms_undo, stringResource(R.string.ed_undo), if (canUndo) PepoColors.Text else PepoColors.TextDim)
+            }
+            TextButton(onClick = onSnap) {
+                IconLabel(R.drawable.ms_grid_4x4, stringResource(R.string.ed_snap), if (snap) PepoColors.Blue else PepoColors.TextDim)
+            }
+            TextButton(onClick = onMirror) { IconLabel(R.drawable.ms_flip, stringResource(R.string.ed_mirror), PepoColors.Text) }
             TextButton(onClick = onProfiles) { IconLabel(R.drawable.ms_view_list, profile.name, PepoColors.Text) }
             TextButton(onClick = onPadSettings) { IconLabel(R.drawable.ms_tune, stringResource(R.string.ed_pad_settings), PepoColors.Blue) }
             Text(stringResource(R.string.ed_opacity), style = MaterialTheme.typography.labelMedium, color = PepoColors.TextDim)
@@ -560,7 +646,9 @@ internal fun ElementSettingsDialog(
             Spacer(Modifier.height(6.dp))
             val used = profile.elements.filter { it.kind == ElementKind.KEY && it.id != element.id }.map { it.key }.toSet()
             ChipFlow {
-                for ((name, label) in PadKeys.ALL) {
+                val lang = appLang()
+                for ((name, _) in PadKeys.ALL) {
+                    val label = PadKeys.label(name, lang)
                     if (name in used) continue
                     ModeChip(label, selected = name == element.key, dense = true) { onChange(element.copy(key = name)) }
                 }

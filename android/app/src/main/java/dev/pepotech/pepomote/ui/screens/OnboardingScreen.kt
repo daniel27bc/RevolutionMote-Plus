@@ -59,7 +59,12 @@ fun OnboardingScreen(onDone: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(48.dp))
-            Text("PepoMote", style = MaterialTheme.typography.displayLarge)
+            androidx.compose.foundation.Image(
+                androidx.compose.ui.res.painterResource(R.drawable.rm_logo), null,
+                Modifier.size(96.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            dev.pepotech.pepomote.ui.components.BrandTitle(logo = 0.dp)
             Text(
                 stringResource(R.string.onboarding_sub),
                 style = MaterialTheme.typography.bodyMedium

@@ -27,7 +27,7 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class UpdateUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
-    private val release = UpdateManifest(UpdateCheck.Version(1,11,0), "", mapOf("es" to listOf("Mejor conexión"), "en" to listOf("Better connection")), UpdateAsset("PepoMote.apk", "", 100, "a".repeat(64)), "")
+    private val release = UpdateManifest(UpdateCheck.Version(1,11,0), "", mapOf("es" to listOf("Mejor conexión"), "en" to listOf("Better connection")), UpdateAsset("RevolutionMote-Plus.apk", "", 100, "a".repeat(64)), "")
     @Test fun offerExplainsChangesAndRequiresExplicitDownloadClick() {
         var clicked = false
         compose.setContent { PepoMoteTheme { UpdateDialog(UpdateUiState(release=release), "es", { clicked=true }, {}, {}, {}) } }

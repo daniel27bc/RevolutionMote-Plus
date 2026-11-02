@@ -42,7 +42,7 @@ object Kbm {
             if (field == value) return
             releaseAll()
             field = value
-            if (value == Backend.APP || value == Backend.BT) startTicker() else stopTicker()
+            if (value == Backend.APP || value == Backend.BT) wake() else stopTicker()
         }
 
     private val touch = FloatArray(4)
@@ -74,6 +74,7 @@ object Kbm {
         }
         touch[src * 2] = vx
         touch[src * 2 + 1] = vy
+        if (vx != 0f || vy != 0f) wake()
     }
 
     /** Giro del móvil como ratón: [yawRate] (+ = a la izquierda), [pitchRate] (+ = arriba), ya con su sensibilidad. */
@@ -84,6 +85,7 @@ object Kbm {
         }
         yaw = yawRate
         pitch = pitchRate
+        if (yawRate != 0f || pitchRate != 0f) wake()
     }
 
     /** Botón del ratón: 0 izquierdo, 1 derecho, 2 central. */
@@ -96,8 +98,9 @@ object Kbm {
                 1 -> ButtonState.set(ButtonState.B, down)
             }
             Backend.APP -> queue(JSONArray().put("btn").put(index).put(down))
-            Backend.BT -> BtHid.mouseButton(index, down)
+            Backend.BT -> BtHid.mouseButton(index, down).also { wake() }
         }
+        Diag.kbmEvents.incrementAndGet()
         synchronized(lock) { heldButtons[index] = down }
     }
 
@@ -108,7 +111,7 @@ object Kbm {
             Backend.NONE -> Unit
             Backend.POINTER -> ButtonState.addScroll(units / 4)
             Backend.APP -> queue(JSONArray().put("wh").put(units))
-            Backend.BT -> BtHid.wheel(units)
+            Backend.BT -> BtHid.wheel(units).also { wake() }
         }
     }
 
@@ -117,8 +120,9 @@ object Kbm {
         when (backend) {
             Backend.NONE, Backend.POINTER -> return
             Backend.APP -> queue(JSONArray().put("key").put(name).put(down))
-            Backend.BT -> BtHid.key(name, down)
+            Backend.BT -> BtHid.key(name, down).also { wake() }
         }
+        Diag.kbmEvents.incrementAndGet()
         synchronized(lock) { if (down) heldKeys += name else heldKeys -= name }
     }
 
@@ -134,7 +138,19 @@ object Kbm {
         when (backend) {
             Backend.NONE -> Unit
             Backend.APP, Backend.POINTER -> LinkState.sendText?.invoke(s)
-            Backend.BT -> BtHid.type(s)
+            Backend.BT -> BtHid.type(s).also { wake() }
+        }
+    }
+
+    /**
+     * Recentrar: el cursor al centro de la pantalla (receptor de
+     * RevolutionMote+) o el recentrado del puntero (receptor original).
+     */
+    fun center() {
+        when (backend) {
+            Backend.APP -> queue(JSONArray().put("ctr"))
+            Backend.POINTER -> ButtonState.bumpRecenter()
+            else -> Unit
         }
     }
 
@@ -170,6 +186,7 @@ object Kbm {
 
     private fun queue(ev: JSONArray) {
         synchronized(lock) { pending.put(ev) }
+        wake()
     }
 
     private fun flush() {
@@ -179,7 +196,31 @@ object Kbm {
             pending = JSONArray()
             b
         }
+        Diag.kbmBatches.incrementAndGet()
         LinkState.sendKbm?.invoke(batch)
+    }
+
+    /** Ticks seguidos sin nada que hacer; al llegar a [IDLE_TICKS] el reloj se duerme. */
+    private var idleTicks = 0
+    private const val IDLE_TICKS = 40
+
+    /** ¿Está el reloj en marcha? (para el diagnóstico y los tests) */
+    val ticking: Boolean get() = tick != null
+
+    /** Hay movimiento o algo por mandar: el reloj se pone en marcha si dormía. */
+    @Synchronized
+    private fun wake() {
+        idleTicks = 0
+        if (tick == null && (backend == Backend.APP || backend == Backend.BT)) startTicker()
+    }
+
+    /** Mismo cerrojo que [wake]: nada puede colarse entre comprobar y parar. */
+    @Synchronized
+    private fun sleepIfIdle() {
+        if (idleTicks < IDLE_TICKS) return
+        if (synchronized(lock) { pending.length() } != 0) return
+        if (backend == Backend.BT && BtHid.pending) return
+        stopTicker()
     }
 
     @Synchronized
@@ -203,21 +244,33 @@ object Kbm {
         val now = System.nanoTime()
         val dtMs = ((now - lastTickNs) / 1_000_000f).coerceIn(0f, 50f)
         lastTickNs = now
-        accX += (touch[0] + touch[2]) * dtMs * PX_PER_DP - yaw * dtMs / 1000f * PX_PER_RAD
-        accY += (touch[1] + touch[3]) * dtMs * PX_PER_DP - pitch * dtMs / 1000f * PX_PER_RAD
+        // El giro ya llega con la precisión aplicada ([GyroAim]); los dedos, aquí
+        val fine = Precision.factor
+        accX += (touch[0] + touch[2]) * fine * dtMs * PX_PER_DP - yaw * dtMs / 1000f * PX_PER_RAD
+        accY += (touch[1] + touch[3]) * fine * dtMs * PX_PER_DP - pitch * dtMs / 1000f * PX_PER_RAD
         val dx = accX.toInt()
         val dy = accY.toInt()
         if (dx != 0 || dy != 0) {
             accX -= dx
             accY -= dy
+            Diag.mousePixels.addAndGet((kotlin.math.abs(dx) + kotlin.math.abs(dy)).toLong())
             when (backend) {
-                Backend.APP -> queue(JSONArray().put("mv").put(dx).put(dy))
+                Backend.APP -> synchronized(lock) { pending.put(JSONArray().put("mv").put(dx).put(dy)) }
                 Backend.BT -> BtHid.move(dx, dy)
                 else -> Unit
             }
         }
         if (backend == Backend.APP) flush()
         if (backend == Backend.BT) BtHid.pump()
+        // Sin dedos, sin giro y sin nada pendiente: a dormir (batería). Lo
+        // que llegue después lo despierta con [wake].
+        val still = touch.all { it == 0f } && yaw == 0f && pitch == 0f
+        val empty = synchronized(lock) { pending.length() == 0 } && !(backend == Backend.BT && BtHid.pending)
+        if (still && empty) {
+            if (++idleTicks >= IDLE_TICKS) sleepIfIdle()
+        } else {
+            idleTicks = 0
+        }
     }
 
     /** Para los tests: dp/ms durante [ms] → píxeles. */

@@ -112,8 +112,20 @@ object ButtonState {
         }
     }
 
+    /**
+     * Desvío de botones: si devuelve true, el botón no va al mando. Lo usa
+     * el modo ratón del mando universal (A = clic izquierdo, B = derecho) con
+     * el receptor de RevolutionMote+ o Bluetooth, para que A no llegue al
+     * mando virtual del PC mientras se maneja el escritorio.
+     */
+    @Volatile
+    var intercept: ((bit: Int, down: Boolean) -> Boolean)? = null
+
     /** Aplica la pulsación al estado y avisa al emisor sin esperar al siguiente sensor. */
-    fun set(bit: Int, down: Boolean) = latch.set(bit, down)
+    fun set(bit: Int, down: Boolean) {
+        if (intercept?.invoke(bit, down) == true) return
+        latch.set(bit, down)
+    }
 
     fun current(): Int = mask.get()
 

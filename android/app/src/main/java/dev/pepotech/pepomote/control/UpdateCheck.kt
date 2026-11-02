@@ -2,11 +2,13 @@ package dev.pepotech.pepomote.control
 
 /** Stable version comparison and foreground update scheduling, without identifiers. */
 object UpdateCheck {
-    const val REPO = "pepitolas13/PepoMote"
+    const val REPO = "daniel27bc/RevolutionMote-Plus"
     const val LATEST_URL = "https://github.com/$REPO/releases/latest"
     const val MANIFEST_URL = "$LATEST_URL/download/update.json"
-    /** Fijo y sin versión: GitHub solo ve «un PepoMote», nada más. */
-    const val USER_AGENT = "PepoMote-update-check"
+    /** Fijo y sin versión: GitHub solo ve «un RevolutionMote+», nada más. */
+    const val USER_AGENT = "RevolutionMote-Plus-update-check"
+    /** Nombre fijo del APK en cada release (el que busca `update.json`). */
+    const val APK_NAME = "RevolutionMote-Plus.apk"
     const val CHECK_EVERY_MS = 3600L * 1000
     /** La primera consulta espera a que el inicio esté en pantalla. */
     const val FIRST_DELAY_MS = 3000L

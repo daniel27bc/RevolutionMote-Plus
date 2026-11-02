@@ -2,6 +2,11 @@ package dev.pepotech.pepomote.ui.screens
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -159,35 +164,150 @@ internal fun MouseFreeLayer(modifier: Modifier, sensitivity: Float, inertia: Flo
 }
 
 /**
- * En las pantallas del mando de Wii: con el modo puntero y «ratón con el
- * dedo» encendido, los huecos sin botones mueven el cursor. Va DENTRO de la
- * caja de la pantalla (la que lleva `slideCanvas`), debajo de los botones.
+ * En las pantallas del mando de Wii: con el modo puntero y el trackpad en
+ * «solo el dedo» o «los dos», los huecos sin botones mueven el cursor. Va
+ * DENTRO de la caja de la pantalla (la que lleva `slideCanvas`), debajo de
+ * los botones.
  */
 @Composable
 internal fun androidx.compose.foundation.layout.BoxScope.PointerPadUnderlay(link: dev.pepotech.pepomote.service.UiLink) {
-    val on by PointerTrackpad.enabled.collectAsState()
+    val mode by PointerTrackpad.mode.collectAsState()
     val pointer = (link as? dev.pepotech.pepomote.service.UiLink.Connected)?.mode == dev.pepotech.pepomote.service.LinkState.MODE_POINTER
-    if (on && pointer) PointerTrackpadLayer(Modifier.matchParentSize())
-}
-
-/** «Trackpad»: mover el ratón con el dedo, sí o no. */
-@Composable
-internal fun PointerTrackpadChip(on: Boolean, onChange: (Boolean) -> Unit) {
-    ModeChip(stringResource(R.string.pointer_trackpad_chip), selected = on, toggle = true, compact = true) {
-        onChange(!on)
+    if (mode != PointerTrackpad.OFF && pointer) {
+        DisposableEffect(mode) {
+            PointerTrackpad.mixGyro = mode == PointerTrackpad.BOTH
+            onDispose { PointerTrackpad.mixGyro = false }
+        }
+        PointerTrackpadLayer(Modifier.matchParentSize())
     }
 }
 
-/** Ajustes del ratón con el dedo: interruptor, sensibilidad e inercia. */
+private val POINTER_MODES = listOf(
+    Triple(PointerTrackpad.OFF, R.string.pointer_mode_aim, R.string.pointer_mode_aim_desc),
+    Triple(PointerTrackpad.ON, R.string.pointer_mode_touch, R.string.pointer_mode_touch_desc),
+    Triple(PointerTrackpad.BOTH, R.string.pointer_mode_both, R.string.pointer_mode_both_desc)
+)
+
+@Composable
+private fun PointerModeIcon(mode: Int, tint: androidx.compose.ui.graphics.Color, size: Dp) {
+    when (mode) {
+        PointerTrackpad.OFF -> Ico(R.drawable.ms_my_location, tint, size)
+        PointerTrackpad.ON -> Ico(R.drawable.ms_touchpad_mouse, tint, size)
+        else -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Ico(R.drawable.ms_my_location, tint, size * 0.72f)
+            Ico(R.drawable.ms_touchpad_mouse, tint, size * 0.72f)
+        }
+    }
+}
+
+/**
+ * Selector de tres posiciones del modo puntero: apuntar con el móvil, solo
+ * el dedo, o los dos a la vez. Iconos para no ocupar; mantener pulsado
+ * cualquiera explica lo que hace.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+internal fun PointerModeSwitch(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val view = LocalView.current
+    val mode by PointerTrackpad.mode.collectAsState()
+    var hint by remember { mutableStateOf<Int?>(null) }
+    val pill = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    val seg = androidx.compose.foundation.shape.RoundedCornerShape(13.dp)
+    Box(modifier) {
+        Row(
+            Modifier
+                .background(PepoColors.Card, pill)
+                .border(1.5.dp, PepoColors.CardBorder, pill)
+                .padding(2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            for ((m, label, _) in POINTER_MODES) {
+                val selected = mode == m
+                val name = stringResource(label)
+                Box(
+                    Modifier
+                        .height(32.dp)
+                        .padding(horizontal = 1.dp)
+                        .background(if (selected) PepoColors.Blue else androidx.compose.ui.graphics.Color.Transparent, seg)
+                        .combinedClickable(
+                            onClickLabel = name,
+                            onLongClick = {
+                                Haptics.tap(view, HapticFeedbackConstants.LONG_PRESS)
+                                hint = m
+                            }
+                        ) {
+                            Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
+                            PointerTrackpad.setMode(context, m)
+                        }
+                        .semantics {
+                            contentDescription = name
+                            this.selected = selected
+                        }
+                        .padding(horizontal = 9.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    PointerModeIcon(m, if (selected) PepoColors.OnAccent else PepoColors.TextDim, 20.dp)
+                }
+            }
+        }
+        hint?.let { h ->
+            val (_, label, desc) = POINTER_MODES[h]
+            androidx.compose.runtime.LaunchedEffect(h) {
+                kotlinx.coroutines.delay(4000)
+                hint = null
+            }
+            androidx.compose.ui.window.Popup(
+                alignment = Alignment.TopEnd,
+                offset = androidx.compose.ui.unit.IntOffset(0, 110),
+                onDismissRequest = { hint = null }
+            ) {
+                Column(
+                    Modifier
+                        .padding(8.dp)
+                        .widthIn(max = 260.dp)
+                        .shadow(6.dp, androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                        .background(PepoColors.Card, androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                        .padding(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        PointerModeIcon(h, PepoColors.Blue, 18.dp)
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(label), style = MaterialTheme.typography.titleMedium)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(stringResource(desc), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
+}
+
+/** Candado de orientación y, en modo puntero, el selector del trackpad (arriba a la derecha). */
+@Composable
+internal fun PointerQuickControls(link: dev.pepotech.pepomote.service.UiLink, modifier: Modifier = Modifier) {
+    val pointer = (link as? dev.pepotech.pepomote.service.UiLink.Connected)?.mode == dev.pepotech.pepomote.service.LinkState.MODE_POINTER
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (pointer) PointerModeSwitch()
+        dev.pepotech.pepomote.ui.components.OrientationLockButton()
+    }
+}
+
+/** Ajustes del ratón con el dedo: modo, sensibilidad e inercia. */
 @Composable
 internal fun PointerTrackpadSettings() {
     val context = LocalContext.current
-    val on by PointerTrackpad.enabled.collectAsState()
+    val mode by PointerTrackpad.mode.collectAsState()
     var sens by remember { mutableStateOf(AppPrefs.pointerTrackpadSens(context)) }
     var inertia by remember { mutableStateOf(AppPrefs.pointerTrackpadInertia(context)) }
     SectionTitle(stringResource(R.string.pointer_trackpad_title), stringResource(R.string.pointer_trackpad_sub))
-    SwitchRow(stringResource(R.string.pointer_trackpad_enable), on) { PointerTrackpad.setEnabled(context, it) }
-    if (on) {
+    ChipFlow {
+        for ((m, label, _) in POINTER_MODES) {
+            ModeChip(stringResource(label), selected = mode == m, dense = true) { PointerTrackpad.setMode(context, m) }
+        }
+    }
+    Text(stringResource(POINTER_MODES[mode].third), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
+    if (mode != PointerTrackpad.OFF) {
         LabeledSlider(
             stringResource(R.string.ed_sensitivity), sens, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
             "%.2fx".format(sens), log = true
@@ -538,8 +658,23 @@ internal fun MousePad(
                     var travel = 0f
                     var fingers = 1
                     var scrollAcc = 0f
-                    do {
-                        val ev = awaitPointerEvent()
+                    // Mantener quieto un momento = agarrar (botón izquierdo
+                    // pulsado mientras se mueve: arrastrar pestañas, ventanas…)
+                    var dragging = false
+                    while (true) {
+                        val canGrab = mouseNow && !dragging && fingers == 1 && travel < GRAB_SLOP_DP
+                        val left = GRAB_MS - (android.os.SystemClock.uptimeMillis() - t0)
+                        val ev = if (canGrab) {
+                            if (left <= 0) null else withTimeoutOrNull(left) { awaitPointerEvent() }
+                        } else {
+                            awaitPointerEvent()
+                        }
+                        if (ev == null) {
+                            dragging = true
+                            Haptics.tap(view, HapticFeedbackConstants.LONG_PRESS)
+                            Kbm.button(0, true)
+                            continue
+                        }
                         val pressed = ev.changes.filter { it.pressed }
                         fingers = maxOf(fingers, pressed.size)
                         if (pressed.size >= 2) {
@@ -565,13 +700,22 @@ internal fun MousePad(
                             lastMove[0] = android.os.SystemClock.uptimeMillis()
                         }
                         ev.changes.forEach { it.consume() }
-                    } while (ev.changes.any { it.pressed })
+                        if (ev.changes.none { it.pressed }) break
+                    }
                     isDown = false
                     touching = false
                     val dur = android.os.SystemClock.uptimeMillis() - t0
-                    // Toque corto sin moverse: clic (dos dedos = derecho)
-                    if (mouseNow && dur < 260 && travel < 10f) {
-                        val btn = if (fingers >= 2) 1 else 0
+                    if (dragging) {
+                        Kbm.button(0, false)
+                        Haptics.release(view)
+                    } else if (mouseNow && dur < 260 && travel < 10f) {
+                        // Toque corto sin moverse: clic (dos dedos = derecho,
+                        // tres = central). Dos toques seguidos = doble clic
+                        val btn = when {
+                            fingers >= 3 -> 2
+                            fingers == 2 -> 1
+                            else -> 0
+                        }
                         Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
                         scope.launch {
                             Kbm.button(btn, true)
@@ -603,6 +747,12 @@ internal fun MousePad(
         }
     }
 }
+
+/** Mantener el dedo quieto este tiempo en el touchpad agarra (botón izquierdo pulsado). */
+private const val GRAB_MS = 380L
+
+/** Lo que puede moverse el dedo (dp) y seguir contando como «quieto» para agarrar. */
+private const val GRAB_SLOP_DP = 6f
 
 /** Un botón redondo con icono y rótulo (clics, teclado, mando/ratón). */
 @Composable

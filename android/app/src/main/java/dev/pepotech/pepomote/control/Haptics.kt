@@ -42,23 +42,32 @@ object Haptics {
     internal var emitted = 0
 
     fun tap(view: View?, constant: Int) {
-        if (GameRumble.isOn || view == null) return
+        if (view == null) return Diag.hapticSkipped("sin vista")
+        if (GameRumble.isOn) return Diag.hapticSkipped("vibra el juego")
         val level = AppPrefs.hapticLevel(view.context)
-        if (level == OFF) return
+        if (level == OFF) return Diag.hapticSkipped("apagada en Ajustes")
         emitted++
         // Modo compatible: la vibración táctil del sistema, la de toda la vida
         if (AppPrefs.hapticSystem(view.context)) {
-            view.performHapticFeedback(
+            val ok = view.performHapticFeedback(
                 if (level == STRONG && Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else constant,
                 HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
             )
+            if (ok) Diag.hapticDone("sistema") else Diag.hapticSkipped("el sistema la rechazó")
             return
         }
         val tick = constant == HapticFeedbackConstants.CLOCK_TICK
-        if (!play(view.context, level, if (tick) Kind.TICK else Kind.CLICK)) {
-            view.performHapticFeedback(constant)
+        if (play(view.context, level, if (tick) Kind.TICK else Kind.CLICK)) {
+            Diag.hapticDone(lastPath)
+        } else if (view.performHapticFeedback(constant, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING)) {
+            Diag.hapticDone("respaldo del sistema")
+        } else {
+            Diag.hapticSkipped("sin motor o rechazada")
         }
     }
+
+    @Volatile
+    private var lastPath = ""
 
     /** Tic al soltar (solo con Nítida o Fuerte). */
     fun release(view: View?) {
@@ -112,6 +121,11 @@ object Haptics {
             // Como vibración TÁCTIL: con el móvil en silencio o la vibración
             // de notificaciones apagada sigue sonando (manda el ajuste
             // «Respuesta táctil» del sistema)
+            lastPath = when {
+                Build.VERSION.SDK_INT >= 30 && supportsPrimitives(v) -> "primitivas"
+                Build.VERSION.SDK_INT >= 29 -> "efecto predefinido"
+                else -> "pulso"
+            }
             if (Build.VERSION.SDK_INT >= 33) {
                 v.vibrate(e, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH))
             } else {

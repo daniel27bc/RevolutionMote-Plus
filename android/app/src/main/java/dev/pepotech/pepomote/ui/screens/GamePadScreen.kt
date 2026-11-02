@@ -69,6 +69,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -169,6 +170,15 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     var editing by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf<PadProfile?>(null) }
     var draftOldName by remember { mutableStateOf<String?>(null) }
+    // «Deshacer» del editor: estados anteriores del borrador (los 30 últimos)
+    val undo = remember { mutableStateListOf<PadProfile>() }
+    var snap by remember { mutableStateOf(AppPrefs.editorSnap(context)) }
+    val pushUndo: () -> Unit = {
+        draft?.let { d ->
+            if (undo.lastOrNull() != d) undo.add(d)
+            if (undo.size > 30) undo.removeAt(0)
+        }
+    }
     var gearFor by remember { mutableStateOf<String?>(null) }
     var showAdd by remember { mutableStateOf(false) }
     var showProfiles by remember { mutableStateOf(false) }
@@ -352,7 +362,20 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
         }
         PointerTrackpad.sensitivity = 1f
         PointerTrackpad.active = mouseMode && !kbmCapable
+        // Modo ratón con el receptor nuevo: A y B son los clics y no llegan
+        // al mando virtual (antes A pulsaba el botón A del mando de Xbox
+        // del PC, y Windows lo tomaba como su menú)
+        if (mouseMode && kbmCapable) {
+            ButtonState.intercept = { bit, down ->
+                when (bit) {
+                    ButtonState.A -> { Kbm.button(0, down); true }
+                    ButtonState.B -> { Kbm.button(1, down); true }
+                    else -> false
+                }
+            }
+        }
         onDispose {
+            ButtonState.intercept = null
             PointerTrackpad.active = false
             Kbm.backend = Kbm.Backend.NONE
         }
@@ -555,6 +578,9 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                                 editing = editing,
                                 onElementChange = { old, new -> draft = draft?.replace(old, new) },
                                 onGear = { gearFor = it.id },
+                                onGestureStart = pushUndo,
+                                onGestureEnd = { e -> if (snap) draft = draft?.replace(e, snapElement(e)) },
+                                snap = snap,
                                 modifier = Modifier.alpha(if (operative || editing) 1f else 0.4f)
                             )
                         }
@@ -906,15 +932,28 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     onProfiles = { showProfiles = true },
                     onPadSettings = { showPadSettings = true },
                     onOpacity = { draft = d.copy(opacity = it) },
-                    onReset = { draft = factoryProfile(d.name) },
+                    onReset = { pushUndo(); draft = factoryProfile(d.name) },
                     onCancel = {
                         editing = false
                         draft = null
+                        undo.clear()
                     },
                     onSave = {
                         PadProfileStore.save(context, d, draftOldName)
                         editing = false
                         draft = null
+                        undo.clear()
+                    },
+                    canUndo = undo.isNotEmpty(),
+                    onUndo = { if (undo.isNotEmpty()) draft = undo.removeAt(undo.lastIndex) },
+                    snap = snap,
+                    onSnap = {
+                        snap = !snap
+                        AppPrefs.setEditorSnap(context, snap)
+                    },
+                    onMirror = {
+                        pushUndo()
+                        draft = d.copy(elements = d.elements.map { it.copy(x = 1f - it.x) })
                     },
                     modifier = Modifier.align(Alignment.TopCenter)
                 )
@@ -925,11 +964,13 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         profile = d,
                         layout = layout,
                         onChange = { new ->
+                            pushUndo()
                             val fixed = PadProfiles.clampElement(new)
                             draft = d.replace(target, fixed)
                             gearFor = fixed.id
                         },
                         onRemove = {
+                            pushUndo()
                             draft = d.remove(target)
                             gearFor = null
                         },
@@ -942,6 +983,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         layout = layout,
                         onPick = {
                             val el = PadProfiles.newElement(it)
+                            pushUndo()
                             draft = d.add(if (el.kind == ElementKind.KEY) el.copy(key = PadProfiles.freeKey(d)) else el)
                             showAdd = false
                         },

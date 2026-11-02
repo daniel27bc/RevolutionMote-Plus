@@ -10,7 +10,7 @@ import java.security.MessageDigest
 
 class UpdatePayloadTest {
     private val bytes = "verified package".toByteArray()
-    private val asset = UpdateAsset("PepoMote.apk", "", bytes.size.toLong(),
+    private val asset = UpdateAsset("RevolutionMote-Plus.apk", "", bytes.size.toLong(),
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) })
 
     @Test fun copiesOnlyExactSizeAndDigest() {
@@ -33,13 +33,13 @@ class UpdatePayloadTest {
         assertEquals(0, output.size())
     }
     @Test fun redirectsStayOnHttpsGitHubReleaseInfrastructure() {
-        assertTrue(UpdateTransportPolicy.allowed("https://release-assets.githubusercontent.com/a?token=abc", "PepoMote.apk"))
-        assertTrue(UpdateTransportPolicy.allowed("https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.apk", "PepoMote.apk"))
+        assertTrue(UpdateTransportPolicy.allowed("https://release-assets.githubusercontent.com/a?token=abc", "RevolutionMote-Plus.apk"))
+        assertTrue(UpdateTransportPolicy.allowed("https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus.apk", "RevolutionMote-Plus.apk"))
         for (bad in listOf("http://release-assets.githubusercontent.com/a", "https://evil.example/a",
-            "https://github.com/evil/repo/releases/download/v1.11.0/PepoMote.apk",
+            "https://github.com/evil/repo/releases/download/v1.11.0/RevolutionMote-Plus.apk",
             "https://user@release-assets.githubusercontent.com/a", "https://release-assets.githubusercontent.com:444/a",
-            "https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/evil.apk")) {
-            assertFalse(bad, UpdateTransportPolicy.allowed(bad, "PepoMote.apk"))
+            "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/evil.apk")) {
+            assertFalse(bad, UpdateTransportPolicy.allowed(bad, "RevolutionMote-Plus.apk"))
         }
     }
 }

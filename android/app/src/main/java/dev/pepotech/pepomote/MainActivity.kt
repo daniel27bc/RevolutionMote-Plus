@@ -29,6 +29,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.displayCutoutPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
@@ -37,7 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.pepotech.pepomote.ui.components.OrientationLockButton
 import dev.pepotech.pepomote.ui.screens.KbmScreen
-import dev.pepotech.pepomote.ui.screens.PointerTrackpadChip
+import dev.pepotech.pepomote.ui.screens.PointerQuickControls
 import dev.pepotech.pepomote.control.PointerTrackpad
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.LaunchedEffect
@@ -109,7 +112,7 @@ import dev.pepotech.pepomote.ui.components.UpdateHost
  * layouts Wii o Nunchuk) la decide [Route] a partir del enlace y de la
  * intención pendiente del usuario.
  */
-internal enum class Screen { Onboarding, Home, Pair, Controller, Nunchuk, Settings, Server, Kbm }
+internal enum class Screen { Onboarding, Home, Pair, Controller, Nunchuk, Settings, Server, Kbm, Diag }
 
 class MainActivity : ComponentActivity() {
 
@@ -289,6 +292,7 @@ class MainActivity : ComponentActivity() {
         PadProfileStore.load(this)
         PointerTrackpad.loadEnabled(this)
         dev.pepotech.pepomote.ui.theme.ThemeMode.load(this)
+        dev.pepotech.pepomote.ui.theme.AccentColor.load(this)
         OrientationLock.load(this)
         UpdateNotice.refresh(this)
         lifecycleScope.launch {
@@ -526,7 +530,7 @@ private fun Root(activity: MainActivity) {
         enabled = activity.currentScreen != Screen.Home &&
             activity.currentScreen != Screen.Onboarding
     ) {
-        activity.currentScreen = Screen.Home
+        activity.currentScreen = if (activity.currentScreen == Screen.Diag) Screen.Settings else Screen.Home
     }
 
     // Sin petición de permiso de notificaciones: el servicio funciona igual
@@ -690,8 +694,11 @@ private fun Root(activity: MainActivity) {
                 LinkState.pendingMode = null
                 activity.openPair()
             },
-            onBack = { activity.currentScreen = Screen.Home }
+            onBack = { activity.currentScreen = Screen.Home },
+            onDiag = { activity.currentScreen = Screen.Diag }
         )
+
+        Screen.Diag -> dev.pepotech.pepomote.ui.screens.DiagScreen(onBack = { activity.currentScreen = Screen.Settings })
 
         Screen.Nunchuk -> {
             NunchukScreen(
@@ -709,7 +716,11 @@ private fun Root(activity: MainActivity) {
     }
 }
 
-private fun screenDepth(s: Screen): Int = if (s == Screen.Home || s == Screen.Onboarding) 0 else 1
+private fun screenDepth(s: Screen): Int = when (s) {
+    Screen.Home, Screen.Onboarding -> 0
+    Screen.Diag -> 2
+    else -> 1
+}
 
 private fun screenTransition(from: Screen, to: Screen): ContentTransform {
     val forward = screenDepth(to) >= screenDepth(from)
@@ -748,8 +759,6 @@ private fun ControllerRoute(activity: MainActivity, link: UiLink) {
             }
             // Modo puntero: el ratón con el dedo en vez de apuntando con el
             // móvil (capa debajo de todo: solo coge los huecos sin botones)
-            val pointerMode = (link as? UiLink.Connected)?.mode == LinkState.MODE_POINTER
-            val pointerPad by PointerTrackpad.enabled.collectAsState()
             val landscape =
                 LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
             // Selector Puntero/Dolphin/Wii U: entrando por Conectar/Mando/Wii U
@@ -767,18 +776,18 @@ private fun ControllerRoute(activity: MainActivity, link: UiLink) {
             } else {
                 ControllerScreen(link = link, showChips = showChips, onDisconnect = onDisconnect)
             }
-            // Candado de orientación (que el mando no gire solo al inclinarlo)
-            // y, en modo puntero, el trackpad sí/no
-            Row(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .navigationBarsPadding(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OrientationLockButton()
-                if (pointerMode) {
-                    PointerTrackpadChip(pointerPad) { PointerTrackpad.setEnabled(context, it) }
-                }
+            // Candado de orientación y selector del trackpad del puntero: en
+            // vertical van en la cabecera; apaisado, arriba a la derecha (la
+            // cabecera plegable va centrada)
+            if (landscape) {
+                PointerQuickControls(
+                    link,
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .displayCutoutPadding()
+                        .padding(top = 4.dp, end = 4.dp)
+                )
             }
         }
     }

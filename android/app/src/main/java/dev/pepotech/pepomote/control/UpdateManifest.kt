@@ -65,7 +65,7 @@ data class UpdateManifest(
                 }
                 val apk = root.getJSONObject("assets").getJSONObject("android-universal")
                 val name = apk.strictString("name")
-                require(name == "PepoMote.apk") { "Invalid APK name" }
+                require(name == UpdateCheck.APK_NAME) { "Invalid APK name" }
                 val url = apk.strictString("url")
                 require(url == "https://github.com/${UpdateCheck.REPO}/releases/download/v$version/$name") { "Invalid APK URL" }
                 val sizeValue = apk.get("size")

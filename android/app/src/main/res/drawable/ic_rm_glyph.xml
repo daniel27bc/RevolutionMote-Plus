@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Logo de RevolutionMote+ en blanco: notificación y tile de Ajustes rápidos -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp" android:height="23.4dp"
+    android:viewportWidth="314" android:viewportHeight="306">
+  <path android:fillColor="#FFFFFF" android:fillType="evenOdd" android:pathData="M107 59L167 59A8 8 0 0 1 175 67L175 96L222 96A28 28 0 0 1 250 124L250 214C250 242 248 254 262 254.8C271 255.5 274 262 274 274L274 288A18 18 0 0 1 256 306L18 306A18 18 0 0 1 0 288L0 274C0 262 3 255.5 12 254.8C26 254 24 242 24 214L24 124A28 28 0 0 1 52 96L99 96L99 67A8 8 0 0 1 107 59ZM44.5 137A15 15 0 0 1 74.5 137A15 15 0 0 1 44.5 137ZM199.5 137A15 15 0 0 1 229.5 137A15 15 0 0 1 199.5 137ZM114 150L160 150A8 8 0 0 1 168 158L168 178A2 2 0 0 1 166 180L108 180A2 2 0 0 1 106 178L106 158A8 8 0 0 1 114 150ZM108 184L166 184A2 2 0 0 1 168 186L168 208A8 8 0 0 1 160 216L114 216A8 8 0 0 1 106 208L106 186A2 2 0 0 1 108 184Z"/>
+  <path android:fillColor="#FFFFFF" android:pathData="M265 0L279 0A7 7 0 0 1 286 7L286 28L307 28A7 7 0 0 1 314 35L314 49A7 7 0 0 1 307 56L286 56L286 77A7 7 0 0 1 279 84L265 84A7 7 0 0 1 258 77L258 56L237 56A7 7 0 0 1 230 49L230 35A7 7 0 0 1 237 28L258 28L258 7A7 7 0 0 1 265 0Z"/>
+</vector>

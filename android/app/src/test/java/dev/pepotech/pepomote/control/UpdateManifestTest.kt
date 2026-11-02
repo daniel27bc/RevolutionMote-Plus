@@ -8,8 +8,8 @@ class UpdateManifestTest {
     private fun manifest() = JSONObject("""{
       "schema":1,"version":"1.11.0","published_at":"2026-09-19T12:00:00Z",
       "notes":{"es":["Mejor conexión"],"en":["Better connection"]},
-      "release_url":"https://github.com/pepitolas13/PepoMote/releases/tag/v1.11.0",
-      "assets":{"android-universal":{"name":"PepoMote.apk","url":"https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.apk","size":1234,"sha256":"${"a".repeat(64)}"}}
+      "release_url":"https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/v1.11.0",
+      "assets":{"android-universal":{"name":"RevolutionMote-Plus.apk","url":"https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus.apk","size":1234,"sha256":"${"a".repeat(64)}"}}
     }""")
     private fun rejects(edit: (JSONObject) -> Unit) {
         val json = manifest().apply(edit)
@@ -23,10 +23,10 @@ class UpdateManifestTest {
         assertEquals(1234L, release.asset.size)
     }
     @Test fun rejectsWrongRepositoryTagAssetAndNonHttps() {
-        for (bad in listOf("http://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.apk",
-            "https://github.com/evil/PepoMote/releases/download/v1.11.0/PepoMote.apk",
-            "https://github.com/pepitolas13/PepoMote/releases/download/v1.10.0/PepoMote.apk",
-            "https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.apk?x=1")) {
+        for (bad in listOf("http://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus.apk",
+            "https://github.com/evil/PepoMote/releases/download/v1.11.0/RevolutionMote-Plus.apk",
+            "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.10.0/RevolutionMote-Plus.apk",
+            "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus.apk?x=1")) {
             rejects { it.getJSONObject("assets").getJSONObject("android-universal").put("url", bad) }
         }
         rejects { it.put("release_url", "https://example.com/v1.11.0") }

@@ -206,7 +206,7 @@ open class ServerForegroundService : Service() {
             Intent(this, ServerForegroundService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_pepomote_glyph).setContentTitle(getString(R.string.server_notification_title))
+            .setSmallIcon(R.drawable.ic_rm_glyph).setContentTitle(getString(R.string.server_notification_title))
             .setContentText(getString(if (retroArch) R.string.server_notification_retroarch else R.string.server_notification_body))
             .setContentIntent(open)
             .setOngoing(true).setOnlyAlertOnce(true).setCategory(NotificationCompat.CATEGORY_SERVICE)
