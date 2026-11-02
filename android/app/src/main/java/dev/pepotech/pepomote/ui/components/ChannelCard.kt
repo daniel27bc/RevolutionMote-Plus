@@ -42,8 +42,19 @@ fun ChannelCard(
     wide: Boolean = false,
     /** Icono de Material Symbols en vez del glifo dibujado (el engranaje de Ajustes). */
     icon: Int? = null,
+    /**
+     * Logo propio del programa, si lo has puesto tú en `res/drawable` con
+     * este nombre (p. ej. `logo_dolphin.xml` o `.png`). Si no está, se usa
+     * el glifo dibujado.
+     */
+    logoName: String? = null,
     onClick: () -> Unit = {}
 ) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    @Suppress("DiscouragedApi")
+    val logo = androidx.compose.runtime.remember(logoName) {
+        logoName?.let { ctx.resources.getIdentifier(it, "drawable", ctx.packageName) }?.takeIf { it != 0 }
+    }
     val ink = PepoColors.Text
     val card = PepoColors.Card
     val land = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
@@ -80,7 +91,12 @@ fun ChannelCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                if (icon != null) {
+                if (logo != null) {
+                    androidx.compose.foundation.Image(
+                        androidx.compose.ui.res.painterResource(logo), null,
+                        Modifier.size(glyphSize).padding(bottom = 4.dp)
+                    )
+                } else if (icon != null) {
                     Ico(icon, accent, glyphSize, Modifier.padding(bottom = 4.dp))
                 } else {
                     Canvas(modifier = Modifier.size(glyphSize).padding(bottom = 4.dp)) {

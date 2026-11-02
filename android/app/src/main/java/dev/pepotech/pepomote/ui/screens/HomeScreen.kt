@@ -165,6 +165,7 @@ fun HomeScreen(
                     title = stringResource(R.string.channel_dolphin),
                     subtitle = stringResource(R.string.channel_dolphin_sub),
                     glyph = ChannelGlyph.Dolphin,
+                    logoName = "logo_dolphin",
                     accent = Color(0xFF1E88E5),
                     onClick = onDolphin
                 )
@@ -194,6 +195,7 @@ fun HomeScreen(
                     title = stringResource(R.string.channel_retroarch),
                     subtitle = stringResource(if (androidReceiver) R.string.channel_retroarch_android_sub else R.string.channel_retroarch_sub),
                     glyph = ChannelGlyph.Invader,
+                    logoName = "logo_retroarch",
                     accent = Color(0xFF8E5BE8),
                     onClick = onRetroArch
                 )
