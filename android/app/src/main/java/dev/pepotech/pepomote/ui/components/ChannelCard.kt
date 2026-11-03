@@ -289,12 +289,12 @@ private fun DrawScope.drawKbmGlyph(c: Color, hole: Color) {
     for (r in listOf(0.2f, 0.13f, 0.065f)) {
         drawArc(
             c, 225f, 90f, false,
-            topLeft = o(w * 0.37f - w * r, h * 0.3f - w * r), size = sz(w * r * 2, w * r * 2),
+            topLeft = o(w * 0.37f - w * r, h * 0.37f - w * r), size = sz(w * r * 2, w * r * 2),
             style = Stroke(w * 0.04f, cap = StrokeCap.Round)
         )
     }
     // Teclado
-    val top = h * 0.4f
+    val top = h * 0.47f
     val kw = w * 0.7f
     val kh = h * 0.32f
     drawRoundRect(c, o(w * 0.02f, top), sz(kw, kh), cr(w * 0.035f))
