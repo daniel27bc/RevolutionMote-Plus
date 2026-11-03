@@ -122,6 +122,85 @@ internal fun LookSurface(look: LookConfig, modifier: Modifier = Modifier) {
 }
 
 /**
+ * Cámara también desde los botones: con la cámara en el espacio libre, un
+ * dedo que pulsa un botón (saltar, por ejemplo) y luego se desliza sigue
+ * girando la cámara, como en los juegos de móvil (girarse en el aire). Mira
+ * los dedos ANTES que los botones y no consume nada: el botón sigue pulsado.
+ * Un dedo es «de botón» si al bajar se ha pulsado un botón nuevo (así los
+ * sticks y la cámara normal no cuentan dos veces).
+ */
+@Composable
+internal fun Modifier.buttonLook(enabled: Boolean, look: LookConfig): Modifier {
+    val cfg by rememberUpdatedState(look)
+    val v = remember { FloatArray(2) }
+    val lastMove = remember { LongArray(1) }
+    val fingers = remember { IntArray(1) }
+    var running by remember { mutableStateOf(false) }
+    DisposableEffect(enabled) { onDispose { ButtonState.setStick2From(ButtonState.SRC_BUTTON_LOOK, 0, 0) } }
+    androidx.compose.runtime.LaunchedEffect(running) {
+        if (!running) return@LaunchedEffect
+        var last = 0 to 0
+        while (true) {
+            androidx.compose.runtime.withFrameMillis { }
+            if (fingers[0] == 0) {
+                v[0] = 0f; v[1] = 0f
+                ButtonState.setStick2From(ButtonState.SRC_BUTTON_LOOK, 0, 0)
+                running = false
+                break
+            }
+            if (android.os.SystemClock.uptimeMillis() - lastMove[0] > 24L) {
+                v[0] *= 0.45f; v[1] *= 0.45f
+            }
+            val c = cfg
+            val (x, y) = dev.pepotech.pepomote.control.TrackpadEngine.fromVelocity(v[0], v[1], c.sensitivity, c.antiDeadzone)
+            val out = x to (if (c.invertY) -y else y)
+            if (out != last) {
+                last = out
+                ButtonState.setStick2From(ButtonState.SRC_BUTTON_LOOK, out.first, out.second)
+            }
+        }
+    }
+    if (!enabled) return this
+    return this.pointerInput(Unit) {
+        // id → bits pulsados al bajar; null = aún no se sabe si es de botón
+        val start = HashMap<Long, Int>()
+        val buttonFingers = HashSet<Long>()
+        awaitPointerEventScope {
+            while (true) {
+                val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                for (ch in ev.changes) {
+                    val id = ch.id.value
+                    if (ch.pressed && !ch.previousPressed) {
+                        val inZone = cfg.zone == LookZone.ALL || (cfg.zone == LookZone.RIGHT && ch.position.x > size.width / 2f)
+                        if (inZone) start[id] = ButtonState.current()
+                        continue
+                    }
+                    if (!ch.pressed) {
+                        start.remove(id)
+                        if (buttonFingers.remove(id)) fingers[0] = buttonFingers.size
+                        continue
+                    }
+                    // Primer movimiento: ¿pulsó un botón nuevo al bajar?
+                    val before = start.remove(id)
+                    if (before != null && ButtonState.current() and before.inv() != 0) {
+                        buttonFingers += id
+                        fingers[0] = buttonFingers.size
+                        running = true
+                    }
+                    if (id in buttonFingers) {
+                        val d = ch.positionChangeIgnoreConsumed()
+                        val dt = (ch.uptimeMillis - ch.previousUptimeMillis).coerceAtLeast(1L)
+                        v[0] += (d.x / density / dt - v[0]) * 0.55f
+                        v[1] += (d.y / density / dt - v[1]) * 0.55f
+                        lastMove[0] = android.os.SystemClock.uptimeMillis()
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
  * Trackpad de ratón (modo puntero): una superficie invisible debajo de los
  * controles; el dedo en un hueco mueve el cursor del PC ([PointerTrackpad]).
  * Mientras está puesta, mover el móvil no mueve el cursor.
@@ -605,8 +684,8 @@ internal fun GyroSettingsSection(gyro: GyroConfig, onChange: (GyroConfig) -> Uni
         Spacer(Modifier.height(4.dp))
         Text(stringResource(R.string.gyro_button_note), style = MaterialTheme.typography.bodySmall, color = PepoColors.Warn)
     }
-    Spacer(Modifier.height(6.dp))
-    Text(stringResource(R.string.gyro_landscape), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 6.dp))
+    GroupTitle(stringResource(R.string.gyro_group_sens))
+    Text(stringResource(R.string.gyro_landscape), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 2.dp))
     LabeledSlider(
         stringResource(R.string.gyro_sens_x), gyro.sensX, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
         "%.2fx".format(gyro.sensX), log = true
@@ -615,7 +694,7 @@ internal fun GyroSettingsSection(gyro: GyroConfig, onChange: (GyroConfig) -> Uni
         stringResource(R.string.gyro_sens_y), gyro.sensY, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
         "%.2fx".format(gyro.sensY), log = true
     ) { onChange(gyro.copy(sensY = it)) }
-    Text(stringResource(R.string.gyro_portrait), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 6.dp))
+    Text(stringResource(R.string.gyro_portrait), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
     LabeledSlider(
         stringResource(R.string.gyro_sens_x), gyro.sensXPortrait, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
         "%.2fx".format(gyro.sensXPortrait), log = true
@@ -624,6 +703,7 @@ internal fun GyroSettingsSection(gyro: GyroConfig, onChange: (GyroConfig) -> Uni
         stringResource(R.string.gyro_sens_y), gyro.sensYPortrait, PadProfiles.MIN_SENS..PadProfiles.MAX_SENS,
         "%.2fx".format(gyro.sensYPortrait), log = true
     ) { onChange(gyro.copy(sensYPortrait = it)) }
+    GroupTitle(stringResource(R.string.gyro_group_feel))
     LabeledSlider(
         stringResource(R.string.anti_deadzone_title), gyro.antiDeadzone, 0f..0.9f,
         "${(gyro.antiDeadzone * 100).roundToInt()}%",
@@ -634,10 +714,52 @@ internal fun GyroSettingsSection(gyro: GyroConfig, onChange: (GyroConfig) -> Uni
         "${(gyro.smoothing * 100).roundToInt()}%",
         stringResource(R.string.gyro_smoothing_sub)
     ) { onChange(gyro.copy(smoothing = it)) }
+    GroupTitle(stringResource(R.string.gyro_group_axes))
     SwitchRow(stringResource(R.string.invert_x), gyro.invertX) { onChange(gyro.copy(invertX = it)) }
     SwitchRow(stringResource(R.string.invert_y), gyro.invertY) { onChange(gyro.copy(invertY = it)) }
     SwitchRow(stringResource(R.string.gyro_swap), gyro.swapAxes, stringResource(R.string.gyro_swap_sub)) {
         onChange(gyro.copy(swapAxes = it))
+    }
+}
+
+/** Subtítulo de un grupo dentro de una sección (Sensibilidad, Respuesta, Ejes…). */
+@Composable
+internal fun GroupTitle(text: String) {
+    Text(
+        text.uppercase(),
+        style = MaterialTheme.typography.labelMedium.copy(color = PepoColors.Blue, fontWeight = FontWeight.Bold),
+        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
+    )
+}
+
+/**
+ * Precisión: cuánto frena y qué botón del mando la activa mientras se
+ * mantiene (L3 para «aguantar la respiración», por ejemplo). El botón sigue
+ * llegando al juego. También existe el botón «Precisión» para el diseño.
+ */
+@Composable
+internal fun PrecisionSettingsSection(gyro: GyroConfig, onChange: (GyroConfig) -> Unit) {
+    SectionTitle(stringResource(R.string.precision_title), stringResource(R.string.precision_sub))
+    LabeledSlider(
+        stringResource(R.string.precision_amount), gyro.precisionAmount, 0.1f..0.9f,
+        "${(gyro.precisionAmount * 100).roundToInt()}%",
+        stringResource(R.string.precision_amount_sub)
+    ) { onChange(gyro.copy(precisionAmount = it)) }
+    Text(stringResource(R.string.precision_bind), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
+    Text(stringResource(R.string.precision_bind_sub), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
+    Spacer(Modifier.height(6.dp))
+    ChipFlow {
+        for ((bit, label) in listOf(
+            0 to stringResource(R.string.precision_none),
+            ButtonState.STICK_L to "L3",
+            ButtonState.STICK_R to "R3",
+            ButtonState.L to "LB",
+            ButtonState.R to "RB",
+            ButtonState.ZL to "LT",
+            ButtonState.ZR to "RT"
+        )) {
+            ModeChip(label, selected = gyro.precisionBit == bit, dense = true) { onChange(gyro.copy(precisionBit = bit)) }
+        }
     }
 }
 
@@ -667,19 +789,26 @@ internal fun PadSettingsDialog(
     mouse: MouseConfig? = null,
     onMouse: (MouseConfig) -> Unit = {}
 ) {
+    // Una pestaña por tema en vez de una lista larguísima
+    val tabs = buildList {
+        add(0 to R.string.pad_tab_camera)
+        if (showGyro) add(1 to R.string.pad_tab_gyro)
+        if (showGyro) add(2 to R.string.pad_tab_precision)
+        if (mouse != null) add(3 to R.string.pad_tab_mouse)
+    }
+    var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
     EditorDialog(onDismiss) {
-        LookSettingsSection(look, onLook)
-        if (showGyro) {
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = PepoColors.CardBorder)
-            Spacer(Modifier.height(12.dp))
-            GyroSettingsSection(gyro, onGyro)
+        Text(stringResource(R.string.ed_pad_settings), style = MaterialTheme.typography.headlineSmall)
+        Spacer(Modifier.height(8.dp))
+        ChipFlow {
+            for ((id, label) in tabs) ModeChip(stringResource(label), selected = tab == id, dense = true) { tab = id }
         }
-        if (mouse != null) {
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = PepoColors.CardBorder)
-            Spacer(Modifier.height(12.dp))
-            MouseSettingsSection(mouse, onMouse)
+        Spacer(Modifier.height(12.dp))
+        when (tab) {
+            1 -> GyroSettingsSection(gyro, onGyro)
+            2 -> PrecisionSettingsSection(gyro, onGyro)
+            3 -> if (mouse != null) MouseSettingsSection(mouse, onMouse)
+            else -> LookSettingsSection(look, onLook)
         }
         Spacer(Modifier.height(10.dp))
         TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {

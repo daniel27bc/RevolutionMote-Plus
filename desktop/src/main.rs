@@ -227,7 +227,7 @@ fn main() {
     let viewport = egui::ViewportBuilder::default()
         .with_inner_size([460.0, 640.0])
         .with_min_inner_size([360.0, 480.0])
-        .with_title("PepoMote")
+        .with_title("RevolutionMote+ · Receptor")
         // app_id (Wayland) / WM_CLASS (X11): así el compositor casa la
         // ventana con PepoMote.desktop (icono, agrupación, reglas)
         .with_app_id("PepoMote")

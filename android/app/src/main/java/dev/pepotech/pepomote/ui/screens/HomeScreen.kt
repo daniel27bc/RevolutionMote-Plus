@@ -125,8 +125,8 @@ fun HomeScreen(
         // Tres filas de pares: Conectar | Mando, Dolphin | Wii U, Nunchuk | Ajustes
         // En vertical, dos columnas; apaisado (o tablet) caben más y las
         // tarjetas no se estiran hasta ser cajas enormes
-        // El mando y el Nunchuk de Wii: blancos en el tema claro, negros en el oscuro
-        val wiiBody = if (dev.pepotech.pepomote.ui.theme.LocalPepoColors.current.isDark) Color(0xFF1B1E21) else Color.White
+        // Siluetas en negro con el tema claro y en blanco con el oscuro (el negativo)
+        val wiiBody = if (dev.pepotech.pepomote.ui.theme.LocalPepoColors.current.isDark) Color.White else Color(0xFF1B1E21)
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 168.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -156,6 +156,7 @@ fun HomeScreen(
                     title = stringResource(R.string.channel_controller),
                     subtitle = stringResource(R.string.channel_controller_sub),
                     glyph = ChannelGlyph.Wiimote,
+                    mask = R.drawable.icon_wiimote,
                     accent = wiiBody,
                     onClick = onController
                 )
@@ -175,7 +176,7 @@ fun HomeScreen(
                 ChannelCard(
                     title = stringResource(R.string.channel_wiiu),
                     subtitle = stringResource(R.string.channel_wiiu_sub),
-                    glyph = ChannelGlyph.GamePad,
+                    glyph = ChannelGlyph.WiiU,
                     accent = Color(0xFF009AC7),
                     onClick = onWiiU
                 )
@@ -185,6 +186,7 @@ fun HomeScreen(
                     title = stringResource(if (androidReceiver) R.string.mode_eden else R.string.channel_switch),
                     subtitle = stringResource(R.string.channel_switch_sub),
                     glyph = ChannelGlyph.Switch,
+                    image = R.drawable.logo_switch,
                     accent = PepoColors.Error,
                     onClick = onSwitch
                 )
@@ -217,7 +219,7 @@ fun HomeScreen(
                 ChannelCard(
                     title = stringResource(R.string.channel_kbm),
                     subtitle = stringResource(R.string.channel_kbm_sub),
-                    glyph = ChannelGlyph.Keyboard,
+                    glyph = ChannelGlyph.Kbm,
                     accent = Color(0xFFF2B705),
                     onClick = onKbm
                 )
@@ -228,6 +230,7 @@ fun HomeScreen(
                     title = stringResource(R.string.channel_nunchuk),
                     subtitle = stringResource(R.string.channel_nunchuk_sub),
                     glyph = ChannelGlyph.Nunchuk,
+                    mask = R.drawable.icon_nunchuk,
                     accent = wiiBody,
                     onClick = onNunchuk
                 )

@@ -7,7 +7,7 @@
     <string name="home_subtitle">Your phone, a controller for your PC or Android</string>
     <string name="channel_connect">Connect</string>
     <string name="channel_connect_sub">QR and nearby devices</string>
-    <string name="channel_controller">Wii Remote</string>
+    <string name="channel_controller">WiiMote Pointer</string>
     <string name="channel_controller_sub">Pointer and buttons</string>
     <string name="channel_dolphin">Dolphin</string>
     <string name="channel_dolphin_sub">Play real Wii games</string>
@@ -27,7 +27,7 @@
     <string name="lang_switch_to">Switch to %1$s</string>
 
     <!-- launcher shortcuts -->
-    <string name="shortcut_pointer">Pointer</string>
+    <string name="shortcut_pointer">WiiMote Pointer</string>
     <string name="shortcut_pointer_long">Controller with pointer</string>
     <string name="shortcut_dolphin">Dolphin</string>
     <string name="shortcut_dolphin_long">Wii Remote for Dolphin</string>
@@ -185,8 +185,8 @@
     <string name="wiiu_as_wiimote">Wii U · Wii Remote</string>
     <string name="mode_wiiu">Wii U</string>
     <string name="mode_dolphin">Dolphin</string>
-    <string name="mode_pointer">Pointer</string>
-    <string name="pointer_player1_points">Pointer: Player 1 points</string>
+    <string name="mode_pointer">WiiMote Pointer</string>
+    <string name="pointer_player1_points">WiiMote Pointer: Player 1 points</string>
     <string name="reconnect">Reconnect</string>
     <string name="exit">Exit</string>
     <string name="keyboard">Keyboard</string>
@@ -724,7 +724,7 @@
     <string name="settings_sec_app">Connection and app</string>
     <string name="hint_ok">Got it</string>
     <string name="hint_pad_mouse">Mouse mode: A is left click and B right click (hold them and slide to drag). In empty areas and on the touchpad: tap = click, double tap = double click, double tap and hold = grab, two fingers = right click and scroll.</string>
-    <string name="hint_editor">Drag to move and pinch to resize. Snap lines controls up; Undo reverts the last change and Mirror makes it left-handed.</string>
+    <string name="hint_editor">Drag to move and pinch to resize. With snap on, controls line up with each other (you will see a line) and with the grid; Undo reverts the last change.</string>
     <string name="hint_pointer_modes">Top right you choose how the cursor moves: by pointing, with your finger or both. Hold an icon to see what it does.</string>
     <string name="settings_sec_appearance_sub">Theme, accent colour and sounds</string>
     <string name="settings_sec_controls_sub">Sticks, camera, gyro, volume buttons and layouts</string>
@@ -772,4 +772,18 @@
     <string name="floating_sub">The stick appears wherever you rest your thumb inside its area, no need to look for it (like mobile games). Off, the stick stays fixed.</string>
     <string name="side_menu_title">Controller side</string>
     <string name="side_menu_hint">Flips the landscape controller (left or right). This is the first-time question: change it here whenever you like.</string>
+    <string name="pad_tab_camera">Camera</string>
+    <string name="pad_tab_gyro">Gyro</string>
+    <string name="pad_tab_precision">Precision</string>
+    <string name="pad_tab_mouse">Mouse</string>
+    <string name="gyro_group_sens">Sensitivity</string>
+    <string name="gyro_group_feel">Response</string>
+    <string name="gyro_group_axes">Axes</string>
+    <string name="precision_title">Precision mode</string>
+    <string name="precision_sub">While it is on, the gyro, trackpads and mouse move slower for fine aiming.</string>
+    <string name="precision_amount">Speed with precision</string>
+    <string name="precision_amount_sub">How much of the normal speed is left (35% = almost three times slower)</string>
+    <string name="precision_bind">Activate while holding</string>
+    <string name="precision_bind_sub">A controller button that turns precision on while you hold it (for example L3 to "hold your breath"). The button still reaches the game. You can also add the Precision button to the layout.</string>
+    <string name="precision_none">None</string>
 </resources>

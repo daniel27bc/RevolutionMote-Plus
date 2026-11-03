@@ -219,6 +219,14 @@ class MainActivity : ComponentActivity() {
     internal fun openPad() {
         controllerDolphinOnly = false
         linkRole = LinkState.ROLE_WIIMOTE
+        // «Puntero WiiMote» siempre abre el puntero: antes, si el PC se había
+        // quedado en el mando universal (o en su modo ratón), se abría ese
+        if (LinkState.padMouse.value) LinkState.setPadMouse(false)
+        // (el servidor Android no tiene puntero: ahí se deja el modo que tenga)
+        if (PairStore.load(this)?.platform != ReceiverCapabilities.ANDROID) {
+            if (LinkState.flow.value.alive && !linkIsNunchuk()) LinkState.requestMode(LinkState.MODE_POINTER)
+            else LinkState.pendingMode = LinkState.MODE_POINTER
+        }
         when {
             // Sin emparejar no hay mando que abrir: al escáner
             PairStore.load(this) == null -> openPair()

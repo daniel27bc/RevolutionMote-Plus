@@ -7,7 +7,7 @@
     <string name="home_subtitle">Tu móvil, mando de tu PC u otro Android</string>
     <string name="channel_connect">Conectar</string>
     <string name="channel_connect_sub">QR y dispositivos cercanos</string>
-    <string name="channel_controller">Mando Wii</string>
+    <string name="channel_controller">Puntero WiiMote</string>
     <string name="channel_controller_sub">Puntero y botones</string>
     <string name="channel_dolphin">Dolphin</string>
     <string name="channel_dolphin_sub">Juega a la Wii de verdad</string>
@@ -27,7 +27,7 @@
     <string name="lang_switch_to">Cambiar a %1$s</string>
 
     <!-- accesos directos del icono -->
-    <string name="shortcut_pointer">Puntero</string>
+    <string name="shortcut_pointer">Puntero WiiMote</string>
     <string name="shortcut_pointer_long">Mando con puntero</string>
     <string name="shortcut_dolphin">Dolphin</string>
     <string name="shortcut_dolphin_long">Mando de Wii para Dolphin</string>
@@ -185,8 +185,8 @@
     <string name="wiiu_as_wiimote">Wii U · Mando de Wii</string>
     <string name="mode_wiiu">Wii U</string>
     <string name="mode_dolphin">Dolphin</string>
-    <string name="mode_pointer">Puntero</string>
-    <string name="pointer_player1_points">Puntero: apunta el Jugador 1</string>
+    <string name="mode_pointer">Puntero WiiMote</string>
+    <string name="pointer_player1_points">Puntero WiiMote: apunta el Jugador 1</string>
     <string name="reconnect">Reconectar</string>
     <string name="exit">Salir</string>
     <string name="keyboard">Teclado</string>
@@ -725,7 +725,7 @@
     <string name="turbo_tag" translatable="false">TURBO</string>
     <string name="hint_ok">Entendido</string>
     <string name="hint_pad_mouse">Modo ratón: A es clic izquierdo y B derecho (mantenlos y desliza para arrastrar). En los huecos y en el touchpad: toque = clic, doble toque = doble clic, doble toque y mantener = agarrar, dos dedos = clic derecho y rueda.</string>
-    <string name="hint_editor">Arrastra para mover y pellizca para cambiar el tamaño. Con el imán los controles se alinean; «Deshacer» revierte el último cambio y «Espejo» lo pasa a zurdos.</string>
+    <string name="hint_editor">Arrastra para mover y pellizca para cambiar el tamaño. Con el imán, los controles se alinean entre sí (verás una línea) y con la cuadrícula; «Deshacer» revierte el último cambio.</string>
     <string name="hint_pointer_modes">Arriba a la derecha eliges cómo se mueve el cursor: apuntando, con el dedo o con los dos. Mantén pulsado un icono para ver qué hace.</string>
     <string name="settings_sec_appearance_sub">Tema, color de acento y sonidos</string>
     <string name="settings_sec_controls_sub">Sticks, cámara, giroscopio, botones de volumen y diseños</string>
@@ -773,4 +773,18 @@
     <string name="floating_sub">El stick aparece donde apoyas el pulgar dentro de su zona, sin tener que buscarlo (como en los juegos de móvil). Apagado, el stick queda fijo.</string>
     <string name="side_menu_title">Lado del mando</string>
     <string name="side_menu_hint">Da la vuelta al mando apaisado (izquierda o derecha). Es la pregunta de la primera vez: aquí se cambia cuando quieras.</string>
+    <string name="pad_tab_camera">Cámara</string>
+    <string name="pad_tab_gyro">Giroscopio</string>
+    <string name="pad_tab_precision">Precisión</string>
+    <string name="pad_tab_mouse">Ratón</string>
+    <string name="gyro_group_sens">Sensibilidad</string>
+    <string name="gyro_group_feel">Respuesta</string>
+    <string name="gyro_group_axes">Ejes</string>
+    <string name="precision_title">Modo precisión</string>
+    <string name="precision_sub">Mientras está puesto, el giroscopio, los trackpads y el ratón van más despacio para apuntar fino.</string>
+    <string name="precision_amount">Velocidad con precisión</string>
+    <string name="precision_amount_sub">Lo que queda de la velocidad normal (35 % = casi tres veces más lento)</string>
+    <string name="precision_bind">Activar al mantener</string>
+    <string name="precision_bind_sub">Un botón del mando que, mientras lo mantienes, pone la precisión (por ejemplo L3 para «aguantar la respiración»). El botón sigue llegando al juego. También puedes añadir el botón «Precisión» al diseño.</string>
+    <string name="precision_none">Ninguno</string>
 </resources>

@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import dev.pepotech.pepomote.ui.theme.PepoColors
 
 // Glifos propios, dibujados a mano — nada de iconografía ajena.
-enum class ChannelGlyph { Qr, Pad, Pointer, Stick, GamePad, Switch, Gear, Server, Retro, Keyboard, Wiimote, Nunchuk, Dolphin, Xbox, Invader }
+enum class ChannelGlyph { Qr, Pad, Pointer, Stick, GamePad, Switch, Gear, Server, Retro, Keyboard, Wiimote, Nunchuk, Dolphin, Xbox, Invader, WiiU, Kbm }
 
 /** `wide`: tarjeta apaisada a todo el ancho (glifo a la izquierda, textos al lado). */
 @Composable
@@ -42,6 +42,10 @@ fun ChannelCard(
     wide: Boolean = false,
     /** Icono de Material Symbols en vez del glifo dibujado (el engranaje de Ajustes). */
     icon: Int? = null,
+    /** Imagen a color tal cual (logos) en vez del glifo. */
+    image: Int? = null,
+    /** Silueta de un color: se tiñe con [accent]. */
+    mask: Int? = null,
     /**
      * Logo propio del programa, si lo has puesto tú en `res/drawable` con
      * este nombre (p. ej. `logo_dolphin.xml` o `.png`). Si no está, se usa
@@ -91,10 +95,17 @@ fun ChannelCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                if (logo != null) {
+                val pic = logo ?: image
+                if (pic != null) {
                     androidx.compose.foundation.Image(
-                        androidx.compose.ui.res.painterResource(logo), null,
+                        androidx.compose.ui.res.painterResource(pic), null,
                         Modifier.size(glyphSize).padding(bottom = 4.dp)
+                    )
+                } else if (mask != null) {
+                    androidx.compose.foundation.Image(
+                        androidx.compose.ui.res.painterResource(mask), null,
+                        Modifier.size(glyphSize).padding(bottom = 4.dp),
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(accent)
                     )
                 } else if (icon != null) {
                     Ico(icon, accent, glyphSize, Modifier.padding(bottom = 4.dp))
@@ -123,6 +134,8 @@ private fun DrawScope.drawGlyph(glyph: ChannelGlyph, accent: Color, ink: Color, 
         ChannelGlyph.Dolphin -> drawDolphinGlyph(accent, card)
         ChannelGlyph.Xbox -> drawXboxGlyph(accent, card)
         ChannelGlyph.Invader -> drawInvaderGlyph(accent)
+        ChannelGlyph.WiiU -> drawWiiUGlyph(accent)
+        ChannelGlyph.Kbm -> drawKbmGlyph(accent, card)
         ChannelGlyph.Qr -> drawQrGlyph(accent)
         ChannelGlyph.Pad -> drawPadGlyph(accent)
         ChannelGlyph.Pointer -> drawPointerGlyph(accent)
@@ -248,6 +261,56 @@ private fun DrawScope.drawInvaderGlyph(fill: Color) {
     for ((r, line) in rows.withIndex()) for ((c, ch) in line.withIndex()) {
         if (ch == 'X') drawRect(fill, o(left + c * cell, top + r * cell), sz(cell + 0.5f, cell + 0.5f))
     }
+}
+
+/** GamePad de Wii U en línea: cuerpo, pantalla, sticks, cruceta y botones. */
+private fun DrawScope.drawWiiUGlyph(c: Color) {
+    val w = size.width
+    val h = size.height
+    val st = Stroke(w * 0.055f)
+    drawRoundRect(c, o(w * 0.03f, h * 0.2f), sz(w * 0.94f, h * 0.6f), cr(w * 0.16f), style = st)
+    drawRoundRect(c, o(w * 0.3f, h * 0.31f), sz(w * 0.4f, h * 0.36f), cr(w * 0.03f), style = st)
+    drawRoundRect(c, o(w * 0.42f, h * 0.235f), sz(w * 0.16f, h * 0.035f), cr(w * 0.02f))
+    drawCircle(c, w * 0.055f, o(w * 0.16f, h * 0.34f), style = Stroke(w * 0.045f))
+    drawCircle(c, w * 0.055f, o(w * 0.84f, h * 0.34f), style = Stroke(w * 0.045f))
+    drawRect(c, o(w * 0.145f, h * 0.5f), sz(w * 0.03f, h * 0.13f))
+    drawRect(c, o(w * 0.095f, h * 0.55f), sz(w * 0.13f, h * 0.03f))
+    for ((dx, dy) in listOf(0f to -1f, 0f to 1f, -1f to 0f, 1f to 0f)) {
+        drawCircle(c, w * 0.018f, o(w * 0.84f + dx * w * 0.045f, h * 0.565f + dy * w * 0.045f))
+    }
+    drawCircle(c, w * 0.018f, o(w * 0.5f, h * 0.73f))
+}
+
+/** Teclado con las ondas de inalámbrico encima y un ratón al lado (relleno). */
+private fun DrawScope.drawKbmGlyph(c: Color, hole: Color) {
+    val w = size.width
+    val h = size.height
+    // Ondas
+    for (r in listOf(0.2f, 0.13f, 0.065f)) {
+        drawArc(
+            c, 225f, 90f, false,
+            topLeft = o(w * 0.37f - w * r, h * 0.3f - w * r), size = sz(w * r * 2, w * r * 2),
+            style = Stroke(w * 0.04f, cap = StrokeCap.Round)
+        )
+    }
+    // Teclado
+    val top = h * 0.4f
+    val kw = w * 0.7f
+    val kh = h * 0.32f
+    drawRoundRect(c, o(w * 0.02f, top), sz(kw, kh), cr(w * 0.035f))
+    val kx = kw / 9f
+    for (row in 0..2) for (col in 0..7) {
+        if (row == 2 && col in 2..5) continue
+        drawRect(hole, o(w * 0.02f + kx * 0.55f + col * kx, top + kh * (0.14f + row * 0.28f)), sz(kx * 0.62f, kh * 0.17f))
+    }
+    drawRect(hole, o(w * 0.02f + kx * 2.55f, top + kh * 0.7f), sz(kx * 3.62f, kh * 0.17f))
+    // Ratón
+    val mx = w * 0.79f
+    val mw = w * 0.19f
+    val mt = top + kh * 0.05f
+    val mh = kh * 0.95f
+    drawRoundRect(c, o(mx, mt), sz(mw, mh), cr(mw / 2f))
+    drawLine(hole, o(mx + mw / 2f, mt + mh * 0.08f), o(mx + mw / 2f, mt + mh * 0.38f), strokeWidth = w * 0.025f, cap = StrokeCap.Round)
 }
 
 /** Joy-Con: rojo a la izquierda y azul a la derecha (los colores de siempre). */

@@ -13,7 +13,19 @@ object Precision {
     var held: Boolean = false
         private set
 
-    val factor: Float get() = if (held) FACTOR else 1f
+    /** Botón del mando que también la activa mientras se mantiene (0 = ninguno). */
+    @Volatile
+    var bindBit: Int = 0
+
+    /** Velocidad que queda con la precisión puesta. */
+    @Volatile
+    var amount: Float = FACTOR
+
+    /** ¿Está puesta ahora? (botón en pantalla o el botón asignado mantenido) */
+    val active: Boolean
+        get() = held || (bindBit != 0 && ButtonState.current() and bindBit != 0)
+
+    val factor: Float get() = if (active) amount else 1f
 
     fun set(on: Boolean) {
         held = on

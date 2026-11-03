@@ -421,7 +421,7 @@ impl eframe::App for PepoMoteApp {
                         ui.vertical_centered(|ui| {
                             ui.add_space(8.0);
                             ui.label(
-                                RichText::new("PepoMote")
+                                RichText::new("RevolutionMote+")
                                     .size(34.0)
                                     .strong()
                                     .color(theme::text()),

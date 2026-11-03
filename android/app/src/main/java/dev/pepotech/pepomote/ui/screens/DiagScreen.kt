@@ -159,7 +159,7 @@ fun DiagScreen(onBack: () -> Unit) {
                 PointerTrackpad.BOTH -> stringResource(R.string.pointer_mode_both)
                 else -> stringResource(R.string.pointer_mode_aim)
             })
-            Line(stringResource(R.string.precision), stringResource(if (Precision.held) R.string.diag_on else R.string.diag_off))
+            Line(stringResource(R.string.precision), stringResource(if (Precision.active) R.string.diag_on else R.string.diag_off))
         }
 
         DiagCard(stringResource(R.string.diag_haptics)) {

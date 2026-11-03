@@ -108,7 +108,7 @@ class AndroidServerUiTest {
         } }
         compose.onNodeWithText("RetroArch").assertIsDisplayed()
         compose.onNodeWithText("Eden").assertIsDisplayed()
-        compose.onNodeWithText("Puntero").assertDoesNotExist()
+        compose.onNodeWithText("Puntero WiiMote").assertDoesNotExist()
         compose.onNodeWithText("Wii U").assertDoesNotExist()
     }
 
@@ -194,7 +194,7 @@ class AndroidServerUiTest {
         } }
         compose.onNodeWithText("Dolphin").assertIsDisplayed()
         compose.onNodeWithText("Eden").assertIsDisplayed()
-        compose.onNodeWithText("Puntero").assertDoesNotExist()
+        compose.onNodeWithText("Puntero WiiMote").assertDoesNotExist()
         compose.onNodeWithText("Wii U").assertDoesNotExist()
     }
 

@@ -1,26 +1,30 @@
-//! Icono procedural (aro + punto, el logo) — sin assets binarios.
+//! El logo de RevolutionMote+ (el mismo que el icono de la app), en RGBA.
 
-/// RGBA size×size con el aro azul y el punto central sobre fondo transparente.
+/// El logo a 128 px, RGBA sin comprimir (sale de `assets/revolutionmote-icon.svg`).
+const LOGO_128: &[u8] = include_bytes!("logo128.rgba");
+const LOGO_SIZE: u32 = 128;
+
+/// RGBA size×size del logo, reescalado con un promedio por área (nítido a 16–64 px).
 pub fn logo_rgba(size: u32) -> Vec<u8> {
-    let s = size as f32;
-    let c = s / 2.0;
-    let r_outer = s * 0.42;
-    let r_ring = s * 0.10;
-    let r_dot = s * 0.13;
-    let blue = (0x3F, 0xA9, 0xF5);
-
     let mut out = Vec::with_capacity((size * size * 4) as usize);
+    let k = LOGO_SIZE as f32 / size as f32;
     for y in 0..size {
         for x in 0..size {
-            let dx = x as f32 + 0.5 - c;
-            let dy = y as f32 + 0.5 - c;
-            let d = (dx * dx + dy * dy).sqrt();
-            let ring = (d - r_outer).abs() < r_ring;
-            let dot = d < r_dot;
-            if ring || dot {
-                out.extend_from_slice(&[blue.0, blue.1, blue.2, 255]);
-            } else {
-                out.extend_from_slice(&[0, 0, 0, 0]);
+            let (x0, y0) = ((x as f32 * k) as u32, (y as f32 * k) as u32);
+            let (x1, y1) = ((((x + 1) as f32 * k).ceil() as u32).min(LOGO_SIZE), (((y + 1) as f32 * k).ceil() as u32).min(LOGO_SIZE));
+            let mut acc = [0u32; 4];
+            let mut n = 0u32;
+            for sy in y0..y1.max(y0 + 1) {
+                for sx in x0..x1.max(x0 + 1) {
+                    let i = ((sy.min(LOGO_SIZE - 1) * LOGO_SIZE + sx.min(LOGO_SIZE - 1)) * 4) as usize;
+                    for c in 0..4 {
+                        acc[c] += LOGO_128[i + c] as u32;
+                    }
+                    n += 1;
+                }
+            }
+            for c in acc {
+                out.push((c / n.max(1)) as u8);
             }
         }
     }
@@ -61,14 +65,11 @@ mod tests {
     }
 
     #[test]
-    fn el_logo_tiene_aro_y_punto_sobre_transparente() {
+    fn el_logo_tiene_el_tamano_pedido_y_es_opaco_en_el_centro() {
         let s = 32;
         let logo = logo_rgba(s);
         assert_eq!(logo.len(), (s * s * 4) as usize);
-        assert_eq!(px(&logo, s, 16, 16), [0x3F, 0xA9, 0xF5, 255], "punto central");
-        assert_eq!(px(&logo, s, 16, 2)[3], 255, "aro arriba");
-        assert_eq!(px(&logo, s, 16, 8)[3], 0, "hueco entre punto y aro");
-        assert_eq!(px(&logo, s, 0, 0)[3], 0, "esquina transparente");
+        assert_eq!(px(&logo, s, 16, 16)[3], 255, "centro opaco");
     }
 
     #[test]

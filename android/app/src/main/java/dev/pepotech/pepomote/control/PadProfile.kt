@@ -94,7 +94,11 @@ data class GyroConfig(
     val antiDeadzone: Float = 0.12f,
     val smoothing: Float = 0.9f,
     /** Por si en algún móvil el giro horizontal y el vertical salen cruzados. */
-    val swapAxes: Boolean = false
+    val swapAxes: Boolean = false,
+    /** Botón del mando que, mantenido, activa la precisión (0 = ninguno). Por ejemplo L3 = «aguantar la respiración». */
+    val precisionBit: Int = 0,
+    /** Velocidad que queda con la precisión puesta (0.1..0.9). */
+    val precisionAmount: Float = Precision.FACTOR
 ) {
     val needsButton: Boolean
         get() = enabled && (activation == GyroActivation.HOLD_BUTTON || activation == GyroActivation.TOGGLE_BUTTON)
@@ -466,6 +470,8 @@ object PadProfileJson {
         put("swap", g.swapAxes)
         put("sxp", g.sensXPortrait.toDouble())
         put("syp", g.sensYPortrait.toDouble())
+        put("pbit", g.precisionBit)
+        put("pamt", g.precisionAmount.toDouble())
     }
 
     fun gyroFromJson(j: JSONObject?): GyroConfig = if (j == null) GyroConfig() else GyroConfig(
@@ -479,7 +485,9 @@ object PadProfileJson {
         smoothing = j.optDouble("smooth", 0.9).toFloat().coerceIn(0f, 0.97f),
         swapAxes = j.optBoolean("swap", false),
         sensXPortrait = j.optDouble("sxp", 2.1).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS),
-        sensYPortrait = j.optDouble("syp", 1.9).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS)
+        sensYPortrait = j.optDouble("syp", 1.9).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS),
+        precisionBit = j.optInt("pbit", 0),
+        precisionAmount = j.optDouble("pamt", Precision.FACTOR.toDouble()).toFloat().coerceIn(0.1f, 0.9f)
     )
 
     fun mouseToJson(m: MouseConfig): JSONObject = JSONObject().apply {

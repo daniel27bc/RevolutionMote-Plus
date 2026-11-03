@@ -351,7 +351,10 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
         GyroAim.config = gyroCfg
         GyroAim.mouseConfig = mouseCfg
         GyroAim.mouse = mouseMode
+        dev.pepotech.pepomote.control.Precision.bindBit = if (xboxPad) gyroCfg.precisionBit else 0
+        dev.pepotech.pepomote.control.Precision.amount = gyroCfg.precisionAmount
     }
+    DisposableEffect(Unit) { onDispose { dev.pepotech.pepomote.control.Precision.bindBit = 0 } }
     // Teclado y ratón: con el receptor de RevolutionMote+ van por el canal de
     // control a la vez que el mando (y las teclas sueltas siempre); con el de
     // PepoTech, el modo ratón pasa el PC a puntero. El cursor siempre en
@@ -583,6 +586,9 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         .height(bodyH)
                         // Modo ratón: A o B mantenidos y deslizando = arrastrar
                         .clickButtonDrag(mouseMode && kbmCapable && !editing, mouseCfg.padSens)
+                        // Modo mando con cámara en el espacio libre: pulsar un
+                        // botón y deslizar el dedo también gira
+                        .buttonLook(!mouseMode && !editing && lookCfg.zone != LookZone.OFF && customAllowed, lookCfg)
                 ) {
                     val shown = shownProfile
                     if (shown != null) {
@@ -598,7 +604,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                                 onElementChange = { old, new -> draft = draft?.replace(old, new) },
                                 onGear = { gearFor = it.id },
                                 onGestureStart = pushUndo,
-                                onGestureEnd = { e -> if (snap) draft = draft?.replace(e, snapElement(e)) },
+                                onGestureEnd = { },
                                 snap = snap,
                                 modifier = Modifier.alpha(if (operative || editing) 1f else 0.4f)
                             )
@@ -939,7 +945,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                     onMouseToggle = { LinkState.setPadMouse(!padMouse) },
                     activeName = activeName,
                     locked = orientationLock != AppPrefs.ORIENTATION_FREE,
-                    gyroOn = if (xboxPad) gyroCfg.enabled else null,
+                    gyroOn = null,
                     onLock = { OrientationLock.toggle(context, rotation) },
                     onProfiles = { showMenu = false; showProfiles = true },
                     onGyroToggle = { setGyro(gyroCfg.copy(enabled = !gyroCfg.enabled)) },
@@ -988,10 +994,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         snap = !snap
                         AppPrefs.setEditorSnap(context, snap)
                     },
-                    onMirror = {
-                        pushUndo()
-                        draft = d.copy(elements = d.elements.map { it.copy(x = 1f - it.x) })
-                    },
+
                     modifier = Modifier.align(Alignment.TopCenter)
                 )
                 val target = d.elements.firstOrNull { it.id == gearFor }

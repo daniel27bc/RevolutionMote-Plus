@@ -109,6 +109,9 @@ internal fun appLang(): String = androidx.compose.ui.platform.LocalConfiguration
 /** Divisiones de la cuadrícula del imán en cada eje. */
 internal const val SNAP_STEPS = 24
 
+/** Distancia (fracción del ancho) a la que un control se pega a la línea de otro. */
+internal const val SNAP_ALIGN = 0.018f
+
 /** Coloca el centro de un control en la cuadrícula del imán. */
 internal fun snapElement(e: PadElement): PadElement = e.copy(
     x = (kotlin.math.round(e.x * SNAP_STEPS) / SNAP_STEPS).coerceIn(0f, 1f),
@@ -191,6 +194,8 @@ internal fun CustomPadCanvas(
     snap: Boolean = false
 ) {
     val layout = remember(layout, profile.faceStyle) { layout.styled(profile.faceStyle) }
+    var guideX by remember { mutableStateOf<Float?>(null) }
+    var guideY by remember { mutableStateOf<Float?>(null) }
     BoxWithConstraints(modifier.fillMaxSize()) {
         val w = maxWidth
         val h = maxHeight
@@ -232,8 +237,30 @@ internal fun CustomPadCanvas(
                     onChange = onElementChange,
                     onGear = { onGear(e) },
                     onStart = onGestureStart,
-                    onEnd = onGestureEnd
+                    onEnd = {
+                        guideX = null
+                        guideY = null
+                        onGestureEnd(it)
+                    },
+                    snap = snap,
+                    others = profile.elements.filter { it.id != e.id },
+                    onGuides = { gx, gy ->
+                        guideX = gx
+                        guideY = gy
+                    }
                 )
+            }
+        }
+        // Guías del imán: la línea con la que se ha alineado el control
+        if (editing && (guideX != null || guideY != null)) {
+            val accent = PepoColors.Blue
+            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                guideX?.let { gx ->
+                    drawLine(accent, androidx.compose.ui.geometry.Offset(size.width * gx, 0f), androidx.compose.ui.geometry.Offset(size.width * gx, size.height), 3f)
+                }
+                guideY?.let { gy ->
+                    drawLine(accent, androidx.compose.ui.geometry.Offset(0f, size.height * gy), androidx.compose.ui.geometry.Offset(size.width, size.height * gy), 3f)
+                }
             }
         }
     }
@@ -414,12 +441,21 @@ private fun EditFrame(
     onChange: (PadElement, PadElement) -> Unit,
     onGear: () -> Unit,
     onStart: () -> Unit = {},
-    onEnd: (PadElement) -> Unit = {}
+    onEnd: (PadElement) -> Unit = {},
+    snap: Boolean = false,
+    others: List<PadElement> = emptyList(),
+    onGuides: (Float?, Float?) -> Unit = { _, _ -> }
 ) {
     val latest by rememberUpdatedState(element)
     val change by rememberUpdatedState(onChange)
     val start by rememberUpdatedState(onStart)
     val end by rememberUpdatedState(onEnd)
+    val snapNow by rememberUpdatedState(snap)
+    val othersNow by rememberUpdatedState(others)
+    val guides by rememberUpdatedState(onGuides)
+    // Posición «real» del dedo durante el arrastre (sin imán), para que el
+    // control se suelte de una guía en cuanto el dedo se aleja
+    val raw = remember { FloatArray(2) }
     val round = element.kind in setOf(
         ElementKind.GYRO, ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT, ElementKind.KEYBOARD, ElementKind.MODE_TOGGLE,
         ElementKind.KEY, ElementKind.PRECISION, ElementKind.RECENTER
@@ -442,6 +478,8 @@ private fun EditFrame(
             .pointerInput(element.id) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    raw[0] = latest.x
+                    raw[1] = latest.y
                     start()
                     do {
                         val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
@@ -454,18 +492,33 @@ private fun EditFrame(
                 val hPx = areaH.toPx()
                 detectTransformGestures { _, pan, zoom, _ ->
                     val cur = latest
-                    val moved = PadProfiles.clampElement(
-                        cur.copy(
-                            x = cur.x + pan.x / wPx,
-                            y = cur.y + pan.y / hPx,
-                            size = cur.size * zoom
-                        )
-                    )
+                    raw[0] += pan.x / wPx
+                    raw[1] += pan.y / hPx
+                    val grow = (cur.size * zoom).coerceIn(PadProfiles.MIN_SIZE, PadProfiles.MAX_SIZE) / cur.size
                     // El control entero dentro de la pantalla, no solo su centro
-                    val grow = moved.size / cur.size
                     val hw = (boxW.toPx() * grow / 2f / wPx).coerceAtMost(0.5f)
                     val hh = (boxH.toPx() * grow / 2f / hPx).coerceAtMost(0.5f)
-                    val next = moved.copy(x = moved.x.coerceIn(hw, 1f - hw), y = moved.y.coerceIn(hh, 1f - hh))
+                    var nx = raw[0]
+                    var ny = raw[1]
+                    var gx: Float? = null
+                    var gy: Float? = null
+                    if (snapNow) {
+                        // Imán: primero se alinea con otro control (centro con
+                        // centro); si no hay ninguno cerca, a la cuadrícula
+                        val tx = SNAP_ALIGN * 1f
+                        othersNow.minByOrNull { kotlin.math.abs(it.x - nx) }?.let { o ->
+                            if (kotlin.math.abs(o.x - nx) < tx) { nx = o.x; gx = o.x }
+                        }
+                        othersNow.minByOrNull { kotlin.math.abs(it.y - ny) }?.let { o ->
+                            if (kotlin.math.abs(o.y - ny) < tx * wPx / hPx) { ny = o.y; gy = o.y }
+                        }
+                        if (gx == null) nx = kotlin.math.round(nx * SNAP_STEPS) / SNAP_STEPS
+                        if (gy == null) ny = kotlin.math.round(ny * SNAP_STEPS) / SNAP_STEPS
+                    }
+                    val next = PadProfiles.clampElement(
+                        cur.copy(x = nx.coerceIn(hw, 1f - hw), y = ny.coerceIn(hh, 1f - hh), size = cur.size * zoom)
+                    )
+                    guides(gx, gy)
                     change(cur, next)
                 }
             }
@@ -536,8 +589,7 @@ internal fun EditorToolbar(
     canUndo: Boolean = false,
     onUndo: () -> Unit = {},
     snap: Boolean = false,
-    onSnap: () -> Unit = {},
-    onMirror: () -> Unit = {}
+    onSnap: () -> Unit = {}
 ) {
     Card(
         modifier = modifier.padding(top = 6.dp, start = 8.dp, end = 8.dp),
@@ -558,7 +610,7 @@ internal fun EditorToolbar(
             TextButton(onClick = onSnap) {
                 IconLabel(R.drawable.ms_grid_4x4, stringResource(R.string.ed_snap), if (snap) PepoColors.Blue else PepoColors.TextDim)
             }
-            TextButton(onClick = onMirror) { IconLabel(R.drawable.ms_flip, stringResource(R.string.ed_mirror), PepoColors.Text) }
+
             TextButton(onClick = onProfiles) { IconLabel(R.drawable.ms_view_list, profile.name, PepoColors.Text) }
             TextButton(onClick = onPadSettings) { IconLabel(R.drawable.ms_tune, stringResource(R.string.ed_pad_settings), PepoColors.Blue) }
             Text(stringResource(R.string.ed_opacity), style = MaterialTheme.typography.labelMedium, color = PepoColors.TextDim)

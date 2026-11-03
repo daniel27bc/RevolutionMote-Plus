@@ -166,7 +166,10 @@ object ButtonState {
     const val SRC_LOOK = 1
     const val SRC_GYRO = 2
     const val SRC_PHYSICAL = 3
-    private const val SOURCES = 4
+
+    /** El dedo que ha pulsado un botón y se desliza: también gira la cámara. */
+    const val SRC_BUTTON_LOOK = 4
+    private const val SOURCES = 5
     private val mixLock = Any()
     private val leftX = IntArray(SOURCES)
     private val leftY = IntArray(SOURCES)
