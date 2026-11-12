@@ -821,4 +821,13 @@
     <string name="share_qr_hint">On the other phone: Settings, profile backup, "Scan QR", and point at this screen</string>
     <string name="share_qr_too_big">This profile is too large for a QR code. Export it to a file</string>
     <string name="share_qr_desc">Profile QR code</string>
+    <string name="pad_tab_gestures">Gestures</string>
+    <string name="gesture_title">Motion gestures</string>
+    <string name="gesture_sub">Move the phone to play, on top of touching the screen</string>
+    <string name="gesture_tilt">Steering wheel</string>
+    <string name="gesture_tilt_sub">Tilt the phone left or right like a wheel: it moves the left stick</string>
+    <string name="gesture_tilt_sens">Steering sensitivity</string>
+    <string name="gesture_tilt_invert">Invert steering</string>
+    <string name="gesture_shake">Shake presses</string>
+    <string name="gesture_shake_sub">Shaking the phone presses this button</string>
 </resources>

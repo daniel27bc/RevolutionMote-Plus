@@ -43,6 +43,7 @@ object GyroAim {
             if (!value) {
                 buttonHeld = false
                 zero()
+                resetGestures()
             }
         }
 
@@ -108,10 +109,12 @@ object GyroAim {
         }
         // Modo ratón: el giro mueve el cursor (relativo), no la cámara
         if (mouse) {
+            resetGestures()
             mouseSample(rotation)
             return
         }
         val c = config
+        gestures(c, an, System.nanoTime() / 1_000_000)
         if (c.enabled && c.activation == GyroActivation.TOGGLE_LT) trackLt()
         if (!gateOpen(c)) {
             sx = 0f
@@ -136,6 +139,79 @@ object GyroAim {
             lastX = ox
             lastY = oy
             ButtonState.setStick2From(ButtonState.SRC_GYRO, ox, oy)
+        }
+    }
+
+    // ---- Gestos: volante al inclinar y un botón al agitar ----
+
+    const val TILT_MIN_SENS = 0.5f
+    const val TILT_MAX_SENS = 3f
+
+    /** Seno de la inclinación que da el tope con sensibilidad 1 (unos 40°). */
+    private const val TILT_FULL = 0.64f
+
+    /** Inclinación (fracción del tope) que aún cuenta como «recto». */
+    private const val TILT_REST = 0.06f
+
+    /** Gravedad y cuánto hay que salirse de ella (m/s²) para que cuente como agitar. */
+    private const val GRAVITY = 9.81f
+    private const val SHAKE_OVER = 13f
+
+    /** Lo que dura la pulsación de agitar y lo mínimo entre dos (ms). */
+    private const val SHAKE_PRESS_MS = 120L
+    private const val SHAKE_GAP_MS = 350L
+
+    private var tilt = 0f
+    private var lastTilt = 0
+    private var shakeDown = 0
+    private var shakeUntil = 0L
+    private var lastShake = -SHAKE_GAP_MS
+
+    /** Inclinación lateral (componente x de la vertical, −1..1) → stick −127..127. */
+    internal fun tiltToStick(upX: Float, sens: Float, invert: Boolean): Int {
+        val v = (-upX / TILT_FULL * sens).coerceIn(-1f, 1f)
+        if (abs(v) < TILT_REST) return 0
+        val out = sign(v) * (abs(v) - TILT_REST) / (1f - TILT_REST)
+        return ((if (invert) -out else out) * 127f).roundToInt().coerceIn(-127, 127)
+    }
+
+    /** ¿Esta lectura del acelerómetro (módulo, m/s²) es una sacudida? */
+    internal fun isShake(accelNorm: Float): Boolean = abs(accelNorm - GRAVITY) > SHAKE_OVER
+
+    private fun gestures(c: GyroConfig, accelNorm: Float, nowMs: Long) {
+        if (c.tiltSteer && accelNorm > 1f) {
+            tilt += (a[0] / accelNorm - tilt) * 0.25f
+            val v = tiltToStick(tilt, c.tiltSens, c.tiltInvert)
+            if (v != lastTilt) {
+                lastTilt = v
+                ButtonState.setStickFrom(ButtonState.SRC_GYRO, v, 0)
+            }
+        } else if (lastTilt != 0) {
+            lastTilt = 0
+            tilt = 0f
+            ButtonState.setStickFrom(ButtonState.SRC_GYRO, 0, 0)
+        }
+        if (shakeDown != 0 && nowMs >= shakeUntil) {
+            ButtonState.set(shakeDown, false)
+            shakeDown = 0
+        }
+        if (c.shakeBit != 0 && shakeDown == 0 && nowMs - lastShake >= SHAKE_GAP_MS && isShake(accelNorm)) {
+            lastShake = nowMs
+            shakeDown = c.shakeBit
+            shakeUntil = nowMs + SHAKE_PRESS_MS
+            ButtonState.set(c.shakeBit, true)
+        }
+    }
+
+    private fun resetGestures() {
+        if (lastTilt != 0) {
+            lastTilt = 0
+            ButtonState.setStickFrom(ButtonState.SRC_GYRO, 0, 0)
+        }
+        tilt = 0f
+        if (shakeDown != 0) {
+            ButtonState.set(shakeDown, false)
+            shakeDown = 0
         }
     }
 

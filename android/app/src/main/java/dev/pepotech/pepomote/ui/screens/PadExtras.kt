@@ -763,6 +763,43 @@ internal fun PrecisionSettingsSection(gyro: GyroConfig, onChange: (GyroConfig) -
     }
 }
 
+/** Gestos con el móvil: volante al inclinarlo y un botón al agitarlo. */
+@Composable
+internal fun GestureSettingsSection(gyro: GyroConfig, onChange: (GyroConfig) -> Unit) {
+    SectionTitle(stringResource(R.string.gesture_title), stringResource(R.string.gesture_sub))
+    SwitchRow(stringResource(R.string.gesture_tilt), gyro.tiltSteer, stringResource(R.string.gesture_tilt_sub)) {
+        onChange(gyro.copy(tiltSteer = it))
+    }
+    if (gyro.tiltSteer) {
+        LabeledSlider(
+            stringResource(R.string.gesture_tilt_sens), gyro.tiltSens,
+            dev.pepotech.pepomote.control.GyroAim.TILT_MIN_SENS..dev.pepotech.pepomote.control.GyroAim.TILT_MAX_SENS,
+            "%.2fx".format(gyro.tiltSens)
+        ) { onChange(gyro.copy(tiltSens = it)) }
+        SwitchRow(stringResource(R.string.gesture_tilt_invert), gyro.tiltInvert) { onChange(gyro.copy(tiltInvert = it)) }
+    }
+    Text(stringResource(R.string.gesture_shake), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 10.dp))
+    Text(stringResource(R.string.gesture_shake_sub), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
+    Spacer(Modifier.height(6.dp))
+    ChipFlow {
+        for ((bit, label) in listOf(
+            0 to stringResource(R.string.precision_none),
+            ButtonState.A to "A",
+            ButtonState.B to "B",
+            ButtonState.X to "X",
+            ButtonState.Y to "Y",
+            ButtonState.L to "LB",
+            ButtonState.R to "RB",
+            ButtonState.ZL to "LT",
+            ButtonState.ZR to "RT",
+            ButtonState.STICK_L to "L3",
+            ButtonState.STICK_R to "R3"
+        )) {
+            ModeChip(label, selected = gyro.shakeBit == bit, dense = true) { onChange(gyro.copy(shakeBit = bit)) }
+        }
+    }
+}
+
 /** Inercia de un trackpad: interruptor y, encendida, cuánto dura. */
 @Composable
 internal fun InertiaControls(inertia: Float, onChange: (Float) -> Unit) {
@@ -794,6 +831,7 @@ internal fun PadSettingsDialog(
         add(0 to R.string.pad_tab_camera)
         if (showGyro) add(1 to R.string.pad_tab_gyro)
         if (showGyro) add(2 to R.string.pad_tab_precision)
+        if (showGyro) add(4 to R.string.pad_tab_gestures)
         if (mouse != null) add(3 to R.string.pad_tab_mouse)
     }
     var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
@@ -807,6 +845,7 @@ internal fun PadSettingsDialog(
         when (tab) {
             1 -> GyroSettingsSection(gyro, onGyro)
             2 -> PrecisionSettingsSection(gyro, onGyro)
+            4 -> GestureSettingsSection(gyro, onGyro)
             3 -> if (mouse != null) MouseSettingsSection(mouse, onMouse)
             else -> LookSettingsSection(look, onLook)
         }

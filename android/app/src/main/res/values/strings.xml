@@ -822,4 +822,13 @@
     <string name="share_qr_hint">En el otro móvil: Ajustes, copia de perfiles, «Leer QR», y apunta a esta pantalla</string>
     <string name="share_qr_too_big">Este perfil es demasiado grande para un QR. Expórtalo a un archivo</string>
     <string name="share_qr_desc">Código QR del perfil</string>
+    <string name="pad_tab_gestures">Gestos</string>
+    <string name="gesture_title">Gestos con el móvil</string>
+    <string name="gesture_sub">Mueve el móvil para jugar, además de tocar la pantalla</string>
+    <string name="gesture_tilt">Volante</string>
+    <string name="gesture_tilt_sub">Inclina el móvil a izquierda o derecha, como un volante: mueve el stick izquierdo</string>
+    <string name="gesture_tilt_sens">Sensibilidad del volante</string>
+    <string name="gesture_tilt_invert">Invertir el volante</string>
+    <string name="gesture_shake">Agitar pulsa</string>
+    <string name="gesture_shake_sub">Una sacudida del móvil pulsa este botón</string>
 </resources>

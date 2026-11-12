@@ -58,4 +58,28 @@ class GyroAimTest {
         assertTrue(PointerTrackpad.toGyro(-1f) > 0.03f)
         assertEquals(0f, PointerTrackpad.toGyro(0f), 0f)
     }
+
+    @Test fun elVolanteRectoNoGiraYElTopeLlegaAlFinal() {
+        assertEquals(0, GyroAim.tiltToStick(0f, 1f, false))
+        assertEquals(0, GyroAim.tiltToStick(0.02f, 1f, false))
+        // Borde derecho abajo (la vertical se va hacia −x): girar a la derecha
+        assertEquals(127, GyroAim.tiltToStick(-0.7f, 1f, false))
+        assertEquals(-127, GyroAim.tiltToStick(0.7f, 1f, false))
+        assertEquals(-127, GyroAim.tiltToStick(-0.7f, 1f, true))
+        // Con más sensibilidad, la misma inclinación gira más
+        assertTrue(GyroAim.tiltToStick(-0.2f, 2f, false) > GyroAim.tiltToStick(-0.2f, 1f, false))
+    }
+
+    @Test fun soloUnaSacudidaDeVerdadCuentaComoAgitar() {
+        assertTrue(!GyroAim.isShake(9.81f))
+        assertTrue(!GyroAim.isShake(14f)) // caminar, apoyar el móvil
+        assertTrue(GyroAim.isShake(26f))
+        assertTrue(!GyroAim.isShake(1f)) // caída libre corta: no es agitar
+    }
+
+    @Test fun losGestosVanYVuelvenEnElPerfil() {
+        val g = GyroConfig(tiltSteer = true, tiltSens = 1.5f, tiltInvert = true, shakeBit = ButtonState.X)
+        assertEquals(g, PadProfileJson.gyroFromJson(PadProfileJson.gyroToJson(g)))
+        assertEquals(GyroConfig(), PadProfileJson.gyroFromJson(PadProfileJson.gyroToJson(GyroConfig())))
+    }
 }

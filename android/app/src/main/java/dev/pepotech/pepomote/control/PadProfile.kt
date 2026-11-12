@@ -98,7 +98,14 @@ data class GyroConfig(
     /** Botón del mando que, mantenido, activa la precisión (0 = ninguno). Por ejemplo L3 = «aguantar la respiración». */
     val precisionBit: Int = 0,
     /** Velocidad que queda con la precisión puesta (0.1..0.9). */
-    val precisionAmount: Float = Precision.FACTOR
+    val precisionAmount: Float = Precision.FACTOR,
+    /** Volante: inclinar el móvil a un lado mueve el stick izquierdo en horizontal. */
+    val tiltSteer: Boolean = false,
+    /** Cuánto hay que inclinar: 1 = tope a unos 40°; más = menos recorrido. */
+    val tiltSens: Float = 1f,
+    val tiltInvert: Boolean = false,
+    /** Botón del mando que se pulsa al agitar el móvil (0 = ninguno). */
+    val shakeBit: Int = 0
 ) {
     val needsButton: Boolean
         get() = enabled && (activation == GyroActivation.HOLD_BUTTON || activation == GyroActivation.TOGGLE_BUTTON)
@@ -472,6 +479,10 @@ object PadProfileJson {
         put("syp", g.sensYPortrait.toDouble())
         put("pbit", g.precisionBit)
         put("pamt", g.precisionAmount.toDouble())
+        if (g.tiltSteer) put("tilt", true)
+        if (g.tiltSens != 1f) put("tsens", g.tiltSens.toDouble())
+        if (g.tiltInvert) put("tinv", true)
+        if (g.shakeBit != 0) put("shake", g.shakeBit)
     }
 
     fun gyroFromJson(j: JSONObject?): GyroConfig = if (j == null) GyroConfig() else GyroConfig(
@@ -487,7 +498,11 @@ object PadProfileJson {
         sensXPortrait = j.optDouble("sxp", 2.1).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS),
         sensYPortrait = j.optDouble("syp", 1.9).toFloat().coerceIn(PadProfiles.MIN_SENS, PadProfiles.MAX_SENS),
         precisionBit = j.optInt("pbit", 0),
-        precisionAmount = j.optDouble("pamt", Precision.FACTOR.toDouble()).toFloat().coerceIn(0.1f, 0.9f)
+        precisionAmount = j.optDouble("pamt", Precision.FACTOR.toDouble()).toFloat().coerceIn(0.1f, 0.9f),
+        tiltSteer = j.optBoolean("tilt", false),
+        tiltSens = j.optDouble("tsens", 1.0).toFloat().coerceIn(GyroAim.TILT_MIN_SENS, GyroAim.TILT_MAX_SENS),
+        tiltInvert = j.optBoolean("tinv", false),
+        shakeBit = j.optInt("shake", 0)
     )
 
     fun mouseToJson(m: MouseConfig): JSONObject = JSONObject().apply {
