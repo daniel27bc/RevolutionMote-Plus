@@ -830,4 +830,20 @@
     <string name="gesture_tilt_invert">Invert steering</string>
     <string name="gesture_shake">Shake presses</string>
     <string name="gesture_shake_sub">Shaking the phone presses this button</string>
+    <string name="ed_macro">Macro</string>
+    <string name="ed_shift">Shift (second function)</string>
+    <string name="shift_short">Shift</string>
+    <string name="ed_shift_help">While you hold it, each loose button sends its second function. Pick it in each button\'s ⚙</string>
+    <string name="ed_shift_pick">With Shift it sends</string>
+    <string name="ed_shift_pick_note">What this button sends while you hold Shift</string>
+    <string name="ed_shift_same">The same</string>
+    <string name="ed_macro_help">One tap fires the whole sequence. Add the steps in order</string>
+    <string name="ed_macro_empty">No steps yet</string>
+    <string name="ed_macro_undo">Remove last</string>
+    <string name="ed_macro_clear">Clear</string>
+    <string name="ed_macro_together">Together with the previous one</string>
+    <string name="ed_macro_together_sub">The next thing you tap is pressed along with the last step (A+B)</string>
+    <string name="ed_macro_buttons">Add a button</string>
+    <string name="ed_macro_wait">Add a wait</string>
+    <string name="ed_macro_keys">Add keyboard keys</string>
 </resources>

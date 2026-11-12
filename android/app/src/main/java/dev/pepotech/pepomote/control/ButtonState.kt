@@ -122,7 +122,10 @@ object ButtonState {
     var intercept: ((bit: Int, down: Boolean) -> Boolean)? = null
 
     /** Aplica la pulsación al estado y avisa al emisor sin esperar al siguiente sensor. */
-    fun set(bit: Int, down: Boolean) {
+    fun set(bit: Int, down: Boolean) = setDirect(PadShift.route(bit, down), down)
+
+    /** Como [set], sin pasar por la capa Shift (las macros mandan justo lo que dicen). */
+    fun setDirect(bit: Int, down: Boolean) {
         if (intercept?.invoke(bit, down) == true) return
         latch.set(bit, down)
     }

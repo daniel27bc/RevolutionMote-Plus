@@ -1025,7 +1025,13 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
                         onPick = {
                             val el = PadProfiles.newElement(it)
                             pushUndo()
-                            draft = d.add(if (el.kind == ElementKind.KEY) el.copy(key = PadProfiles.freeKey(d)) else el)
+                            draft = d.add(
+                                when (el.kind) {
+                                    ElementKind.KEY -> el.copy(key = PadProfiles.freeKey(d))
+                                    ElementKind.MACRO -> el.copy(key = PadProfiles.freeMacro(d) ?: el.key)
+                                    else -> el
+                                }
+                            )
                             showAdd = false
                         },
                         onDismiss = { showAdd = false }

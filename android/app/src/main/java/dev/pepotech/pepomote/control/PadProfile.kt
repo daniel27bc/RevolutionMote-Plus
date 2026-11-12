@@ -26,7 +26,13 @@ enum class ElementKind {
     PRECISION,
 
     /** Tocar: el cursor al centro (modo ratón) o la cámara sin arrastre del giro. */
-    RECENTER
+    RECENTER,
+
+    /** Una secuencia de pulsaciones con un toque ([PadElement.macro]; [PadElement.key] es su hueco: «M1»…). */
+    MACRO,
+
+    /** Mantener: los botones sueltos envían su segunda función ([PadElement.shiftBit]). */
+    SHIFT
 }
 
 /**
@@ -138,12 +144,17 @@ data class PadElement(
     /** Tecla del teclado (solo [ElementKind.KEY]). */
     val key: String = "",
     /** Stick flotante: el centro aparece donde cae el pulgar. */
-    val floating: Boolean = true
+    val floating: Boolean = true,
+    /** La secuencia de una macro, en el texto de [PadMacro] (solo [ElementKind.MACRO]). */
+    val macro: String = "",
+    /** Botón que envía este con Shift mantenido (0 = el mismo; solo [ElementKind.BUTTON]). */
+    val shiftBit: Int = 0
 ) {
     /** Único dentro de un perfil: un tipo de control, un bit o una tecla no se repiten. */
     val id: String get() = when (kind) {
         ElementKind.BUTTON -> "btn_$bit"
         ElementKind.KEY -> "key_$key"
+        ElementKind.MACRO -> "macro_$key"
         else -> kind.name
     }
 
@@ -275,10 +286,12 @@ object PadProfiles {
         for (k in listOf(
             ElementKind.STICK_L, ElementKind.STICK_R, ElementKind.DPAD, ElementKind.GYRO,
             ElementKind.MODE_TOGGLE, ElementKind.MOUSE_PAD, ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT,
-            ElementKind.KEYBOARD, ElementKind.PRECISION, ElementKind.RECENTER
+            ElementKind.KEYBOARD, ElementKind.PRECISION, ElementKind.RECENTER, ElementKind.SHIFT
         )) {
             if (k !in kinds) out += AddOption(k)
         }
+        // Macros: hasta que se acaben los huecos
+        if (freeMacro(profile) != null) out += AddOption(ElementKind.MACRO)
         // Teclas: siempre se puede poner otra (la primera libre de la lista)
         out += AddOption(ElementKind.KEY)
         if (ElementKind.FACE !in kinds && faceBits.isNotEmpty() && faceBits.none { it in used }) {
@@ -293,6 +306,17 @@ object PadProfiles {
         val used = usedBits(profile, faceBits) - element.bit
         return BUTTON_BITS.filter { it !in used }
     }
+
+    /** El primer hueco de macro libre del diseño (null = no quedan). */
+    fun freeMacro(profile: PadProfile): String? =
+        PadMacro.freeSlot(profile.elements.filter { it.kind == ElementKind.MACRO }.map { it.key }.toSet())
+
+    /** Qué envía cada botón suelto con Shift mantenido (vacío si el diseño no tiene Shift). */
+    fun shiftMap(profile: PadProfile): Map<Int, Int> =
+        if (profile.elements.none { it.kind == ElementKind.SHIFT }) emptyMap()
+        else profile.elements
+            .filter { it.kind == ElementKind.BUTTON && it.shiftBit != 0 && it.shiftBit != it.bit }
+            .associate { it.bit to it.shiftBit }
 
     /** Un control nuevo, en el centro y con su tamaño típico. */
     /** La primera tecla de la lista que aún no está en el diseño. */
@@ -332,6 +356,8 @@ object PadProfiles {
         ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT -> PadElement(option.kind, 0.5f, 0.5f, 0.15f)
         ElementKind.MOUSE_PAD -> PadElement(option.kind, 0.5f, 0.5f, 0.45f, pill = true)
         ElementKind.KEY -> PadElement(option.kind, 0.5f, 0.5f, 0.13f, key = "Escape")
+        ElementKind.MACRO -> PadElement(option.kind, 0.5f, 0.5f, 0.13f, key = "M1")
+        ElementKind.SHIFT -> PadElement(option.kind, 0.5f, 0.5f, 0.15f)
         ElementKind.BUTTON -> PadElement(
             ElementKind.BUTTON, 0.5f, 0.5f,
             0.13f,
@@ -422,6 +448,8 @@ object PadProfileJson {
                 put("inertia", e.inertia.toDouble())
                 if (e.key.isNotEmpty()) put("key", e.key)
                 if (!e.floating) put("float", false)
+                if (e.macro.isNotEmpty()) put("macro", e.macro)
+                if (e.shiftBit != 0) put("sbit", e.shiftBit)
             })
         })
     }
@@ -447,7 +475,9 @@ object PadProfileJson {
                     turbo = j.optBoolean("turbo", false),
                     inertia = j.optDouble("inertia", 0.0).toFloat(),
                     key = j.optString("key", ""),
-                    floating = j.optBoolean("float", true)
+                    floating = j.optBoolean("float", true),
+                    macro = PadMacro.format(PadMacro.parse(j.optString("macro", ""))),
+                    shiftBit = j.optInt("sbit", 0)
                 )
             )
         }

@@ -831,4 +831,20 @@
     <string name="gesture_tilt_invert">Invertir el volante</string>
     <string name="gesture_shake">Agitar pulsa</string>
     <string name="gesture_shake_sub">Una sacudida del móvil pulsa este botón</string>
+    <string name="ed_macro">Macro</string>
+    <string name="ed_shift">Shift (segunda función)</string>
+    <string name="shift_short">Shift</string>
+    <string name="ed_shift_help">Mientras lo mantienes, cada botón suelto envía su segunda función. Elígela en el ⚙ de cada botón</string>
+    <string name="ed_shift_pick">Con Shift envía</string>
+    <string name="ed_shift_pick_note">Lo que manda este botón mientras mantienes Shift</string>
+    <string name="ed_shift_same">Lo mismo</string>
+    <string name="ed_macro_help">Un toque lanza toda la secuencia. Añade los pasos en orden</string>
+    <string name="ed_macro_empty">Sin pasos todavía</string>
+    <string name="ed_macro_undo">Quitar el último</string>
+    <string name="ed_macro_clear">Vaciar</string>
+    <string name="ed_macro_together">A la vez que el anterior</string>
+    <string name="ed_macro_together_sub">Lo siguiente que toques se pulsa junto al último paso (A+B)</string>
+    <string name="ed_macro_buttons">Añadir un botón</string>
+    <string name="ed_macro_wait">Añadir una espera</string>
+    <string name="ed_macro_keys">Añadir teclas del teclado</string>
 </resources>

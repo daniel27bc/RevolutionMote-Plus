@@ -170,6 +170,8 @@ internal fun elementTitle(kind: ElementKind, bit: Int, layout: RetroLayout): Str
     ElementKind.KEY -> stringResource(R.string.ed_key)
     ElementKind.PRECISION -> stringResource(R.string.ed_precision)
     ElementKind.RECENTER -> stringResource(R.string.ed_recenter)
+    ElementKind.MACRO -> stringResource(R.string.ed_macro)
+    ElementKind.SHIFT -> stringResource(R.string.ed_shift)
     ElementKind.BUTTON -> stringResource(R.string.ed_button, buttonLabel(bit, layout))
 }
 
@@ -194,6 +196,12 @@ internal fun CustomPadCanvas(
     snap: Boolean = false
 ) {
     val layout = remember(layout, profile.faceStyle) { layout.styled(profile.faceStyle) }
+    // Capa Shift: qué envía cada botón suelto con Shift mantenido (editando, nada)
+    DisposableEffect(profile.elements, editing) {
+        dev.pepotech.pepomote.control.PadShift.map =
+            if (editing) emptyMap() else PadProfiles.shiftMap(profile)
+        onDispose { dev.pepotech.pepomote.control.PadShift.clear() }
+    }
     var guideX by remember { mutableStateOf<Float?>(null) }
     var guideY by remember { mutableStateOf<Float?>(null) }
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -314,6 +322,20 @@ private fun ElementControl(e: PadElement, layout: RetroLayout, gyro: GyroConfig,
             val act = LocalPadActions.current
             IconPadButton(bw, R.drawable.ms_keyboard, PadKeys.label(e.key, appLang()), enabled = act.keysAvailable) { down ->
                 Kbm.key(e.key, down)
+            }
+        }
+        ElementKind.MACRO -> {
+            DisposableEffect(Unit) { onDispose { dev.pepotech.pepomote.control.PadMacro.cancel() } }
+            IconPadButton(bw, R.drawable.ms_bolt, e.key) { down ->
+                if (down) dev.pepotech.pepomote.control.PadMacro.run(e.macro)
+            }
+        }
+        ElementKind.SHIFT -> {
+            var held by remember { mutableStateOf(false) }
+            DisposableEffect(Unit) { onDispose { dev.pepotech.pepomote.control.PadShift.held = false } }
+            IconPadButton(bw, R.drawable.ms_swap_horiz, stringResource(R.string.shift_short), highlighted = held) { down ->
+                held = down
+                dev.pepotech.pepomote.control.PadShift.held = down
             }
         }
         ElementKind.KEYBOARD -> {
@@ -458,7 +480,7 @@ private fun EditFrame(
     val raw = remember { FloatArray(2) }
     val round = element.kind in setOf(
         ElementKind.GYRO, ElementKind.MOUSE_LEFT, ElementKind.MOUSE_RIGHT, ElementKind.KEYBOARD, ElementKind.MODE_TOGGLE,
-        ElementKind.KEY, ElementKind.PRECISION, ElementKind.RECENTER
+        ElementKind.KEY, ElementKind.PRECISION, ElementKind.RECENTER, ElementKind.MACRO, ElementKind.SHIFT
     )
     val shape = if (element.kind == ElementKind.BUTTON && !element.pill || round || element.isStick && !element.trackpad) {
         CircleShape
@@ -763,6 +785,26 @@ internal fun ElementSettingsDialog(
                     val label = PadKeys.label(name, lang)
                     if (name in used) continue
                     ModeChip(label, selected = name == element.key, dense = true) { onChange(element.copy(key = name)) }
+                }
+            }
+        }
+        if (element.kind == ElementKind.MACRO) MacroEditor(element, onChange)
+        if (element.kind == ElementKind.SHIFT) {
+            Text(stringResource(R.string.ed_shift_help), style = MaterialTheme.typography.bodyMedium, color = PepoColors.TextDim)
+        }
+        if (element.kind == ElementKind.BUTTON && profile.elements.any { it.kind == ElementKind.SHIFT }) {
+            Text(stringResource(R.string.ed_shift_pick), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
+            Text(stringResource(R.string.ed_shift_pick_note), style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim)
+            Spacer(Modifier.height(6.dp))
+            ChipFlow {
+                ModeChip(stringResource(R.string.ed_shift_same), selected = element.shiftBit == 0, dense = true) {
+                    onChange(element.copy(shiftBit = 0))
+                }
+                for (bit in PadProfiles.BUTTON_BITS) {
+                    if (bit == element.bit) continue
+                    ModeChip(buttonLabel(bit, layout), selected = element.shiftBit == bit, dense = true) {
+                        onChange(element.copy(shiftBit = bit))
+                    }
                 }
             }
         }
@@ -1190,6 +1232,60 @@ internal fun PadMenuDialog(
         Spacer(Modifier.height(6.dp))
         TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
             Text(stringResource(R.string.ed_done), color = PepoColors.Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+    }
+}
+
+/** El ⚙ de una macro: la secuencia, y chips para ir añadiendo pasos. */
+@Composable
+private fun MacroEditor(element: PadElement, onChange: (PadElement) -> Unit) {
+    val macro = dev.pepotech.pepomote.control.PadMacro
+    val steps = remember(element.macro) { macro.parse(element.macro) }
+    val lang = appLang()
+    var together by remember { mutableStateOf(false) }
+    var showKeys by remember { mutableStateOf(false) }
+    fun save(list: List<dev.pepotech.pepomote.control.PadMacro.Step>) = onChange(element.copy(macro = macro.format(list)))
+    // Un paso nuevo, o (con «a la vez») sumado al último
+    fun press(bits: Int, key: String?) {
+        val last = steps.lastOrNull()
+        if (together && last != null && !last.isWait) {
+            val keys = if (key != null && key !in last.keys) last.keys + key else last.keys
+            save(steps.dropLast(1) + last.copy(bits = last.bits or bits, keys = keys))
+        } else if (steps.size < macro.MAX_STEPS) {
+            save(steps + dev.pepotech.pepomote.control.PadMacro.Step(bits, listOfNotNull(key)))
+        }
+    }
+    Text(stringResource(R.string.ed_macro_help), style = MaterialTheme.typography.bodyMedium, color = PepoColors.TextDim)
+    Spacer(Modifier.height(8.dp))
+    val text = if (steps.isEmpty()) stringResource(R.string.ed_macro_empty) else steps.joinToString("  →  ") { s ->
+        if (s.isWait) "${s.waitMs} ms"
+        else (macro.BUTTONS.filter { s.bits and it.second != 0 }.map { it.first } + s.keys.map { PadKeys.label(it, lang) }).joinToString("+")
+    }
+    Text(text, style = MaterialTheme.typography.titleMedium)
+    Spacer(Modifier.height(8.dp))
+    ChipFlow {
+        ModeChip(stringResource(R.string.ed_macro_undo), selected = false, dense = true, enabled = steps.isNotEmpty()) { save(steps.dropLast(1)) }
+        ModeChip(stringResource(R.string.ed_macro_clear), selected = false, dense = true, enabled = steps.isNotEmpty()) { save(emptyList()) }
+    }
+    SwitchRow(stringResource(R.string.ed_macro_together), together, stringResource(R.string.ed_macro_together_sub)) { together = it }
+    Text(stringResource(R.string.ed_macro_buttons), style = MaterialTheme.typography.titleSmall)
+    Spacer(Modifier.height(6.dp))
+    ChipFlow {
+        for ((name, bit) in macro.BUTTONS) ModeChip(name, selected = false, dense = true) { press(bit, null) }
+    }
+    Text(stringResource(R.string.ed_macro_wait), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+    Spacer(Modifier.height(6.dp))
+    ChipFlow {
+        for (ms in listOf(100, 250, 500, 1000)) {
+            ModeChip("$ms ms", selected = false, dense = true, enabled = steps.size < macro.MAX_STEPS) {
+                save(steps + dev.pepotech.pepomote.control.PadMacro.Step(waitMs = ms))
+            }
+        }
+    }
+    SwitchRow(stringResource(R.string.ed_macro_keys), showKeys, stringResource(R.string.ed_key_note)) { showKeys = it }
+    if (showKeys) {
+        ChipFlow {
+            for ((name, _) in PadKeys.ALL) ModeChip(PadKeys.label(name, lang), selected = false, dense = true) { press(0, name) }
         }
     }
 }
