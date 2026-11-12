@@ -846,4 +846,18 @@
     <string name="ed_macro_buttons">Add a button</string>
     <string name="ed_macro_wait">Add a wait</string>
     <string name="ed_macro_keys">Add keyboard keys</string>
+    <string name="kbm_panel_shortcuts">Shortcuts</string>
+    <string name="shortcut_hint">Tap to fire it. Press and hold to change it</string>
+    <string name="shortcut_edit">Edit shortcut</string>
+    <string name="shortcut_label">Name</string>
+    <string name="shortcut_keys">Keys pressed together</string>
+    <string name="shortcut_text">Or a text it types</string>
+    <string name="shortcut_reset">Restore all</string>
+    <string name="wol_title">Turn on the PC over the network</string>
+    <string name="wol_sub">Wake-on-LAN: wakes the PC from the phone. It must be enabled in the PC\'s BIOS and network card, and the phone on the same network</string>
+    <string name="wol_mac">PC MAC address</string>
+    <string name="wol_wake">Turn on now</string>
+    <string name="wol_sent">Signal sent. The PC takes a few seconds to start</string>
+    <string name="wol_failed">Could not send it. Is the phone on Wi-Fi?</string>
+    <string name="wol_wake_short">Turn on PC</string>
 </resources>

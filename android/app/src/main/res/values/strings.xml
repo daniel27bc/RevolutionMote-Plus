@@ -847,4 +847,18 @@
     <string name="ed_macro_buttons">Añadir un botón</string>
     <string name="ed_macro_wait">Añadir una espera</string>
     <string name="ed_macro_keys">Añadir teclas del teclado</string>
+    <string name="kbm_panel_shortcuts">Atajos</string>
+    <string name="shortcut_hint">Toca para lanzarlo. Mantén pulsado para cambiarlo</string>
+    <string name="shortcut_edit">Editar atajo</string>
+    <string name="shortcut_label">Nombre</string>
+    <string name="shortcut_keys">Teclas que pulsa a la vez</string>
+    <string name="shortcut_text">O un texto que escribe</string>
+    <string name="shortcut_reset">Restaurar todos</string>
+    <string name="wol_title">Encender el PC por la red</string>
+    <string name="wol_sub">Wake-on-LAN: despierta el PC desde el móvil. Tiene que estar activado en la BIOS y en la tarjeta de red del PC, y el móvil en la misma red</string>
+    <string name="wol_mac">Dirección MAC del PC</string>
+    <string name="wol_wake">Encender ahora</string>
+    <string name="wol_sent">Señal enviada. El PC tarda unos segundos en arrancar</string>
+    <string name="wol_failed">No se pudo enviar. ¿Está el móvil en la wifi?</string>
+    <string name="wol_wake_short">Encender PC</string>
 </resources>

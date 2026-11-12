@@ -146,6 +146,17 @@ class ScreenshotTest {
         AppPrefs.setKbmTransport(compose.activity, "")
     }
 
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun tecladoYRatonAtajos() {
+        AppPrefs.setKbmTransport(compose.activity, "app")
+        shot("21_teclado_atajos") {
+            dev.pepotech.pepomote.ui.screens.KbmScreen(
+                onBack = {}, onPair = {}, initialPanel = dev.pepotech.pepomote.ui.screens.KbmPanel.Shortcuts
+            )
+        }
+        AppPrefs.setKbmTransport(compose.activity, "")
+    }
+
     @Test @Config(qualifiers = "es-rES-w420dp-h900dp-port-xhdpi")
     fun elegirConexion() = shot("13_elegir_conexion") { dev.pepotech.pepomote.ui.screens.KbmScreen(onBack = {}, onPair = {}) }
 

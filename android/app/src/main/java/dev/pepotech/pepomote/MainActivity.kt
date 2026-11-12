@@ -682,6 +682,19 @@ private fun Root(activity: MainActivity) {
                 update = update,
                 onOpenUpdate = { UpdateNotice.show(context) },
                 onDismissUpdate = { v -> UpdateNotice.dismiss(context, v) },
+                onWake = dev.pepotech.pepomote.control.WakeOnLan.parseMac(AppPrefs.wolMac(context))?.let { mac ->
+                    {
+                        val host = PairStore.load(context)?.host
+                        val main = android.os.Handler(android.os.Looper.getMainLooper())
+                        dev.pepotech.pepomote.control.WakeOnLan.send(mac, host) { ok ->
+                            main.post {
+                                android.widget.Toast.makeText(
+                                    context, if (ok) R.string.wol_sent else R.string.wol_failed, android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+                },
                 favorites = homeFavorites,
                 last = homeLast,
                 onOpened = { e ->

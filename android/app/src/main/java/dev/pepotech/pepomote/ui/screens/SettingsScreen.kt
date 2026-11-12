@@ -570,6 +570,55 @@ private fun ProfileQrDialog(profiles: List<dev.pepotech.pepomote.control.PadProf
     }
 }
 
+/** Encender el PC por la red: su dirección MAC y un botón. */
+@Composable
+internal fun WakeOnLanCard() {
+    val context = LocalContext.current
+    var mac by remember { mutableStateOf(dev.pepotech.pepomote.control.AppPrefs.wolMac(context)) }
+    var status by remember { mutableStateOf<String?>(null) }
+    val sent = stringResource(R.string.wol_sent)
+    val failed = stringResource(R.string.wol_failed)
+    val parsed = dev.pepotech.pepomote.control.WakeOnLan.parseMac(mac)
+    Card(
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
+        border = BorderStroke(1.5.dp, PepoColors.CardBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(18.dp)) {
+            Text(stringResource(R.string.wol_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.wol_sub), style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.material3.OutlinedTextField(
+                value = mac,
+                onValueChange = {
+                    mac = it.take(17)
+                    dev.pepotech.pepomote.control.AppPrefs.setWolMac(context, mac.trim())
+                    status = null
+                },
+                singleLine = true,
+                isError = mac.isNotBlank() && parsed == null,
+                label = { Text(stringResource(R.string.wol_mac)) },
+                placeholder = { Text("AA:BB:CC:DD:EE:FF") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            TextButton(
+                enabled = parsed != null,
+                onClick = {
+                    val host = dev.pepotech.pepomote.net.PairStore.load(context)?.host
+                    val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                    dev.pepotech.pepomote.control.WakeOnLan.send(parsed!!, host) { ok ->
+                        handler.post { status = if (ok) sent else failed }
+                    }
+                }
+            ) {
+                IconLabel(R.drawable.ms_bolt, stringResource(R.string.wol_wake), if (parsed != null) PepoColors.Blue else PepoColors.TextDim)
+            }
+            status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim) }
+        }
+    }
+}
+
 /** Entrada a la pantalla de diagnóstico. */
 @Composable
 internal fun DiagEntryCard(onDiag: () -> Unit) {
@@ -1015,6 +1064,7 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
             }
             }
             SettingItem(listOf(R.string.backup_title, R.string.backup_sub)) { ProfileBackupCard() }
+            SettingItem(listOf(R.string.wol_title, R.string.wol_sub)) { WakeOnLanCard() }
             SettingItem(listOf(R.string.layout_reset_title, R.string.layout_reset_btn)) {
             Card(
                 shape = MaterialTheme.shapes.medium,

@@ -92,7 +92,9 @@ fun HomeScreen(
     last: String? = null,
     /** Se abre una tarjeta de modo: MainActivity lo apunta para «Continuar». */
     onOpened: (HomeEntry) -> Unit = {},
-    onFavorites: (List<String>) -> Unit = {}
+    onFavorites: (List<String>) -> Unit = {},
+    /** Encender el PC por la red (null = sin MAC configurada: no se ofrece). */
+    onWake: (() -> Unit)? = null
 ) {
     // Qué hace cada tarjeta de modo (las de siempre; aquí solo se reparten)
     val open: (HomeEntry) -> Unit = { e ->
@@ -145,39 +147,57 @@ fun HomeScreen(
                 // Estado del enlace, en una píldora que se toca para cambiar de equipo
                 val statusShape = RoundedCornerShape(50)
                 val statusHint = stringResource(R.string.home_status_change)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .background(PepoColors.Card, statusShape)
-                        .border(1.5.dp, PepoColors.CardBorder, statusShape)
-                        .clip(statusShape)
-                        .clickable(onClickLabel = statusHint, onClick = onConnect)
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    when (status.tone) {
-                        HomeTone.On -> Box(
-                            Modifier
-                                .size(10.dp)
-                                .background(PepoColors.Ok, CircleShape)
-                        )
-                        HomeTone.Busy -> PulsingDot(PepoColors.Warn)
-                        HomeTone.Off -> Box(
-                            Modifier
-                                .size(10.dp)
-                                .background(PepoColors.TextDim, CircleShape)
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        status.text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    status.detail?.let {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .background(PepoColors.Card, statusShape)
+                            .border(1.5.dp, PepoColors.CardBorder, statusShape)
+                            .clip(statusShape)
+                            .clickable(onClickLabel = statusHint, onClick = onConnect)
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        when (status.tone) {
+                            HomeTone.On -> Box(
+                                Modifier
+                                    .size(10.dp)
+                                    .background(PepoColors.Ok, CircleShape)
+                            )
+                            HomeTone.Busy -> PulsingDot(PepoColors.Warn)
+                            HomeTone.Off -> Box(
+                                Modifier
+                                    .size(10.dp)
+                                    .background(PepoColors.TextDim, CircleShape)
+                            )
+                        }
                         Spacer(Modifier.width(8.dp))
-                        Text(it, style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim), maxLines = 1)
+                        Text(
+                            status.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        status.detail?.let {
+                            Spacer(Modifier.width(8.dp))
+                            Text(it, style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim), maxLines = 1)
+                        }
+                    }
+                    // Sin conexión y con la MAC del PC guardada: encenderlo desde aquí
+                    if (onWake != null && status.tone == HomeTone.Off) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.wol_wake_short),
+                            style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.Blue),
+                            maxLines = 1,
+                            modifier = Modifier
+                                .background(PepoColors.Card, statusShape)
+                                .border(1.5.dp, PepoColors.CardBorder, statusShape)
+                                .clip(statusShape)
+                                .clickable(onClick = onWake)
+                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                        )
                     }
                 }
                 Spacer(Modifier.height(8.dp))

@@ -297,6 +297,22 @@ object AppPrefs {
             .edit().putString("globalLook", PadProfileJson.lookToJson(value).toString()).apply()
     }
 
+    /** Panel de atajos de Teclado y ratón (JSON de [ShortcutDeck]; null = los de fábrica). */
+    fun shortcutDeck(context: Context): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("shortcutDeck", null)
+
+    fun setShortcutDeck(context: Context, json: String?) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("shortcutDeck", json).apply()
+    }
+
+    /** Dirección MAC del PC para encenderlo por la red (vacío = sin configurar). */
+    fun wolMac(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("wolMac", "") ?: ""
+
+    fun setWolMac(context: Context, mac: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("wolMac", mac).apply()
+    }
+
     /** Tarjetas fijadas arriba en el inicio (ids de [HomeEntry], en orden). */
     fun homeFavorites(context: Context): List<String> =
         HomeLayout.parse(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("homeFavorites", ""))
