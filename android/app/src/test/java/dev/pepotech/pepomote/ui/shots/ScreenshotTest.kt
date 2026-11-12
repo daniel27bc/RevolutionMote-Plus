@@ -113,6 +113,39 @@ class ScreenshotTest {
         AppPrefs.setKbmTransport(compose.activity, "")
     }
 
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun tecladoYRatonMedia() {
+        AppPrefs.setKbmTransport(compose.activity, "app")
+        shot("18_teclado_multimedia") {
+            dev.pepotech.pepomote.ui.screens.KbmScreen(
+                onBack = {}, onPair = {}, initialPanel = dev.pepotech.pepomote.ui.screens.KbmPanel.Media
+            )
+        }
+        AppPrefs.setKbmTransport(compose.activity, "")
+    }
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun tecladoYRatonNumpad() {
+        AppPrefs.setKbmTransport(compose.activity, "app")
+        shot("19_teclado_numerico") {
+            dev.pepotech.pepomote.ui.screens.KbmScreen(
+                onBack = {}, onPair = {}, initialPanel = dev.pepotech.pepomote.ui.screens.KbmPanel.Numpad
+            )
+        }
+        AppPrefs.setKbmTransport(compose.activity, "")
+    }
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun tecladoYRatonPresent() {
+        AppPrefs.setKbmTransport(compose.activity, "app")
+        shot("20_teclado_presentar") {
+            dev.pepotech.pepomote.ui.screens.KbmScreen(
+                onBack = {}, onPair = {}, initialPanel = dev.pepotech.pepomote.ui.screens.KbmPanel.Present
+            )
+        }
+        AppPrefs.setKbmTransport(compose.activity, "")
+    }
+
     @Test @Config(qualifiers = "es-rES-w420dp-h900dp-port-xhdpi")
     fun elegirConexion() = shot("13_elegir_conexion") { dev.pepotech.pepomote.ui.screens.KbmScreen(onBack = {}, onPair = {}) }
 

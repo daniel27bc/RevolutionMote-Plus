@@ -22,6 +22,16 @@ import kotlin.math.roundToInt
  * cursor se mueve en relativo, como un ratón, y nunca se descentra.
  */
 object Kbm {
+    /**
+     * Presentar: los botones de volumen del móvil pasan diapositivas
+     * (MainActivity los desvía mientras esté puesto).
+     */
+    @Volatile
+    var slideKeys = false
+
+    const val SLIDE_NEXT = "PageDown"
+    const val SLIDE_PREV = "PageUp"
+
     enum class Backend { NONE, APP, POINTER, BT }
 
     /** Píxeles de cursor por dp de dedo (con sensibilidad 1). */

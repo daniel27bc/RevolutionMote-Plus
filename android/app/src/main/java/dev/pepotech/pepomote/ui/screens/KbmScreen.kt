@@ -92,13 +92,19 @@ internal object KbmTransport {
  * que haya uno predeterminado; desde la propia pantalla se cambia.
  */
 @Composable
-fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit) {
+fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit, initialPanel: KbmPanel = KbmPanel.Touchpad) {
     val context = LocalContext.current
     var transport by remember { mutableStateOf(AppPrefs.kbmTransport(context)) }
     var asking by remember { mutableStateOf(transport.isEmpty()) }
     var isDefault by remember { mutableStateOf(transport.isNotEmpty()) }
     var mouse by remember { mutableStateOf(AppPrefs.globalMouse(context)) }
     var showSettings by remember { mutableStateOf(false) }
+    // Qué hay en el hueco grande: touchpad, multimedia, numérico o presentar
+    var panel by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialPanel) }
+    DisposableEffect(panel) {
+        Kbm.slideKeys = panel == KbmPanel.Present
+        onDispose { Kbm.slideKeys = false }
+    }
     val link by LinkState.flow.collectAsState()
     val bt by BtHid.state.collectAsState()
 
@@ -186,6 +192,9 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit) {
                 discoverable.launch(Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120))
             })
             Spacer(Modifier.height(6.dp))
+            KbmPanelChips(panel) { panel = it }
+            Spacer(Modifier.height(6.dp))
+            val appBackend = transport == KbmTransport.APP
             val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
                 android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val clicks: @Composable (Modifier) -> Unit = { m ->
@@ -203,9 +212,7 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit) {
                 // Apaisado: el touchpad a la izquierda, a todo lo alto; los
                 // clics, las teclas y el texto a la derecha
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    BoxWithConstraints(Modifier.weight(1.25f).fillMaxHeight()) {
-                        MousePad(maxWidth, maxHeight, mouseMode = true, sensitivity = mouse.padSens, antiDeadzone = 0f, inertia = mouse.inertia)
-                    }
+                    KbmSurface(panel, mouse, appBackend, Modifier.weight(1.25f).fillMaxHeight())
                     Column(
                         Modifier
                             .weight(1f)
@@ -220,9 +227,7 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit) {
                 }
             } else {
                 // El touchpad grande
-                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                    MousePad(maxWidth, maxHeight, mouseMode = true, sensitivity = mouse.padSens, antiDeadzone = 0f, inertia = mouse.inertia)
-                }
+                KbmSurface(panel, mouse, appBackend, Modifier.weight(1f).fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
                 clicks(Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
@@ -379,7 +384,7 @@ private fun TransportOption(
 
 /** Una tecla de mantener (botones del ratón). */
 @Composable
-private fun HoldKey(label: String, modifier: Modifier, icon: Int? = null, onPress: (Boolean) -> Unit) {
+internal fun HoldKey(label: String, modifier: Modifier, icon: Int? = null, onPress: (Boolean) -> Unit) {
     val view = LocalView.current
     var down by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)

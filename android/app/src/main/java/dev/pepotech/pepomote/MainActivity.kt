@@ -61,6 +61,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import dev.pepotech.pepomote.control.AppPrefs
 import dev.pepotech.pepomote.control.HomeLayout
+import dev.pepotech.pepomote.control.Kbm
 import kotlin.math.roundToInt
 import dev.pepotech.pepomote.control.ButtonState
 import dev.pepotech.pepomote.control.Haptics
@@ -483,6 +484,18 @@ class MainActivity : ComponentActivity() {
         // Mando físico (USB / Bluetooth / telescópico) con un mando abierto:
         // sus botones van al PC como los del táctil
         if (currentScreen == Screen.Controller && PhysicalPad.onKey(this, event)) return true
+        // Teclado y ratón > Presentar: los botones de volumen pasan diapositivas
+        if (currentScreen == Screen.Kbm && Kbm.slideKeys) {
+            val slide = when (event.keyCode) {
+                KeyEvent.KEYCODE_VOLUME_DOWN -> Kbm.SLIDE_NEXT
+                KeyEvent.KEYCODE_VOLUME_UP -> Kbm.SLIDE_PREV
+                else -> null
+            }
+            if (slide != null) {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) Kbm.tap(slide)
+                return true
+            }
+        }
         val bit = when (event.keyCode) {
             KeyEvent.KEYCODE_VOLUME_UP -> AppPrefs.volUpBit(this)
             KeyEvent.KEYCODE_VOLUME_DOWN -> AppPrefs.volDownBit(this)

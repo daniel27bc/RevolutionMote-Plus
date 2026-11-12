@@ -799,4 +799,21 @@
     <string name="home_pin_hint">Mantén pulsada una tarjeta para fijarla arriba</string>
     <string name="home_status_change">Cambiar de equipo</string>
     <string name="home_status_ms">%1$d ms</string>
+    <string name="kbm_panel_touchpad">Touchpad</string>
+    <string name="kbm_panel_media">Multimedia</string>
+    <string name="kbm_panel_numpad">Numérico</string>
+    <string name="kbm_panel_present">Presentar</string>
+    <string name="media_play">Reproducir o pausar</string>
+    <string name="media_next">Pista siguiente</string>
+    <string name="media_prev">Pista anterior</string>
+    <string name="media_vol_up">Subir volumen</string>
+    <string name="media_vol_down">Bajar volumen</string>
+    <string name="media_mute">Silenciar</string>
+    <string name="present_start">Empezar</string>
+    <string name="present_end">Terminar</string>
+    <string name="present_black">En negro</string>
+    <string name="present_prev">Anterior</string>
+    <string name="present_next">Siguiente</string>
+    <string name="present_vol_hint">Los botones de volumen del móvil también pasan las diapositivas. Mueve el puntero con el touchpad</string>
+    <string name="kbm_media_app_hint">Por la app, estas teclas necesitan el receptor de RevolutionMote+ 1.4 o posterior</string>
 </resources>

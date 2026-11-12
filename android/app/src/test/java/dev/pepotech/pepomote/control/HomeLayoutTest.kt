@@ -42,6 +42,10 @@ class HomeLayoutTest {
         assertEquals(listOf(HomeEntry.Gamepad, HomeEntry.Dolphin), HomeLayout.favorites(saved, androidReceiver = false))
     }
 
+    @Test fun elMandoDeWiiEsLaPrimeraTarjetaDeConsolas() {
+        assertEquals(HomeEntry.Pointer, HomeLayout.group(HomeGroup.Consoles, emptyList(), false).first())
+    }
+
     @Test fun fijarYQuitar() {
         var s = HomeLayout.toggle(emptyList(), HomeEntry.Dolphin)
         s = HomeLayout.toggle(s, HomeEntry.Kbm)
@@ -61,7 +65,7 @@ class HomeLayoutTest {
         var s = emptyList<String>()
         for (e in HomeEntry.entries) s = HomeLayout.toggle(s, e)
         assertEquals(HomeLayout.MAX_FAVORITES, s.size)
-        assertFalse("dolphin" in s)
+        assertFalse("pointer" in s)
     }
 
     @Test fun continuarSoloConLoQueSePuedeAbrirAhora() {

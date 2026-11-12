@@ -11,6 +11,8 @@ enum class HomeGroup { Consoles, Pc, Tools }
  * puntero, Wii U ni mando de Xbox virtual).
  */
 enum class HomeEntry(val id: String, val group: HomeGroup, val pcOnly: Boolean = false) {
+    // El mando de Wii (puntero): el modo principal, el primero
+    Pointer("pointer", HomeGroup.Consoles, pcOnly = true),
     Dolphin("dolphin", HomeGroup.Consoles),
     WiiU("wiiu", HomeGroup.Consoles, pcOnly = true),
     Switch("switch", HomeGroup.Consoles),
@@ -18,7 +20,6 @@ enum class HomeEntry(val id: String, val group: HomeGroup, val pcOnly: Boolean =
     Nunchuk("nunchuk", HomeGroup.Consoles, pcOnly = true),
     Gamepad("gamepad", HomeGroup.Pc, pcOnly = true),
     Kbm("kbm", HomeGroup.Pc),
-    Pointer("pointer", HomeGroup.Pc, pcOnly = true),
     Settings("settings", HomeGroup.Tools);
 
     companion object {

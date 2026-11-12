@@ -270,6 +270,12 @@ impl Injector for WinInjector {
     /// así que WASD, Ctrl o F5 llegan como de un teclado de verdad.
     fn key_named(&mut self, name: &str, down: bool) -> bool {
         let Some((vk, extended)) = win_vk_by_name(name) else { return false };
+        // Multimedia y volumen: por tecla virtual (las atiende el sistema, no
+        // un juego leyendo el escaneo)
+        if (0xAD..=0xB3).contains(&vk) {
+            self.send_key(VIRTUAL_KEY(vk), down);
+            return true;
+        }
         let scan = unsafe { MapVirtualKeyW(vk as u32, MAPVK_VK_TO_VSC) } as u16;
         if scan == 0 {
             self.send_key(VIRTUAL_KEY(vk), down);
@@ -379,12 +385,25 @@ impl Injector for WinInjector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        VK_ADD, VK_DIVIDE, VK_MEDIA_PLAY_PAUSE, VK_NUMPAD7, VK_VOLUME_MUTE, VK_VOLUME_UP,
+    };
 
     #[test]
     fn las_teclas_virtuales_del_plan_son_las_de_windows() {
         use super::super::text_plan::{WIN_VK_BACK, WIN_VK_RETURN};
         assert_eq!(WIN_VK_RETURN, VK_RETURN.0);
         assert_eq!(WIN_VK_BACK, VK_BACK.0);
+    }
+
+    #[test]
+    fn las_teclas_multimedia_y_del_numerico_tienen_tecla_virtual() {
+        assert_eq!(win_vk_by_name("MediaPlayPause"), Some((VK_MEDIA_PLAY_PAUSE.0, true)));
+        assert_eq!(win_vk_by_name("AudioVolumeUp"), Some((VK_VOLUME_UP.0, true)));
+        assert_eq!(win_vk_by_name("AudioVolumeMute"), Some((VK_VOLUME_MUTE.0, true)));
+        assert_eq!(win_vk_by_name("NumpadAdd"), Some((VK_ADD.0, false)));
+        assert_eq!(win_vk_by_name("NumpadDivide"), Some((VK_DIVIDE.0, true)));
+        assert_eq!(win_vk_by_name("Numpad7"), Some((VK_NUMPAD7.0, false)));
     }
 
     #[test]
@@ -449,6 +468,18 @@ fn win_vk_by_name(name: &str) -> Option<(u16, bool)> {
         "Space" => (0x20, false),
         "Enter" => (0x0D, false),
         "NumpadEnter" => (0x0D, true),
+        "NumpadAdd" => (0x6B, false),
+        "NumpadSubtract" => (0x6D, false),
+        "NumpadMultiply" => (0x6A, false),
+        "NumpadDivide" => (0x6F, true),
+        "NumpadDecimal" => (0x6E, false),
+        "NumLock" => (0x90, true),
+        "AudioVolumeMute" => (0xAD, true),
+        "AudioVolumeDown" => (0xAE, true),
+        "AudioVolumeUp" => (0xAF, true),
+        "MediaTrackNext" => (0xB0, true),
+        "MediaTrackPrevious" => (0xB1, true),
+        "MediaPlayPause" => (0xB3, true),
         "Backspace" => (0x08, false),
         "Delete" => (0x2E, true),
         "Insert" => (0x2D, true),

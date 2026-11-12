@@ -798,4 +798,21 @@
     <string name="home_pin_hint">Press and hold a card to pin it to the top</string>
     <string name="home_status_change">Switch device</string>
     <string name="home_status_ms">%1$d ms</string>
+    <string name="kbm_panel_touchpad">Touchpad</string>
+    <string name="kbm_panel_media">Media</string>
+    <string name="kbm_panel_numpad">Numpad</string>
+    <string name="kbm_panel_present">Present</string>
+    <string name="media_play">Play or pause</string>
+    <string name="media_next">Next track</string>
+    <string name="media_prev">Previous track</string>
+    <string name="media_vol_up">Volume up</string>
+    <string name="media_vol_down">Volume down</string>
+    <string name="media_mute">Mute</string>
+    <string name="present_start">Start</string>
+    <string name="present_end">End</string>
+    <string name="present_black">Black screen</string>
+    <string name="present_prev">Previous</string>
+    <string name="present_next">Next</string>
+    <string name="present_vol_hint">The phone\'s volume buttons also change slides. Move the pointer with the touchpad</string>
+    <string name="kbm_media_app_hint">Over the app, these keys need the RevolutionMote+ receiver 1.4 or later</string>
 </resources>

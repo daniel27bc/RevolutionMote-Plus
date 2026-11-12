@@ -52,6 +52,7 @@ object BtHid {
 
     private const val ID_KEYBOARD = 1
     private const val ID_MOUSE = 2
+    private const val ID_CONSUMER = 3
 
     private val DESCRIPTOR = byteArrayOf(
         // Teclado (informe 1)
@@ -70,7 +71,20 @@ object BtHid {
         0x95.toByte(), 0x01, 0x75, 0x05, 0x81.toByte(), 0x01,
         0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x38,
         0x15, 0x81.toByte(), 0x25, 0x7F, 0x75, 0x08, 0x95.toByte(), 0x03, 0x81.toByte(), 0x06,
-        0xC0.toByte(), 0xC0.toByte()
+        0xC0.toByte(), 0xC0.toByte(),
+        // Control multimedia (página Consumer): un bit por tecla
+        0x05, 0x0C, 0x09, 0x01, 0xA1.toByte(), 0x01,
+        0x85.toByte(), ID_CONSUMER.toByte(),
+        0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95.toByte(), 0x06,
+        0x09, 0xCD.toByte(), // reproducir / pausar
+        0x09, 0xB5.toByte(), // pista siguiente
+        0x09, 0xB6.toByte(), // pista anterior
+        0x09, 0xE2.toByte(), // silenciar
+        0x09, 0xE9.toByte(), // subir volumen
+        0x09, 0xEA.toByte(), // bajar volumen
+        0x81.toByte(), 0x02,
+        0x95.toByte(), 0x02, 0x81.toByte(), 0x01, // relleno hasta el byte
+        0xC0.toByte()
     )
 
     /** ¿Este móvil puede hacer de teclado y ratón Bluetooth? */
@@ -230,7 +244,16 @@ object BtHid {
 
     // --- Teclado ---
 
+    /** Teclas multimedia mantenidas (bits de HidKeys.consumerBit). */
+    private var consumer = 0
+
     fun key(name: String, down: Boolean) {
+        val media = HidKeys.consumerBit(name)
+        if (media != 0) {
+            consumer = if (down) consumer or media else consumer and media.inv()
+            outbox += ID_CONSUMER to byteArrayOf(consumer.toByte())
+            return
+        }
         val mod = HidKeys.modifierBit(name)
         if (mod != 0) {
             modifiers = if (down) modifiers or mod else modifiers and mod.inv()
@@ -262,6 +285,10 @@ object BtHid {
         wheelAcc = 0
         outbox += ID_MOUSE to byteArrayOf(0, 0, 0, 0)
         outbox += ID_KEYBOARD to keyboardReport(0, emptyList())
+        if (consumer != 0) {
+            consumer = 0
+            outbox += ID_CONSUMER to byteArrayOf(0)
+        }
     }
 
     private fun keyboardReport(mods: Int, codes: List<Int>): ByteArray {
@@ -315,13 +342,33 @@ object HidKeys {
         else -> 0
     }
 
+    /** Bit de una tecla multimedia en el informe Consumer (0 = no lo es). */
+    fun consumerBit(name: String): Int = when (name) {
+        "MediaPlayPause" -> 0x01
+        "MediaTrackNext" -> 0x02
+        "MediaTrackPrevious" -> 0x04
+        "AudioVolumeMute" -> 0x08
+        "AudioVolumeUp" -> 0x10
+        "AudioVolumeDown" -> 0x20
+        else -> 0
+    }
+
     fun usage(name: String): Int? {
         if (name.length == 4 && name.startsWith("Key") && name[3] in 'A'..'Z') return 0x04 + (name[3] - 'A')
         if (name.length == 6 && name.startsWith("Digit") && name[5] in '0'..'9') {
             return if (name[5] == '0') 0x27 else 0x1E + (name[5] - '1')
         }
         if (name.startsWith("F")) name.drop(1).toIntOrNull()?.let { n -> if (n in 1..12) return 0x3A + n - 1 }
+        if (name.length == 7 && name.startsWith("Numpad") && name[6] in '0'..'9') {
+            return if (name[6] == '0') 0x62 else 0x59 + (name[6] - '1')
+        }
         return when (name) {
+            "NumLock" -> 0x53
+            "NumpadDivide" -> 0x54
+            "NumpadMultiply" -> 0x55
+            "NumpadSubtract" -> 0x56
+            "NumpadAdd" -> 0x57
+            "NumpadDecimal" -> 0x63
             "Enter", "NumpadEnter" -> 0x28
             "Escape" -> 0x29
             "Backspace" -> 0x2A
