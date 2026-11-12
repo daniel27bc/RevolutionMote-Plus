@@ -66,7 +66,7 @@ object ShortcutDeck {
     /** Las teclas en el orden de pulsar: primero los modificadores. */
     fun chord(s: Shortcut): List<String> {
         val mods = MODIFIERS.map { it.first }
-        return s.keys.filter { it in mods } + s.keys.filter { it !in mods }
+        return mods.filter { it in s.keys } + s.keys.filter { it !in mods }
     }
 
     fun fire(s: Shortcut) {
