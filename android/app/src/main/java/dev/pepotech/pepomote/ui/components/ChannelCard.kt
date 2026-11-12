@@ -88,7 +88,21 @@ fun ChannelCard(
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (icon != null) Ico(icon, accent, 40.dp) else Canvas(modifier = Modifier.size(40.dp)) { drawGlyph(glyph, accent, ink, card) }
+                // El mismo dibujo que la tarjeta cuadrada: logo propio, imagen,
+                // silueta teñida, icono o, si no hay nada de eso, el glifo
+                val widePic = logo ?: image
+                if (widePic != null) {
+                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(widePic), null, Modifier.size(40.dp))
+                } else if (mask != null) {
+                    androidx.compose.foundation.Image(
+                        androidx.compose.ui.res.painterResource(mask), null, Modifier.size(40.dp),
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(accent)
+                    )
+                } else if (icon != null) {
+                    Ico(icon, accent, 40.dp)
+                } else {
+                    Canvas(modifier = Modifier.size(40.dp)) { drawGlyph(glyph, accent, ink, card) }
+                }
                 Spacer(Modifier.width(16.dp))
                 Column {
                     Text(title, style = MaterialTheme.typography.titleMedium)

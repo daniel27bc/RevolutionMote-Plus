@@ -117,70 +117,76 @@ fun HomeScreen(
             .displayCutoutPadding()
             .padding(horizontal = 20.dp)
     ) {
-        Spacer(Modifier.height(28.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            dev.pepotech.pepomote.ui.components.BrandTitle(Modifier.weight(1f), logo = 38.dp, fontSize = 26.sp)
-            // Idioma: ES / EN (toca para cambiar)
-            val pill = RoundedCornerShape(14.dp)
-            Text(
-                langLabel,
-                style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.Text),
-                modifier = Modifier
-                    .semantics { contentDescription = langSwitchHint }
-                    .background(PepoColors.Card, pill)
-                    .border(1.5.dp, PepoColors.CardBorder, pill)
-                    .clickable(onClick = onToggleLang)
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            )
-        }
-        Text(
-            stringResource(R.string.home_subtitle),
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Spacer(Modifier.height(10.dp))
-        // Estado del enlace, en una píldora que se toca para cambiar de equipo
-        val statusShape = RoundedCornerShape(50)
-        val statusHint = stringResource(R.string.home_status_change)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .background(PepoColors.Card, statusShape)
-                .border(1.5.dp, PepoColors.CardBorder, statusShape)
-                .clip(statusShape)
-                .clickable(onClickLabel = statusHint, onClick = onConnect)
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-        ) {
-            when (status.tone) {
-                HomeTone.On -> Box(
-                    Modifier
-                        .size(10.dp)
-                        .background(PepoColors.Ok, CircleShape)
+        // La cabecera va DENTRO de la rejilla: en apaisado se desplaza con las
+        // tarjetas en vez de comerse media pantalla
+        val header: @Composable () -> Unit = {
+            Column {
+                Spacer(Modifier.height(28.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    dev.pepotech.pepomote.ui.components.BrandTitle(Modifier.weight(1f), logo = 38.dp, fontSize = 26.sp)
+                    // Idioma: ES / EN (toca para cambiar)
+                    val pill = RoundedCornerShape(14.dp)
+                    Text(
+                        langLabel,
+                        style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.Text),
+                        modifier = Modifier
+                            .semantics { contentDescription = langSwitchHint }
+                            .background(PepoColors.Card, pill)
+                            .border(1.5.dp, PepoColors.CardBorder, pill)
+                            .clickable(onClick = onToggleLang)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+                Text(
+                    stringResource(R.string.home_subtitle),
+                    style = MaterialTheme.typography.bodyMedium
                 )
-                HomeTone.Busy -> PulsingDot(PepoColors.Warn)
-                HomeTone.Off -> Box(
-                    Modifier
-                        .size(10.dp)
-                        .background(PepoColors.TextDim, CircleShape)
-                )
+                Spacer(Modifier.height(10.dp))
+                // Estado del enlace, en una píldora que se toca para cambiar de equipo
+                val statusShape = RoundedCornerShape(50)
+                val statusHint = stringResource(R.string.home_status_change)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(PepoColors.Card, statusShape)
+                        .border(1.5.dp, PepoColors.CardBorder, statusShape)
+                        .clip(statusShape)
+                        .clickable(onClickLabel = statusHint, onClick = onConnect)
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    when (status.tone) {
+                        HomeTone.On -> Box(
+                            Modifier
+                                .size(10.dp)
+                                .background(PepoColors.Ok, CircleShape)
+                        )
+                        HomeTone.Busy -> PulsingDot(PepoColors.Warn)
+                        HomeTone.Off -> Box(
+                            Modifier
+                                .size(10.dp)
+                                .background(PepoColors.TextDim, CircleShape)
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        status.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    status.detail?.let {
+                        Spacer(Modifier.width(8.dp))
+                        Text(it, style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim), maxLines = 1)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                // Aviso de versión nueva (enlace a la release de GitHub)
+                update?.let { v ->
+                    UpdateCard(version = v, onOpen = { onOpenUpdate(v) }, onDismiss = { onDismissUpdate(v) })
+                    Spacer(Modifier.height(16.dp))
+                }
             }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                status.text,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
-            )
-            status.detail?.let {
-                Spacer(Modifier.width(8.dp))
-                Text(it, style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim), maxLines = 1)
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-        // Aviso de versión nueva (enlace a la release de GitHub)
-        update?.let { v ->
-            UpdateCard(version = v, onOpen = { onOpenUpdate(v) }, onDismiss = { onDismissUpdate(v) })
-            Spacer(Modifier.height(16.dp))
         }
         // Arriba, la conexión; debajo, lo último que se usó, los favoritos y
         // los bloques por intención (consolas, PC y escritorio, lo demás).
@@ -205,6 +211,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
+            item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
             // Continuar: un toque y a jugar con lo de la última vez
             lastEntry?.let { e ->
                 item(key = "continue", span = { GridItemSpan(maxLineSpan) }) {
