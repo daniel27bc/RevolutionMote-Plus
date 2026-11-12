@@ -37,7 +37,7 @@ internal fun KbmPanelChips(current: KbmPanel, onPick: (KbmPanel) -> Unit) {
             KbmPanel.Numpad to R.string.kbm_panel_numpad,
             KbmPanel.Present to R.string.kbm_panel_present
         )) {
-            ModeChip(stringResource(label), selected = current == panel) { onPick(panel) }
+            ModeChip(stringResource(label), selected = current == panel, dense = true) { onPick(panel) }
         }
     }
 }

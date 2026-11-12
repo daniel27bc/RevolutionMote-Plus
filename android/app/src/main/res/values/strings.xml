@@ -816,4 +816,10 @@
     <string name="present_next">Siguiente</string>
     <string name="present_vol_hint">Los botones de volumen del móvil también pasan las diapositivas. Mueve el puntero con el touchpad</string>
     <string name="kbm_media_app_hint">Por la app, estas teclas necesitan el receptor de RevolutionMote+ 1.4 o posterior</string>
+    <string name="share_qr">Compartir por QR</string>
+    <string name="share_qr_scan">Leer QR</string>
+    <string name="share_qr_scan_prompt">Apunta al QR del perfil en el otro móvil</string>
+    <string name="share_qr_hint">En el otro móvil: Ajustes, copia de perfiles, «Leer QR», y apunta a esta pantalla</string>
+    <string name="share_qr_too_big">Este perfil es demasiado grande para un QR. Expórtalo a un archivo</string>
+    <string name="share_qr_desc">Código QR del perfil</string>
 </resources>

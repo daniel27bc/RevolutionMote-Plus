@@ -1,5 +1,7 @@
 package dev.pepotech.pepomote.ui.screens
 
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.horizontalScroll
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -472,6 +474,17 @@ internal fun ProfileBackupCard() {
         status = if (n > 0) importOkFmt.format(n) else failed
     }
     val profiles by PadProfileStore.profiles.collectAsState()
+    // Compartir un perfil de móvil a móvil con un QR
+    var sharing by remember { mutableStateOf(false) }
+    val scanPrompt = stringResource(R.string.share_qr_scan_prompt)
+    val qrScanner = androidx.activity.compose.rememberLauncherForActivityResult(
+        com.journeyapps.barcodescanner.ScanContract()
+    ) { result ->
+        val contents = result.contents ?: return@rememberLauncherForActivityResult
+        val n = dev.pepotech.pepomote.control.PadShare.decode(contents)?.let { PadProfileStore.importJson(context, it) } ?: 0
+        status = if (n > 0) importOkFmt.format(n) else failed
+    }
+    if (sharing) ProfileQrDialog(profiles) { sharing = false }
     Card(
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
@@ -490,7 +503,69 @@ internal fun ProfileBackupCard() {
                     IconLabel(R.drawable.ms_download, stringResource(R.string.backup_import), PepoColors.Blue)
                 }
             }
+            Row {
+                TextButton(onClick = { sharing = true }, enabled = profiles.isNotEmpty()) {
+                    IconLabel(R.drawable.ms_ios_share, stringResource(R.string.share_qr), if (profiles.isNotEmpty()) PepoColors.Blue else PepoColors.TextDim)
+                }
+                TextButton(onClick = {
+                    qrScanner.launch(
+                        com.journeyapps.barcodescanner.ScanOptions()
+                            .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE)
+                            .setPrompt(scanPrompt)
+                            .setBeepEnabled(false)
+                            .setOrientationLocked(true)
+                            .setCaptureActivity(dev.pepotech.pepomote.PortraitCaptureActivity::class.java)
+                    )
+                }) {
+                    IconLabel(R.drawable.ms_center_focus_strong, stringResource(R.string.share_qr_scan), PepoColors.Blue)
+                }
+            }
             status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = PepoColors.TextDim) }
+        }
+    }
+}
+
+/** El QR de un perfil, para que otro móvil lo lea desde esta misma tarjeta. */
+@Composable
+private fun ProfileQrDialog(profiles: List<dev.pepotech.pepomote.control.PadProfile>, onDismiss: () -> Unit) {
+    var picked by remember { mutableStateOf(PadProfileStore.activeProfile()?.name ?: profiles.firstOrNull()?.name) }
+    val profile = profiles.firstOrNull { it.name == picked } ?: profiles.firstOrNull()
+    EditorDialog(onDismiss) {
+        Text(stringResource(R.string.share_qr), style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        if (profiles.size > 1) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                for (p in profiles) ModeChip(p.name, selected = p.name == profile?.name, dense = true) { picked = p.name }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        val text = remember(profile) { profile?.let { dev.pepotech.pepomote.control.PadShare.encode(it) } }
+        if (text == null) {
+            Text(stringResource(R.string.share_qr_too_big), style = MaterialTheme.typography.bodyMedium)
+        } else {
+            val qr = remember(text) {
+                val matrix = com.google.zxing.qrcode.QRCodeWriter().encode(
+                    text, com.google.zxing.BarcodeFormat.QR_CODE, 600, 600,
+                    mapOf(com.google.zxing.EncodeHintType.MARGIN to 2)
+                )
+                android.graphics.Bitmap.createBitmap(matrix.width, matrix.height, android.graphics.Bitmap.Config.ARGB_8888).apply {
+                    setPixels(IntArray(matrix.width * matrix.height) { i ->
+                        if (matrix[i % matrix.width, i / matrix.width]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                    }, 0, matrix.width, 0, 0, matrix.width, matrix.height)
+                }.asImageBitmap()
+            }
+            androidx.compose.foundation.Image(
+                qr, stringResource(R.string.share_qr_desc),
+                Modifier.size(260.dp).align(Alignment.CenterHorizontally)
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.share_qr_hint), style = MaterialTheme.typography.bodyMedium)
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.ed_done), color = PepoColors.Blue, fontWeight = FontWeight.Bold)
         }
     }
 }

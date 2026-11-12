@@ -815,4 +815,10 @@
     <string name="present_next">Next</string>
     <string name="present_vol_hint">The phone\'s volume buttons also change slides. Move the pointer with the touchpad</string>
     <string name="kbm_media_app_hint">Over the app, these keys need the RevolutionMote+ receiver 1.4 or later</string>
+    <string name="share_qr">Share by QR</string>
+    <string name="share_qr_scan">Scan QR</string>
+    <string name="share_qr_scan_prompt">Point at the profile QR on the other phone</string>
+    <string name="share_qr_hint">On the other phone: Settings, profile backup, "Scan QR", and point at this screen</string>
+    <string name="share_qr_too_big">This profile is too large for a QR code. Export it to a file</string>
+    <string name="share_qr_desc">Profile QR code</string>
 </resources>
