@@ -787,4 +787,16 @@
     <string name="precision_bind">Activar al mantener</string>
     <string name="precision_bind_sub">Un botón del mando que, mientras lo mantienes, pone la precisión (por ejemplo L3 para «aguantar la respiración»). El botón sigue llegando al juego. También puedes añadir el botón «Precisión» al diseño.</string>
     <string name="precision_none">Ninguno</string>
+    <string name="home_continue">Continuar con %1$s</string>
+    <string name="home_continue_sub">Lo último que usaste</string>
+    <string name="home_favorites">Favoritos</string>
+    <string name="home_group_consoles">Consolas</string>
+    <string name="home_group_pc">PC y escritorio</string>
+    <string name="home_group_tools">Más</string>
+    <string name="home_pin">Fijar arriba</string>
+    <string name="home_unpin">Quitar de favoritos</string>
+    <string name="home_pin_first">Poner el primero</string>
+    <string name="home_pin_hint">Mantén pulsada una tarjeta para fijarla arriba</string>
+    <string name="home_status_change">Cambiar de equipo</string>
+    <string name="home_status_ms">%1$d ms</string>
 </resources>

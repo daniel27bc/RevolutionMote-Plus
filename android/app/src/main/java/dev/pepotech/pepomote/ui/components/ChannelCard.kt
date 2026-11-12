@@ -1,6 +1,10 @@
 package dev.pepotech.pepomote.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +37,7 @@ import dev.pepotech.pepomote.ui.theme.PepoColors
 enum class ChannelGlyph { Qr, Pad, Pointer, Stick, GamePad, Switch, Gear, Server, Retro, Keyboard, Wiimote, Nunchuk, Dolphin, Xbox, Invader, WiiU, Kbm }
 
 /** `wide`: tarjeta apaisada a todo el ancho (glifo a la izquierda, textos al lado). */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChannelCard(
     title: String,
@@ -52,6 +57,8 @@ fun ChannelCard(
      * el glifo dibujado.
      */
     logoName: String? = null,
+    /** Mantener pulsada (el inicio la usa para fijar la tarjeta arriba). */
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit = {}
 ) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -65,9 +72,10 @@ fun ChannelCard(
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val glyphSize = if (land) 40.dp else 52.dp
     Card(
-        onClick = onClick,
         // Apaisado: tarjetas más bajas que anchas (cuadradas eran enormes)
-        modifier = if (wide) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().aspectRatio(if (land) 1.3f else 1f),
+        modifier = (if (wide) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().aspectRatio(if (land) 1.3f else 1f))
+            .clip(MaterialTheme.shapes.medium)
+            .combinedClickable(role = Role.Button, onClick = onClick, onLongClick = onLongClick),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
         border = BorderStroke(1.5.dp, PepoColors.CardBorder),

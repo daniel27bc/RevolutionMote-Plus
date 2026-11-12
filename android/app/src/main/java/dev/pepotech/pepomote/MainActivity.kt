@@ -60,6 +60,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import dev.pepotech.pepomote.control.AppPrefs
+import dev.pepotech.pepomote.control.HomeLayout
+import kotlin.math.roundToInt
 import dev.pepotech.pepomote.control.ButtonState
 import dev.pepotech.pepomote.control.Haptics
 import dev.pepotech.pepomote.control.LocaleHelper
@@ -624,10 +626,15 @@ private fun Root(activity: MainActivity) {
         Screen.Home -> {
             val l = link
             val pcName = PairStore.load(context)?.pcName
+            var homeFavorites by remember { mutableStateOf(AppPrefs.homeFavorites(context)) }
+            var homeLast by remember { mutableStateOf(AppPrefs.homeLast(context)) }
             val androidReceiver = (l as? UiLink.Connected)?.platform == ReceiverCapabilities.ANDROID ||
                 (l !is UiLink.Connected && PairStore.load(context)?.platform == ReceiverCapabilities.ANDROID)
             val status = if (server.active) HomeStatus(HomeTone.On, stringResource(R.string.server_running_short)) else when (l) {
-                is UiLink.Connected -> HomeStatus(HomeTone.On, stringResource(R.string.status_connected_to, l.pcName))
+                is UiLink.Connected -> HomeStatus(
+                    HomeTone.On, stringResource(R.string.status_connected_to, l.pcName),
+                    detail = l.rttMs?.let { stringResource(R.string.home_status_ms, it.roundToInt()) }
+                )
                 is UiLink.Connecting -> HomeStatus(HomeTone.Busy, stringResource(R.string.status_connecting))
                 is UiLink.Reconnecting -> HomeStatus(HomeTone.Busy, stringResource(R.string.status_reconnecting, l.pcName))
                 else -> HomeStatus(
@@ -661,7 +668,19 @@ private fun Root(activity: MainActivity) {
                 serverRunning = server.active,
                 update = update,
                 onOpenUpdate = { UpdateNotice.show(context) },
-                onDismissUpdate = { v -> UpdateNotice.dismiss(context, v) }
+                onDismissUpdate = { v -> UpdateNotice.dismiss(context, v) },
+                favorites = homeFavorites,
+                last = homeLast,
+                onOpened = { e ->
+                    if (HomeLayout.canPin(e)) {
+                        AppPrefs.setHomeLast(context, e.id)
+                        homeLast = e.id
+                    }
+                },
+                onFavorites = { ids ->
+                    AppPrefs.setHomeFavorites(context, ids)
+                    homeFavorites = ids
+                }
             )
         }
 

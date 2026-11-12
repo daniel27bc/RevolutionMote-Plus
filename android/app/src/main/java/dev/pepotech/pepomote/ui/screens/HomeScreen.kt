@@ -33,6 +33,22 @@ import dev.pepotech.pepomote.ui.components.ChannelGlyph
 import dev.pepotech.pepomote.ui.components.PulsingDot
 import dev.pepotech.pepomote.ui.components.UpdateCard
 import dev.pepotech.pepomote.ui.theme.PepoColors
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import dev.pepotech.pepomote.control.HomeEntry
+import dev.pepotech.pepomote.control.HomeGroup
+import dev.pepotech.pepomote.control.HomeLayout
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,7 +58,8 @@ import androidx.compose.ui.semantics.semantics
 /** Estado del enlace en el inicio: el punto (apagado, en marcha, encendido) y su texto. */
 enum class HomeTone { Off, Busy, On }
 
-data class HomeStatus(val tone: HomeTone, val text: String)
+/** [detail]: dato corto al final de la píldora (la latencia, con el enlace vivo). */
+data class HomeStatus(val tone: HomeTone, val text: String, val detail: String? = null)
 
 @Composable
 fun HomeScreen(
@@ -68,8 +85,30 @@ fun HomeScreen(
     onRetroArch: () -> Unit = {},
     /** Tarjeta «Mando universal» (solo receptor de PC). */
     onGamepad: () -> Unit = {},
-    onKbm: () -> Unit = {}
+    onKbm: () -> Unit = {},
+    /** Ids de las tarjetas fijadas arriba (AppPrefs.homeFavorites). */
+    favorites: List<String> = emptyList(),
+    /** Id de lo último que se abrió, para «Continuar» (null = aún nada). */
+    last: String? = null,
+    /** Se abre una tarjeta de modo: MainActivity lo apunta para «Continuar». */
+    onOpened: (HomeEntry) -> Unit = {},
+    onFavorites: (List<String>) -> Unit = {}
 ) {
+    // Qué hace cada tarjeta de modo (las de siempre; aquí solo se reparten)
+    val open: (HomeEntry) -> Unit = { e ->
+        onOpened(e)
+        when (e) {
+            HomeEntry.Dolphin -> onDolphin()
+            HomeEntry.WiiU -> onWiiU()
+            HomeEntry.Switch -> onSwitch()
+            HomeEntry.RetroArch -> onRetroArch()
+            HomeEntry.Nunchuk -> onNunchuk()
+            HomeEntry.Gamepad -> onGamepad()
+            HomeEntry.Kbm -> onKbm()
+            HomeEntry.Pointer -> onController()
+            HomeEntry.Settings -> onNewPairing()
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -99,7 +138,18 @@ fun HomeScreen(
             style = MaterialTheme.typography.bodyMedium
         )
         Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // Estado del enlace, en una píldora que se toca para cambiar de equipo
+        val statusShape = RoundedCornerShape(50)
+        val statusHint = stringResource(R.string.home_status_change)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .background(PepoColors.Card, statusShape)
+                .border(1.5.dp, PepoColors.CardBorder, statusShape)
+                .clip(statusShape)
+                .clickable(onClickLabel = statusHint, onClick = onConnect)
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
             when (status.tone) {
                 HomeTone.On -> Box(
                     Modifier
@@ -114,7 +164,17 @@ fun HomeScreen(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            Text(status.text, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                status.text,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            status.detail?.let {
+                Spacer(Modifier.width(8.dp))
+                Text(it, style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim), maxLines = 1)
+            }
         }
         Spacer(Modifier.height(24.dp))
         // Aviso de versión nueva (enlace a la release de GitHub)
@@ -122,17 +182,41 @@ fun HomeScreen(
             UpdateCard(version = v, onOpen = { onOpenUpdate(v) }, onDismiss = { onDismissUpdate(v) })
             Spacer(Modifier.height(16.dp))
         }
-        // Tres filas de pares: Conectar | Mando, Dolphin | Wii U, Nunchuk | Ajustes
+        // Arriba, la conexión; debajo, lo último que se usó, los favoritos y
+        // los bloques por intención (consolas, PC y escritorio, lo demás).
         // En vertical, dos columnas; apaisado (o tablet) caben más y las
         // tarjetas no se estiran hasta ser cajas enormes
         // Siluetas en negro con el tema claro y en blanco con el oscuro (el negativo)
         val wiiBody = if (dev.pepotech.pepomote.ui.theme.LocalPepoColors.current.isDark) Color.White else Color(0xFF1B1E21)
+        val favs = HomeLayout.favorites(favorites, androidReceiver)
+        val lastEntry = HomeLayout.last(last, androidReceiver)
+        val serverCard: @Composable () -> Unit = {
+            ChannelCard(
+                title = stringResource(R.string.channel_server),
+                subtitle = stringResource(if (serverRunning) R.string.server_running_short else R.string.channel_server_sub),
+                glyph = ChannelGlyph.Server,
+                accent = Color(0xFF43A047),
+                onClick = onServer
+            )
+        }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 168.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            item(span = { GridItemSpan(if (androidReceiver) maxLineSpan else 1) }) {
+            // Continuar: un toque y a jugar con lo de la última vez
+            lastEntry?.let { e ->
+                item(key = "continue", span = { GridItemSpan(maxLineSpan) }) {
+                    EntryCard(
+                        e, androidReceiver, wiiBody, wide = true,
+                        title = stringResource(R.string.home_continue, entryTitle(e, androidReceiver)),
+                        subtitle = stringResource(R.string.home_continue_sub),
+                        onClick = { open(e) }
+                    )
+                }
+            }
+            item(key = "connect", span = { GridItemSpan(if (androidReceiver) maxLineSpan else 1) }) {
                 ChannelCard(
                     title = stringResource(R.string.channel_connect),
                     subtitle = stringResource(R.string.channel_connect_sub),
@@ -142,118 +226,162 @@ fun HomeScreen(
                     onClick = onConnect
                 )
             }
-            if (!androidReceiver) item {
-                ChannelCard(
-                    title = stringResource(R.string.channel_server),
-                    subtitle = stringResource(if (serverRunning) R.string.server_running_short else R.string.channel_server_sub),
-                    glyph = ChannelGlyph.Server,
-                    accent = Color(0xFF43A047),
-                    onClick = onServer
+            if (!androidReceiver) item(key = "server") { serverCard() }
+
+            val section: (String, Int, List<HomeEntry>, Boolean) -> Unit = { key, label, list, pinned ->
+                if (list.isNotEmpty()) {
+                    item(key = "h-$key", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(label)) }
+                    items(list, key = { "$key-${it.id}" }) { e ->
+                        PinnableCard(
+                            e, androidReceiver, wiiBody, pinned = pinned, first = favs.firstOrNull() == e,
+                            onClick = { open(e) },
+                            onToggle = { onFavorites(HomeLayout.toggle(favorites, e)) },
+                            onFirst = { onFavorites(HomeLayout.moveFirst(favorites, e)) }
+                        )
+                    }
+                }
+            }
+            section("fav", R.string.home_favorites, favs, true)
+            section("consoles", R.string.home_group_consoles, HomeLayout.group(HomeGroup.Consoles, favorites, androidReceiver), false)
+            section("pc", R.string.home_group_pc, HomeLayout.group(HomeGroup.Pc, favorites, androidReceiver), false)
+
+            item(key = "h-tools", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(R.string.home_group_tools)) }
+            if (androidReceiver) item(key = "server") { serverCard() }
+            item(key = "settings") {
+                EntryCard(HomeEntry.Settings, androidReceiver, wiiBody, onClick = { open(HomeEntry.Settings) })
+            }
+            if (favs.isEmpty()) item(key = "hint", span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    stringResource(R.string.home_pin_hint),
+                    style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                 )
             }
-            if (!androidReceiver) item {
-                ChannelCard(
-                    title = stringResource(R.string.channel_controller),
-                    subtitle = stringResource(R.string.channel_controller_sub),
-                    glyph = ChannelGlyph.Wiimote,
-                    mask = R.drawable.icon_wiimote,
-                    accent = wiiBody,
-                    onClick = onController
-                )
-            }
-            item {
-                ChannelCard(
-                    title = stringResource(R.string.channel_dolphin),
-                    subtitle = stringResource(R.string.channel_dolphin_sub),
-                    glyph = ChannelGlyph.Dolphin,
-                    logoName = "logo_dolphin",
-                    accent = Color(0xFF1E88E5),
-                    onClick = onDolphin
-                )
-            }
-            // Wii U: el móvil como GamePad (o Pro Controller) para Cemu
-            if (!androidReceiver) item {
-                ChannelCard(
-                    title = stringResource(R.string.channel_wiiu),
-                    subtitle = stringResource(R.string.channel_wiiu_sub),
-                    glyph = ChannelGlyph.WiiU,
-                    accent = Color(0xFF009AC7),
-                    onClick = onWiiU
-                )
-            }
-            item {
-                ChannelCard(
-                    title = stringResource(if (androidReceiver) R.string.mode_eden else R.string.channel_switch),
-                    subtitle = stringResource(R.string.channel_switch_sub),
-                    glyph = ChannelGlyph.Switch,
-                    image = R.drawable.logo_switch,
-                    accent = PepoColors.Error,
-                    onClick = onSwitch
-                )
-            }
-            // RetroArch: la pistola necesita el ratón del receptor de PC.
-            item {
-                ChannelCard(
-                    title = stringResource(R.string.channel_retroarch),
-                    subtitle = stringResource(if (androidReceiver) R.string.channel_retroarch_android_sub else R.string.channel_retroarch_sub),
-                    glyph = ChannelGlyph.Invader,
-                    logoName = "logo_retroarch",
-                    accent = Color(0xFF8E5BE8),
-                    onClick = onRetroArch
-                )
-            }
-            // Mando universal: solo el receptor de PC puede crear el mando
-            // de Xbox virtual, así que con servidor Android no se ofrece
-            if (!androidReceiver) item {
-                ChannelCard(
-                    title = stringResource(R.string.channel_gamepad),
-                    subtitle = stringResource(R.string.channel_gamepad_sub),
-                    glyph = ChannelGlyph.Xbox,
-                    accent = PepoColors.Blue,
-                    onClick = onGamepad
-                )
-            }
-            // Teclado y ratón: por la app (receptor de RevolutionMote+) o por
-            // Bluetooth (cualquier equipo, sin instalar nada)
-            item {
-                ChannelCard(
-                    title = stringResource(R.string.channel_kbm),
-                    subtitle = stringResource(R.string.channel_kbm_sub),
-                    glyph = ChannelGlyph.Kbm,
-                    accent = Color(0xFFF2B705),
-                    onClick = onKbm
-                )
-            }
-            // Con Dolphin: el segundo móvil, en la otra mano
-            if (!androidReceiver) item {
-                ChannelCard(
-                    title = stringResource(R.string.channel_nunchuk),
-                    subtitle = stringResource(R.string.channel_nunchuk_sub),
-                    glyph = ChannelGlyph.Nunchuk,
-                    mask = R.drawable.icon_nunchuk,
-                    accent = wiiBody,
-                    onClick = onNunchuk
-                )
-            }
-            if (androidReceiver) item {
-                ChannelCard(
-                    title = stringResource(R.string.channel_server),
-                    subtitle = stringResource(if (serverRunning) R.string.server_running_short else R.string.channel_server_sub),
-                    glyph = ChannelGlyph.Server,
-                    accent = Color(0xFF43A047),
-                    onClick = onServer
-                )
-            }
-            item {
-                ChannelCard(
-                    title = stringResource(R.string.channel_settings),
-                    subtitle = stringResource(R.string.channel_settings_sub),
-                    glyph = ChannelGlyph.Gear,
-                    accent = PepoColors.TextDim,
-                    icon = R.drawable.ms_settings,
-                    onClick = onNewPairing
-                )
-            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium.copy(color = PepoColors.TextDim),
+        modifier = Modifier
+            .padding(top = 6.dp)
+            .semantics { heading() }
+    )
+}
+
+/** El nombre de la tarjeta (el mismo que lleva «Continuar con …»). */
+@Composable
+private fun entryTitle(e: HomeEntry, androidReceiver: Boolean): String = stringResource(
+    when (e) {
+        HomeEntry.Dolphin -> R.string.channel_dolphin
+        HomeEntry.WiiU -> R.string.channel_wiiu
+        HomeEntry.Switch -> if (androidReceiver) R.string.mode_eden else R.string.channel_switch
+        HomeEntry.RetroArch -> R.string.channel_retroarch
+        HomeEntry.Nunchuk -> R.string.channel_nunchuk
+        HomeEntry.Gamepad -> R.string.channel_gamepad
+        HomeEntry.Kbm -> R.string.channel_kbm
+        HomeEntry.Pointer -> R.string.channel_controller
+        HomeEntry.Settings -> R.string.channel_settings
+    }
+)
+
+/** La tarjeta de un modo, con su glifo y su color de siempre. */
+@Composable
+private fun EntryCard(
+    e: HomeEntry,
+    androidReceiver: Boolean,
+    wiiBody: Color,
+    wide: Boolean = false,
+    title: String = entryTitle(e, androidReceiver),
+    subtitle: String? = null,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit
+) {
+    when (e) {
+        HomeEntry.Dolphin -> ChannelCard(
+            title = title, subtitle = subtitle ?: stringResource(R.string.channel_dolphin_sub),
+            glyph = ChannelGlyph.Dolphin, logoName = "logo_dolphin", accent = Color(0xFF1E88E5),
+            wide = wide, onLongClick = onLongClick, onClick = onClick
+        )
+        // Wii U: el móvil como GamePad (o Pro Controller) para Cemu
+        HomeEntry.WiiU -> ChannelCard(
+            title = title, subtitle = subtitle ?: stringResource(R.string.channel_wiiu_sub),
+            glyph = ChannelGlyph.WiiU, accent = Color(0xFF009AC7),
+            wide = wide, onLongClick = onLongClick, onClick = onClick
+        )
+        HomeEntry.Switch -> ChannelCard(
+            title = title, subtitle = subtitle ?: stringResource(R.string.channel_switch_sub),
+            glyph = ChannelGlyph.Switch, image = R.drawable.logo_switch, accent = PepoColors.Error,
+            wide = wide, onLongClick = onLongClick, onClick = onClick
+        )
+        // RetroArch: la pistola necesita el ratón del receptor de PC.
+        HomeEntry.RetroArch -> ChannelCard(
+            title = title,
+            subtitle = subtitle ?: stringResource(if (androidReceiver) R.string.channel_retroarch_android_sub else R.string.channel_retroarch_sub),
+            glyph = ChannelGlyph.Invader, logoName = "logo_retroarch", accent = Color(0xFF8E5BE8),
+            wide = wide, onLongClick = onLongClick, onClick = onClick
+        )
+        // Con Dolphin: el segundo móvil, en la otra mano
+        HomeEntry.Nunchuk -> ChannelCard(
+            title = title, subtitle = subtitle ?: stringResource(R.string.channel_nunchuk_sub),
+            glyph = ChannelGlyph.Nunchuk, mask = R.drawable.icon_nunchuk, accent = wiiBody,
+            wide = wide, onLongClick = onLongClick, onClick = onClick
+        )
+        // Mando universal: solo el receptor de PC puede crear el mando
+        // de Xbox virtual, así que con servidor Android no se ofrece
+        HomeEntry.Gamepad -> ChannelCard(
+            title = title, subtitle = subtitle ?: stringResource(R.string.channel_gamepad_sub),
+            glyph = ChannelGlyph.Xbox, accent = PepoColors.Blue,
+            wide = wide, onLongClick = onLongClick, onClick = onClick
+        )
+        // Teclado y ratón: por la app (receptor de RevolutionMote+) o por
+        // Bluetooth (cualquier equipo, sin instalar nada)
+        HomeEntry.Kbm -> ChannelCard(
+            title = title, subtitle = subtitle ?: stringResource(R.string.channel_kbm_sub),
+            glyph = ChannelGlyph.Kbm, accent = Color(0xFFF2B705),
+            wide = wide, onLongClick = onLongClick, onClick = onClick
+        )
+        HomeEntry.Pointer -> ChannelCard(
+            title = title, subtitle = subtitle ?: stringResource(R.string.channel_controller_sub),
+            glyph = ChannelGlyph.Wiimote, mask = R.drawable.icon_wiimote, accent = wiiBody,
+            wide = wide, onLongClick = onLongClick, onClick = onClick
+        )
+        HomeEntry.Settings -> ChannelCard(
+            title = title, subtitle = subtitle ?: stringResource(R.string.channel_settings_sub),
+            glyph = ChannelGlyph.Gear, accent = PepoColors.TextDim, icon = R.drawable.ms_settings,
+            wide = wide, onLongClick = onLongClick, onClick = onClick
+        )
+    }
+}
+
+/** Tarjeta de modo que, al mantenerla, ofrece fijarla arriba o quitarla. */
+@Composable
+private fun PinnableCard(
+    e: HomeEntry,
+    androidReceiver: Boolean,
+    wiiBody: Color,
+    pinned: Boolean,
+    first: Boolean,
+    onClick: () -> Unit,
+    onToggle: () -> Unit,
+    onFirst: () -> Unit
+) {
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        EntryCard(e, androidReceiver, wiiBody, onLongClick = { menu = true }, onClick = onClick)
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(if (pinned) R.string.home_unpin else R.string.home_pin)) },
+                onClick = { menu = false; onToggle() }
+            )
+            if (pinned && !first) DropdownMenuItem(
+                text = { Text(stringResource(R.string.home_pin_first)) },
+                onClick = { menu = false; onFirst() }
+            )
         }
     }
 }

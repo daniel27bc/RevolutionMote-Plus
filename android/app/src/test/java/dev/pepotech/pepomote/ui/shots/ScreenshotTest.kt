@@ -210,4 +210,16 @@ class ScreenshotTest {
     fun inicioClaro() = shot("15_inicio_claro", dark = false) { home() }
 
     @Test fun inicioApaisado() = shot("16_inicio_apaisado") { home() }
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h1300dp-port-xhdpi")
+    fun inicioConFavoritos() = shot("17_inicio_favoritos") {
+        dev.pepotech.pepomote.ui.screens.HomeScreen(
+            status = dev.pepotech.pepomote.ui.screens.HomeStatus(
+                dev.pepotech.pepomote.ui.screens.HomeTone.On, "Conectado a TorreDaniel", detail = "4 ms"
+            ),
+            langLabel = "ES", langSwitchHint = "", onToggleLang = {},
+            onConnect = {}, onController = {}, onDolphin = {}, onWiiU = {}, onSwitch = {}, onNunchuk = {}, onNewPairing = {},
+            favorites = listOf("gamepad", "kbm"), last = "dolphin"
+        )
+    }
 }

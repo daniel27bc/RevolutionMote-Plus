@@ -297,6 +297,22 @@ object AppPrefs {
             .edit().putString("globalLook", PadProfileJson.lookToJson(value).toString()).apply()
     }
 
+    /** Tarjetas fijadas arriba en el inicio (ids de [HomeEntry], en orden). */
+    fun homeFavorites(context: Context): List<String> =
+        HomeLayout.parse(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("homeFavorites", ""))
+
+    fun setHomeFavorites(context: Context, ids: List<String>) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("homeFavorites", HomeLayout.join(ids)).apply()
+    }
+
+    /** Último modo abierto desde el inicio (id de [HomeEntry]) para «Continuar». */
+    fun homeLast(context: Context): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("homeLast", null)
+
+    fun setHomeLast(context: Context, id: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("homeLast", id).apply()
+    }
+
     /** Teclado y ratón: por dónde va de serie ("app", "bt"; vacío = preguntar). */
     fun kbmTransport(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("kbmTransport", "") ?: ""

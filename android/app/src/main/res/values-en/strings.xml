@@ -786,4 +786,16 @@
     <string name="precision_bind">Activate while holding</string>
     <string name="precision_bind_sub">A controller button that turns precision on while you hold it (for example L3 to "hold your breath"). The button still reaches the game. You can also add the Precision button to the layout.</string>
     <string name="precision_none">None</string>
+    <string name="home_continue">Continue with %1$s</string>
+    <string name="home_continue_sub">What you used last</string>
+    <string name="home_favorites">Favorites</string>
+    <string name="home_group_consoles">Consoles</string>
+    <string name="home_group_pc">PC and desktop</string>
+    <string name="home_group_tools">More</string>
+    <string name="home_pin">Pin to top</string>
+    <string name="home_unpin">Remove from favorites</string>
+    <string name="home_pin_first">Move to first</string>
+    <string name="home_pin_hint">Press and hold a card to pin it to the top</string>
+    <string name="home_status_change">Switch device</string>
+    <string name="home_status_ms">%1$d ms</string>
 </resources>
