@@ -16,7 +16,8 @@ object ShortcutDeck {
     const val SIZE = 12
     const val MAX_LABEL = 18
     const val MAX_TEXT = 200
-    val MODIFIERS = listOf("ControlLeft" to "Ctrl", "AltLeft" to "Alt", "ShiftLeft" to "Shift", "MetaLeft" to "Win")
+    // En el orden en que se nombran los atajos de Windows: Win+Shift+S, Ctrl+Alt+Supr
+    val MODIFIERS = listOf("MetaLeft" to "Win", "ControlLeft" to "Ctrl", "AltLeft" to "Alt", "ShiftLeft" to "Shift")
 
     /** Los de fábrica (los rótulos, en el idioma de la app). */
     fun defaults(lang: String): List<Shortcut> {
