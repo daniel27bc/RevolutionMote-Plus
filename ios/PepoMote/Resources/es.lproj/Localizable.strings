@@ -27,22 +27,22 @@
 
 /* app y enlace */
 "error_prefix" = "Error: %1$@";
-"qr_not_pepomote" = "Ese QR no es de PepoMote";
-"scan_prompt" = "Apunta al QR de PepoMote en tu PC";
+"qr_not_pepomote" = "Ese QR no es de RevolutionMote+";
+"scan_prompt" = "Apunta al QR de RevolutionMote+ en tu PC";
 "your_pc" = "Tu PC";
-"re_pair_reason" = "%1$@ ya no reconoce este móvil: su QR ha cambiado (PepoMote reinstalado o restablecido en el PC). Escanéalo otra vez y sigues donde estabas.";
+"re_pair_reason" = "%1$@ ya no reconoce este móvil: su QR ha cambiado (RevolutionMote+ reinstalado o restablecido en el PC). Escanéalo otra vez y sigues donde estabas.";
 "pc_not_responding" = "%1$@ no responde. Elige otro PC o escanea un QR.";
 "lost_connection" = "Se perdió la conexión con %1$@";
-"warn_needs_13" = "El PC necesita PepoMote 1.3 para Wii U";
+"warn_needs_13" = "El PC necesita RevolutionMote+ 1.3 para Wii U";
 "warn_player_1" = "Solo el Jugador 1 cambia el modo";
-"warn_needs_switch" = "El PC necesita un PepoMote más nuevo para Switch";
+"warn_needs_switch" = "El PC necesita un RevolutionMote+ más nuevo para Switch";
 "reconnecting_short" = "Reconectando…";
-"camera_denied" = "PepoMote no tiene permiso de cámara. Actívalo en Ajustes → PepoMote → Cámara.";
-"local_network_hint" = "Si el PC no responde, comprueba que PepoMote tiene permiso de Red local (Ajustes → PepoMote) y que móvil y PC están en la misma Wi-Fi.";
+"camera_denied" = "RevolutionMote+ no tiene permiso de cámara. Actívalo en Ajustes → RevolutionMote+ → Cámara.";
+"local_network_hint" = "Si el PC no responde, comprueba que RevolutionMote+ tiene permiso de Red local (Ajustes → RevolutionMote+) y que móvil y PC están en la misma Wi-Fi.";
 
 /* conectar */
 "pair_title_other" = "Conectar con otro PC";
-"pair_sub_scan" = "Abre PepoMote en tu PC y escanea su QR";
+"pair_sub_scan" = "Abre RevolutionMote+ en tu PC y escanea su QR";
 "pair_sub_saved" = "Toca uno de tus PCs, o escanea el QR de otro";
 "your_pcs" = "Tus PCs";
 "scan_qr" = "Escanear QR del PC";
@@ -98,15 +98,15 @@
 "side_ask_gamepad" = "¿El GamePad está bien así?";
 "link_other_pc" = "Vincular con otro PC";
 "link_other_pc_sub" = "Escanear un QR nuevo";
-"sens_note" = "La sensibilidad del puntero se ajusta en la ventana de PepoMote del PC.";
+"sens_note" = "La sensibilidad del puntero se ajusta en la ventana de RevolutionMote+ del PC.";
 "ios_note" = "En iPhone y iPad el mando funciona con la app en pantalla (en segundo plano iOS corta la conexión) y los botones físicos de volumen no se pueden usar como A/B.";
-"about" = "PepoMote %1$@ · GPL-3.0 · hecho por PepoTech";
+"about" = "RevolutionMote+ %1$@ · GPL-3.0 · hecho por PepoTech";
 "update_title" = "Avisar de versiones nuevas";
 "update_sub" = "Busca novedades en GitHub cada hora mientras usas la app, sin enviar tus datos";
-"update_available" = "PepoMote %1$@ disponible";
+"update_available" = "RevolutionMote+ %1$@ disponible";
 "update_download" = "Ver versión en GitHub";
 "update_dismiss" = "Ahora no";
-"update_notes_version" = "Novedades de PepoMote %1$@";
+"update_notes_version" = "Novedades de RevolutionMote+ %1$@";
 "update_check_now" = "Buscar actualizaciones";
 "update_checking" = "Buscando actualizaciones…";
 "update_current" = "Tienes la última versión publicada.";
@@ -114,13 +114,13 @@
 "update_failed" = "No se ha podido comprobar la última versión. Inténtalo de nuevo; las novedades guardadas pueden estar desactualizadas.";
 "update_changed" = "Hay una versión más reciente. Revisa sus novedades y vuelve a abrir la tienda.";
 "update_cached" = "Novedades guardadas. Se comprobarán de nuevo antes de abrir la tienda.";
-"update_ios_handoff" = "La actualización se instala y se firma desde SideStore o AltStore Classic. PepoMote no puede instalar el IPA por sí sola.";
+"update_ios_handoff" = "La actualización se instala y se firma desde SideStore o AltStore Classic. RevolutionMote+ no puede instalar el IPA por sí sola.";
 "update_open_store" = "Abrir %1$@";
 "update_store_opened" = "%1$@ se ha abierto. Confirma allí la actualización; abrir la tienda no significa que ya esté instalada.";
 "update_store_missing" = "No se ha podido abrir %1$@. Copia la fuente y añádela en tu tienda, o sigue la guía de instalación.";
-"update_copy_source" = "Copiar fuente de PepoMote";
+"update_copy_source" = "Copiar fuente de RevolutionMote+";
 "update_source_copied" = "Fuente copiada";
-"update_store_steps" = "En la tienda, añade la fuente si hace falta y actualiza PepoMote desde Mis apps. Usa la misma cuenta con la que la instalaste. Sigue los requisitos de firma de tu tienda; AltStore puede pedir conexión con AltServer.";
+"update_store_steps" = "En la tienda, añade la fuente si hace falta y actualiza RevolutionMote+ desde Mis apps. Usa la misma cuenta con la que la instalaste. Sigue los requisitos de firma de tu tienda; AltStore puede pedir conexión con AltServer.";
 "update_install_guide" = "Guía de SideStore, AltStore y Sideloadly";
 "update_open_altstore_legacy" = "Abrir AltStore 2.1 o anterior";
 "update_altstore_legacy_help" = "Las versiones antiguas usan otro enlace. Si abre AltStore PAL, copia la fuente y añádela manualmente en AltStore Classic; este IPA necesita firma con tu cuenta.";
@@ -140,8 +140,8 @@
 
 /* primer arranque */
 "onboarding_sub" = "Tu móvil, mando de tu PC en 3 pasos";
-"ob1_title" = "Abre PepoMote en tu PC";
-"ob1_body" = "Un solo archivo, sin instalar nada. En PepoMote verás un QR.";
+"ob1_title" = "Abre RevolutionMote+ en tu PC";
+"ob1_body" = "Un solo archivo, sin instalar nada. En RevolutionMote+ verás un QR.";
 "ob2_title" = "Escanea el QR";
 "ob2_body" = "Conectar → apunta con la cámara. Emparejado para siempre.";
 "ob3_title" = "Apunta. Haz clic. Juega.";
@@ -204,8 +204,8 @@
 "mode_gamepad" = "Mando universal";
 "activating_gamepad" = "Activando el mando universal…";
 "activating_retroarch" = "Activando RetroArch…";
-"warn_needs_retroarch" = "El PC necesita un PepoMote más nuevo para RetroArch";
-"warn_needs_gamepad" = "El PC necesita un PepoMote más nuevo para el mando universal";
+"warn_needs_retroarch" = "El PC necesita un RevolutionMote+ más nuevo para RetroArch";
+"warn_needs_gamepad" = "El PC necesita un RevolutionMote+ más nuevo para el mando universal";
 "in_retroarch" = "En RetroArch soy:";
 "retropad" = "RetroPad";
 "nes_pad" = "Mando Wii";

@@ -27,22 +27,22 @@
 
 /* app and link */
 "error_prefix" = "Error: %1$@";
-"qr_not_pepomote" = "That QR is not from PepoMote";
-"scan_prompt" = "Point at PepoMote's QR on your PC";
+"qr_not_pepomote" = "That QR is not from RevolutionMote+";
+"scan_prompt" = "Point at RevolutionMote+'s QR on your PC";
 "your_pc" = "Your PC";
-"re_pair_reason" = "%1$@ no longer recognises this device: its QR has changed (PepoMote reinstalled or reset on the PC). Scan it again and you continue where you were.";
+"re_pair_reason" = "%1$@ no longer recognises this device: its QR has changed (RevolutionMote+ reinstalled or reset on the PC). Scan it again and you continue where you were.";
 "pc_not_responding" = "%1$@ is not responding. Pick another PC or scan a QR.";
 "lost_connection" = "Lost the connection to %1$@";
-"warn_needs_13" = "The PC needs PepoMote 1.3 for Wii U";
+"warn_needs_13" = "The PC needs RevolutionMote+ 1.3 for Wii U";
 "warn_player_1" = "Only Player 1 changes the mode";
-"warn_needs_switch" = "Your PC needs a newer PepoMote for Switch";
+"warn_needs_switch" = "Your PC needs a newer RevolutionMote+ for Switch";
 "reconnecting_short" = "Reconnecting…";
-"camera_denied" = "PepoMote has no camera permission. Turn it on in Settings → PepoMote → Camera.";
-"local_network_hint" = "If the PC does not answer, check that PepoMote has the Local Network permission (Settings → PepoMote) and that phone and PC are on the same Wi-Fi.";
+"camera_denied" = "RevolutionMote+ has no camera permission. Turn it on in Settings → RevolutionMote+ → Camera.";
+"local_network_hint" = "If the PC does not answer, check that RevolutionMote+ has the Local Network permission (Settings → RevolutionMote+) and that phone and PC are on the same Wi-Fi.";
 
 /* connect */
 "pair_title_other" = "Connect to another PC";
-"pair_sub_scan" = "Open PepoMote on your PC and scan its QR";
+"pair_sub_scan" = "Open RevolutionMote+ on your PC and scan its QR";
 "pair_sub_saved" = "Tap one of your PCs, or scan another one's QR";
 "your_pcs" = "Your PCs";
 "scan_qr" = "Scan the PC's QR";
@@ -98,15 +98,15 @@
 "side_ask_gamepad" = "Is the GamePad the right way up?";
 "link_other_pc" = "Pair with another PC";
 "link_other_pc_sub" = "Scan a new QR";
-"sens_note" = "The pointer sensitivity is set in PepoMote's window on the PC.";
+"sens_note" = "The pointer sensitivity is set in RevolutionMote+'s window on the PC.";
 "ios_note" = "On iPhone and iPad the controller works while the app is on screen (in the background iOS cuts the connection) and the physical volume buttons cannot be used as A/B.";
-"about" = "PepoMote %1$@ · GPL-3.0 · made by PepoTech";
+"about" = "RevolutionMote+ %1$@ · GPL-3.0 · made by PepoTech";
 "update_title" = "Notify about new versions";
 "update_sub" = "Checks GitHub for updates hourly while you use the app, without sending your data";
-"update_available" = "PepoMote %1$@ available";
+"update_available" = "RevolutionMote+ %1$@ available";
 "update_download" = "View release on GitHub";
 "update_dismiss" = "Not now";
-"update_notes_version" = "What's new in PepoMote %1$@";
+"update_notes_version" = "What's new in RevolutionMote+ %1$@";
 "update_check_now" = "Check for updates";
 "update_checking" = "Checking for updates…";
 "update_current" = "You have the latest published version.";
@@ -114,13 +114,13 @@
 "update_failed" = "Could not check the latest release. Try again; saved release notes may be out of date.";
 "update_changed" = "A newer version is available. Review its notes and open the store again.";
 "update_cached" = "Saved release notes. We'll check again before opening the store.";
-"update_ios_handoff" = "SideStore or AltStore Classic signs and installs the update. PepoMote cannot install the IPA itself.";
+"update_ios_handoff" = "SideStore or AltStore Classic signs and installs the update. RevolutionMote+ cannot install the IPA itself.";
 "update_open_store" = "Open %1$@";
 "update_store_opened" = "%1$@ opened. Confirm the update there; opening the store does not mean it is installed.";
 "update_store_missing" = "Could not open %1$@. Copy the source and add it to your store, or follow the installation guide.";
-"update_copy_source" = "Copy PepoMote source";
+"update_copy_source" = "Copy RevolutionMote+ source";
 "update_source_copied" = "Source copied";
-"update_store_steps" = "In the store, add the source if needed and update PepoMote from My Apps. Use the same account you installed it with. Follow your store's signing requirements; AltStore may ask for a connection to AltServer.";
+"update_store_steps" = "In the store, add the source if needed and update RevolutionMote+ from My Apps. Use the same account you installed it with. Follow your store's signing requirements; AltStore may ask for a connection to AltServer.";
 "update_install_guide" = "SideStore, AltStore and Sideloadly guide";
 "update_open_altstore_legacy" = "Open AltStore 2.1 or earlier";
 "update_altstore_legacy_help" = "Older versions use a different link. If it opens AltStore PAL, copy the source and add it manually in AltStore Classic; this IPA needs signing with your account.";
@@ -140,8 +140,8 @@
 
 /* first run */
 "onboarding_sub" = "Your phone, your PC's controller in 3 steps";
-"ob1_title" = "Open PepoMote on your PC";
-"ob1_body" = "A single file, nothing to install. In PepoMote you will see a QR.";
+"ob1_title" = "Open RevolutionMote+ on your PC";
+"ob1_body" = "A single file, nothing to install. In RevolutionMote+ you will see a QR.";
 "ob2_title" = "Scan the QR";
 "ob2_body" = "Connect → point the camera. Paired for good.";
 "ob3_title" = "Point. Click. Play.";
@@ -204,8 +204,8 @@
 "mode_gamepad" = "Universal controller";
 "activating_gamepad" = "Turning on the universal controller…";
 "activating_retroarch" = "Activating RetroArch…";
-"warn_needs_retroarch" = "The PC needs a newer PepoMote for RetroArch";
-"warn_needs_gamepad" = "The PC needs a newer PepoMote for the universal controller";
+"warn_needs_retroarch" = "The PC needs a newer RevolutionMote+ for RetroArch";
+"warn_needs_gamepad" = "The PC needs a newer RevolutionMote+ for the universal controller";
 "in_retroarch" = "In RetroArch I am:";
 "retropad" = "RetroPad";
 "nes_pad" = "Wii Remote";

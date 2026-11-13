@@ -5,7 +5,7 @@ name: ios
 # Sideloadly (ellos lo firman con el Apple ID de quien lo instala).
 on:
   push:
-    branches: [main, ios, next]
+    branches: [main, ios, next, "feat/**"]
     paths: ["ios/**", "protocol/**", ".github/workflows/ios.yml"]
   pull_request:
     paths: ["ios/**", "protocol/**"]
@@ -36,10 +36,12 @@ jobs:
       - name: Simulador
         id: sim
         run: |
-          name="$(xcrun simctl list devices available | grep -E '^[[:space:]]+iPhone' | grep -v unavailable | head -1 | sed -E 's/^[[:space:]]+//; s/ \(.*$//')"
-          if [ -z "$name" ]; then name="iPhone 16"; fi
-          echo "Simulador: $name"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
+          device="$(xcrun simctl list devices booted -j | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))][0].udid // empty')"
+          if [ -z "$device" ]; then
+            device="$(xcrun simctl list devices available -j | jq -r '[.devices | to_entries | sort_by(.key) | reverse | .[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))][0].udid // empty')"
+          fi
+          test -n "$device"
+          echo "id=$device" >> "$GITHUB_OUTPUT"
 
       # Las capturas de todas las pantallas (ScreenshotTests, ImageRenderer)
       # se escriben en /tmp/pepomote-shots y salen como artefacto ios-shots:
@@ -52,7 +54,8 @@ jobs:
           mkdir -p ../build /tmp/pepomote-shots
           set +e
           xcodebuild test -project PepoMote.xcodeproj -scheme PepoMote \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.id }}" \
+            -parallel-testing-enabled NO \
             -resultBundlePath ../build/tests.xcresult \
             CODE_SIGNING_ALLOWED=NO > ../build/test.log 2>&1
           status=$?
@@ -76,13 +79,13 @@ jobs:
           rm -rf ../dist/Payload
           mkdir -p ../dist/Payload
           cp -R "$app" ../dist/Payload/
-          (cd ../dist && rm -f PepoMote.ipa && zip -qr PepoMote.ipa Payload && rm -rf Payload)
+          (cd ../dist && rm -f RevolutionMote-Plus.ipa && zip -qr RevolutionMote-Plus.ipa Payload && rm -rf Payload)
           ls -la ../dist
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PepoMote-ios
-          path: dist/PepoMote.ipa
+          name: RevolutionMote-Plus-ios
+          path: dist/RevolutionMote-Plus.ipa
 
       - uses: actions/upload-artifact@v4
         if: always()
