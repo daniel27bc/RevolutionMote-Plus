@@ -157,17 +157,18 @@ class ScreenshotTest {
         AppPrefs.setKbmTransport(compose.activity, "")
     }
 
-    @Test @Config(qualifiers = "es-rES-w900dp-h420dp-land-xhdpi")
-    fun mandoBluetooth() = shot("22_mando_bluetooth") {
-        // La cabecera que pone BtPadScreen, sin tocar el Bluetooth del test
-        androidx.compose.runtime.CompositionLocalProvider(
-            dev.pepotech.pepomote.ui.screens.LocalBtPad provides dev.pepotech.pepomote.ui.screens.BtPadUi("Mando Bluetooth") {
-                androidx.compose.material3.Text("Conectado con TorreDaniel")
+    // Igual que la captura 01 (misma pantalla y tamaño): solo cambia la cabecera
+    @Test fun mandoBluetooth() {
+        AppPrefs.setGyroWarnShown(compose.activity)
+        shot("22_mando_bluetooth") {
+            // La cabecera que pone BtPadScreen, sin tocar el Bluetooth del test
+            androidx.compose.runtime.CompositionLocalProvider(
+                dev.pepotech.pepomote.ui.screens.LocalBtPad provides dev.pepotech.pepomote.ui.screens.BtPadUi("Mando Bluetooth") {
+                    androidx.compose.material3.Text("Conectado con TorreDaniel")
+                }
+            ) {
+                GamePadScreen(UiLink.Disconnected) {}
             }
-        ) {
-            dev.pepotech.pepomote.ui.screens.GamePadScreen(
-                link = dev.pepotech.pepomote.service.UiLink.Disconnected, onDisconnect = {}
-            )
         }
     }
 
@@ -278,6 +279,16 @@ class ScreenshotTest {
             langLabel = "ES", langSwitchHint = "", onToggleLang = {},
             onConnect = {}, onController = {}, onDolphin = {}, onWiiU = {}, onSwitch = {}, onNunchuk = {}, onNewPairing = {},
             favorites = listOf("gamepad", "kbm"), last = "dolphin"
+        )
+    }
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun inicioConexion() = shot("23_inicio_conexion") {
+        dev.pepotech.pepomote.ui.screens.HomeScreen(
+            status = dev.pepotech.pepomote.ui.screens.HomeStatus(dev.pepotech.pepomote.ui.screens.HomeTone.Off, "Sin conexión"),
+            langLabel = "ES", langSwitchHint = "", onToggleLang = {},
+            onConnect = {}, onController = {}, onDolphin = {}, onWiiU = {}, onSwitch = {}, onNunchuk = {}, onNewPairing = {},
+            initialTab = dev.pepotech.pepomote.ui.screens.HomeTab.Connection
         )
     }
 }

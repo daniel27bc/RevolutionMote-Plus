@@ -34,6 +34,8 @@ import dev.pepotech.pepomote.ui.components.PulsingDot
 import dev.pepotech.pepomote.ui.components.UpdateCard
 import dev.pepotech.pepomote.ui.theme.PepoColors
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.ui.semantics.selected
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.DropdownMenu
@@ -94,7 +96,9 @@ fun HomeScreen(
     onOpened: (HomeEntry) -> Unit = {},
     onFavorites: (List<String>) -> Unit = {},
     /** Encender el PC por la red (null = sin MAC configurada: no se ofrece). */
-    onWake: (() -> Unit)? = null
+    onWake: (() -> Unit)? = null,
+    /** Con qué pestaña se abre (Conexión si aún no hay nada vinculado). */
+    initialTab: HomeTab = HomeTab.Home
 ) {
     // Qué hace cada tarjeta de modo (las de siempre; aquí solo se reparten)
     val open: (HomeEntry) -> Unit = { e ->
@@ -108,7 +112,6 @@ fun HomeScreen(
             HomeEntry.Gamepad -> onGamepad()
             HomeEntry.Kbm -> onKbm()
             HomeEntry.Pointer -> onController()
-            HomeEntry.Settings -> onNewPairing()
         }
     }
     Column(
@@ -119,6 +122,7 @@ fun HomeScreen(
             .displayCutoutPadding()
             .padding(horizontal = 20.dp)
     ) {
+        var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialTab) }
         // La cabecera va DENTRO de la rejilla: en apaisado se desplaza con las
         // tarjetas en vez de comerse media pantalla
         val header: @Composable () -> Unit = {
@@ -155,7 +159,7 @@ fun HomeScreen(
                             .background(PepoColors.Card, statusShape)
                             .border(1.5.dp, PepoColors.CardBorder, statusShape)
                             .clip(statusShape)
-                            .clickable(onClickLabel = statusHint, onClick = onConnect)
+                            .clickable(onClickLabel = statusHint) { tab = HomeTab.Connection }
                             .padding(horizontal = 14.dp, vertical = 8.dp)
                     ) {
                         when (status.tone) {
@@ -229,63 +233,107 @@ fun HomeScreen(
             columns = GridCells.Adaptive(minSize = 168.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 24.dp)
+            contentPadding = PaddingValues(bottom = 16.dp),
+            modifier = Modifier.weight(1f)
         ) {
             item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
-            // Continuar: un toque y a jugar con lo de la última vez
-            lastEntry?.let { e ->
-                item(key = "continue", span = { GridItemSpan(maxLineSpan) }) {
-                    EntryCard(
-                        e, androidReceiver, wiiBody, wide = true,
-                        title = stringResource(R.string.home_continue, entryTitle(e, androidReceiver)),
-                        subtitle = stringResource(R.string.home_continue_sub),
-                        onClick = { open(e) }
-                    )
-                }
-            }
-            item(key = "connect", span = { GridItemSpan(if (androidReceiver) maxLineSpan else 1) }) {
-                ChannelCard(
-                    title = stringResource(R.string.channel_connect),
-                    subtitle = stringResource(R.string.channel_connect_sub),
-                    glyph = ChannelGlyph.Qr,
-                    accent = PepoColors.Blue,
-                    wide = androidReceiver,
-                    onClick = onConnect
-                )
-            }
-            if (!androidReceiver) item(key = "server") { serverCard() }
-
-            val section: (String, Int, List<HomeEntry>, Boolean) -> Unit = { key, label, list, pinned ->
-                if (list.isNotEmpty()) {
-                    item(key = "h-$key", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(label)) }
-                    items(list, key = { "$key-${it.id}" }) { e ->
-                        PinnableCard(
-                            e, androidReceiver, wiiBody, pinned = pinned, first = favs.firstOrNull() == e,
-                            onClick = { open(e) },
-                            onToggle = { onFavorites(HomeLayout.toggle(favorites, e)) },
-                            onFirst = { onFavorites(HomeLayout.moveFirst(favorites, e)) }
+            if (tab == HomeTab.Home) {
+                // Continuar: un toque y a jugar con lo de la última vez
+                lastEntry?.let { e ->
+                    item(key = "continue", span = { GridItemSpan(maxLineSpan) }) {
+                        EntryCard(
+                            e, androidReceiver, wiiBody, wide = true,
+                            title = stringResource(R.string.home_continue, entryTitle(e, androidReceiver)),
+                            subtitle = stringResource(R.string.home_continue_sub),
+                            onClick = { open(e) }
                         )
                     }
                 }
-            }
-            section("fav", R.string.home_favorites, favs, true)
-            section("consoles", R.string.home_group_consoles, HomeLayout.group(HomeGroup.Consoles, favorites, androidReceiver), false)
-            section("pc", R.string.home_group_pc, HomeLayout.group(HomeGroup.Pc, favorites, androidReceiver), false)
-
-            item(key = "h-tools", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(R.string.home_group_tools)) }
-            if (androidReceiver) item(key = "server") { serverCard() }
-            item(key = "settings") {
-                EntryCard(HomeEntry.Settings, androidReceiver, wiiBody, onClick = { open(HomeEntry.Settings) })
-            }
-            if (favs.isEmpty()) item(key = "hint", span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    stringResource(R.string.home_pin_hint),
-                    style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                )
+                val section: (String, Int, List<HomeEntry>, Boolean) -> Unit = { key, label, list, pinned ->
+                    if (list.isNotEmpty()) {
+                        item(key = "h-$key", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(label)) }
+                        items(list, key = { "$key-${it.id}" }) { e ->
+                            PinnableCard(
+                                e, androidReceiver, wiiBody, pinned = pinned, first = favs.firstOrNull() == e,
+                                onClick = { open(e) },
+                                onToggle = { onFavorites(HomeLayout.toggle(favorites, e)) },
+                                onFirst = { onFavorites(HomeLayout.moveFirst(favorites, e)) }
+                            )
+                        }
+                    }
+                }
+                section("fav", R.string.home_favorites, favs, true)
+                section("pads", R.string.home_group_consoles, HomeLayout.group(HomeGroup.Controllers, favorites, androidReceiver), false)
+                section("tools", R.string.home_group_pc, HomeLayout.group(HomeGroup.Tools, favorites, androidReceiver), false)
+                if (favs.isEmpty()) item(key = "hint", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        stringResource(R.string.home_pin_hint),
+                        style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                    )
+                }
+            } else {
+                // Conexión: vincular con un equipo o alojar aquí. Se hace una
+                // vez y se olvida, así que no ocupa el inicio
+                item(key = "h-conn", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(R.string.nav_connection)) }
+                item(key = "connect") {
+                    ChannelCard(
+                        title = stringResource(R.string.channel_connect),
+                        subtitle = stringResource(R.string.channel_connect_sub),
+                        glyph = ChannelGlyph.Qr,
+                        accent = PepoColors.Blue,
+                        onClick = onConnect
+                    )
+                }
+                item(key = "server") { serverCard() }
+                item(key = "conn-hint", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        stringResource(R.string.conn_hint),
+                        style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                    )
+                }
             }
         }
+        HomeNavBar(tab, onTab = { tab = it }, onSettings = onNewPairing)
+    }
+}
+
+/** Las pestañas del inicio. Ajustes es una pantalla aparte: va en la barra, pero no es pestaña. */
+enum class HomeTab { Home, Connection }
+
+/** La barra de abajo: Inicio, Conexión y Ajustes. */
+@Composable
+private fun HomeNavBar(tab: HomeTab, onTab: (HomeTab) -> Unit, onSettings: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        NavItem(R.drawable.ic_nav_home, stringResource(R.string.nav_home), tab == HomeTab.Home) { onTab(HomeTab.Home) }
+        NavItem(R.drawable.ms_wifi, stringResource(R.string.nav_connection), tab == HomeTab.Connection) { onTab(HomeTab.Connection) }
+        NavItem(R.drawable.ms_settings, stringResource(R.string.channel_settings), false, onSettings)
+    }
+}
+
+@Composable
+private fun NavItem(icon: Int, label: String, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(50)
+    val tint = if (selected) PepoColors.Blue else PepoColors.TextDim
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(shape)
+            .background(if (selected) PepoColors.Blue.copy(alpha = 0.14f) else Color.Transparent, shape)
+            .semantics { this.selected = selected }
+            .clickable(role = androidx.compose.ui.semantics.Role.Tab, onClick = onClick)
+            .padding(horizontal = 22.dp, vertical = 6.dp)
+    ) {
+        dev.pepotech.pepomote.ui.components.Ico(icon, tint, 24.dp)
+        Text(label, style = MaterialTheme.typography.bodyMedium.copy(color = tint), maxLines = 1)
     }
 }
 
@@ -312,7 +360,6 @@ private fun entryTitle(e: HomeEntry, androidReceiver: Boolean): String = stringR
         HomeEntry.Gamepad -> R.string.channel_gamepad
         HomeEntry.Kbm -> R.string.channel_kbm
         HomeEntry.Pointer -> R.string.channel_controller
-        HomeEntry.Settings -> R.string.channel_settings
     }
 )
 
@@ -375,11 +422,6 @@ private fun EntryCard(
         HomeEntry.Pointer -> ChannelCard(
             title = title, subtitle = subtitle ?: stringResource(R.string.channel_controller_sub),
             glyph = ChannelGlyph.Wiimote, mask = R.drawable.icon_wiimote, accent = wiiBody,
-            wide = wide, onLongClick = onLongClick, onClick = onClick
-        )
-        HomeEntry.Settings -> ChannelCard(
-            title = title, subtitle = subtitle ?: stringResource(R.string.channel_settings_sub),
-            glyph = ChannelGlyph.Gear, accent = PepoColors.TextDim, icon = R.drawable.ms_settings,
             wide = wide, onLongClick = onLongClick, onClick = onClick
         )
     }

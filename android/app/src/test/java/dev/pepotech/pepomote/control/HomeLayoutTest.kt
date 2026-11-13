@@ -21,9 +21,9 @@ class HomeLayoutTest {
     @Test fun losFavoritosSalenEnSuOrdenYDejanSuBloque() {
         val saved = listOf("kbm", "dolphin")
         assertEquals(listOf(HomeEntry.Kbm, HomeEntry.Dolphin), HomeLayout.favorites(saved, false))
-        assertFalse(HomeEntry.Dolphin in HomeLayout.group(HomeGroup.Consoles, saved, false))
-        assertFalse(HomeEntry.Kbm in HomeLayout.group(HomeGroup.Pc, saved, false))
-        assertTrue(HomeEntry.WiiU in HomeLayout.group(HomeGroup.Consoles, saved, false))
+        assertFalse(HomeEntry.Dolphin in HomeLayout.group(HomeGroup.Controllers, saved, false))
+        assertFalse(HomeEntry.Kbm in HomeLayout.group(HomeGroup.Tools, saved, false))
+        assertTrue(HomeEntry.WiiU in HomeLayout.group(HomeGroup.Controllers, saved, false))
     }
 
     @Test fun cadaTarjetaSaleUnaSolaVez() {
@@ -43,7 +43,7 @@ class HomeLayoutTest {
     }
 
     @Test fun elMandoDeWiiEsLaPrimeraTarjetaDeConsolas() {
-        assertEquals(HomeEntry.Pointer, HomeLayout.group(HomeGroup.Consoles, emptyList(), false).first())
+        assertEquals(HomeEntry.Pointer, HomeLayout.group(HomeGroup.Controllers, emptyList(), false).first())
     }
 
     @Test fun fijarYQuitar() {
@@ -55,10 +55,10 @@ class HomeLayoutTest {
         assertEquals(listOf("switch", "dolphin", "kbm"), HomeLayout.moveFirst(s, HomeEntry.Switch))
     }
 
-    @Test fun ajustesNiSeFijaNiSeContinua() {
-        assertEquals(emptyList<String>(), HomeLayout.toggle(emptyList(), HomeEntry.Settings))
-        assertEquals(emptyList<HomeEntry>(), HomeLayout.favorites(listOf("settings"), false))
-        assertNull(HomeLayout.last("settings", false))
+    @Test fun sinNadaVinculadoSeEmpiezaPorConexion() {
+        assertTrue(HomeLayout.startsOnConnection(paired = false, serverRunning = false))
+        assertFalse(HomeLayout.startsOnConnection(paired = true, serverRunning = false))
+        assertFalse(HomeLayout.startsOnConnection(paired = false, serverRunning = true))
     }
 
     @Test fun elTopeDeFavoritosSueltaElMasAntiguo() {

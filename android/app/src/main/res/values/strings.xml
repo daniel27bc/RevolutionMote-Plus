@@ -790,14 +790,13 @@
     <string name="home_continue">Continuar con %1$s</string>
     <string name="home_continue_sub">Lo último que usaste</string>
     <string name="home_favorites">Favoritos</string>
-    <string name="home_group_consoles">Consolas</string>
-    <string name="home_group_pc">PC y escritorio</string>
-    <string name="home_group_tools">Más</string>
+    <string name="home_group_consoles">Mandos</string>
+    <string name="home_group_pc">Otras herramientas</string>
     <string name="home_pin">Fijar arriba</string>
     <string name="home_unpin">Quitar de favoritos</string>
     <string name="home_pin_first">Poner el primero</string>
     <string name="home_pin_hint">Mantén pulsada una tarjeta para fijarla arriba</string>
-    <string name="home_status_change">Cambiar de equipo</string>
+    <string name="home_status_change">Ver la conexión</string>
     <string name="home_status_ms">%1$d ms</string>
     <string name="kbm_panel_touchpad">Touchpad</string>
     <string name="kbm_panel_media">Multimedia</string>
@@ -865,4 +864,7 @@
     <string name="btpad_unsupported">Este móvil no puede hacer de mando Bluetooth</string>
     <string name="btpad_app_sub">Con el receptor de RevolutionMote+ en el PC, por wifi. Un mando de Xbox para cualquier juego, con vibración</string>
     <string name="btpad_bt_sub">El móvil se empareja como un mando Bluetooth de verdad: PC, tele, tablet, consola portátil… sin instalar nada</string>
+    <string name="nav_home">Inicio</string>
+    <string name="nav_connection">Conexión</string>
+    <string name="conn_hint">Vincula este móvil con un PC u otro Android leyendo su QR, o usa este Android como servidor para jugar aquí. Solo hace falta la primera vez</string>
 </resources>

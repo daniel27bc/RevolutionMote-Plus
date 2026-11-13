@@ -65,25 +65,39 @@ class AndroidServerUiTest {
 
     @After fun reset() { ServerState.mutable.value = ServerUiState() }
 
-    private fun home(android: Boolean = false, onServer: () -> Unit = {}) {
+    private fun home(
+        android: Boolean = false,
+        tab: dev.pepotech.pepomote.ui.screens.HomeTab = dev.pepotech.pepomote.ui.screens.HomeTab.Home,
+        onServer: () -> Unit = {}
+    ) {
         compose.setContent {
             PepoMoteTheme {
                 HomeScreen(HomeStatus(HomeTone.Off, "Sin conexión"), "ES", "English",
-                    {}, {}, {}, {}, {}, {}, {}, {}, onServer = onServer, androidReceiver = android)
+                    {}, {}, {}, {}, {}, {}, {}, {}, onServer = onServer, androidReceiver = android, initialTab = tab)
             }
         }
     }
 
-    @Test fun serverIsAVisiblePrimaryActionOnHome() {
+    @Test fun serverIsAVisiblePrimaryActionOnTheConnectionTab() {
         var opened = false
-        home(onServer = { opened = true })
+        home(tab = dev.pepotech.pepomote.ui.screens.HomeTab.Connection, onServer = { opened = true })
         val server = compose.onNodeWithText("Servidor").assertIsDisplayed()
-        val dolphin = compose.onNodeWithText("Dolphin")
-        assertTrue("Server belongs in the first row", server.fetchSemanticsNode().boundsInRoot.top <
-            dolphin.fetchSemanticsNode().boundsInRoot.top)
+        compose.onNodeWithText("Conectar").assertIsDisplayed()
+        // Los modos de juego no están en esta pestaña
+        compose.onNodeWithText("Dolphin").assertDoesNotExist()
         server.performClick()
         assertTrue(opened)
         capture("home-server-ui-test.png")
+    }
+
+    @Test fun theBottomBarSwitchesBetweenHomeAndConnection() {
+        home()
+        compose.onNodeWithText("Dolphin").assertIsDisplayed()
+        compose.onNodeWithText("Servidor").assertDoesNotExist()
+        compose.onNodeWithText("Conexión").performClick()
+        compose.onNodeWithText("Servidor").assertIsDisplayed()
+        compose.onNodeWithText("Inicio").performClick()
+        compose.onNodeWithText("Dolphin").assertIsDisplayed()
     }
 
     @Test fun androidConnectionHomeOnlyOffersSupportedConsoleModes() {

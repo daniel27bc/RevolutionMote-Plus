@@ -789,14 +789,13 @@
     <string name="home_continue">Continue with %1$s</string>
     <string name="home_continue_sub">What you used last</string>
     <string name="home_favorites">Favorites</string>
-    <string name="home_group_consoles">Consoles</string>
-    <string name="home_group_pc">PC and desktop</string>
-    <string name="home_group_tools">More</string>
+    <string name="home_group_consoles">Controllers</string>
+    <string name="home_group_pc">Other tools</string>
     <string name="home_pin">Pin to top</string>
     <string name="home_unpin">Remove from favorites</string>
     <string name="home_pin_first">Move to first</string>
     <string name="home_pin_hint">Press and hold a card to pin it to the top</string>
-    <string name="home_status_change">Switch device</string>
+    <string name="home_status_change">See the connection</string>
     <string name="home_status_ms">%1$d ms</string>
     <string name="kbm_panel_touchpad">Touchpad</string>
     <string name="kbm_panel_media">Media</string>
@@ -864,4 +863,7 @@
     <string name="btpad_unsupported">This phone cannot act as a Bluetooth controller</string>
     <string name="btpad_app_sub">With the RevolutionMote+ receiver on the PC, over Wi-Fi. An Xbox controller for any game, with rumble</string>
     <string name="btpad_bt_sub">The phone pairs as a real Bluetooth controller: PC, TV, tablet, handheld… nothing to install</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_connection">Connection</string>
+    <string name="conn_hint">Link this phone to a PC or another Android by scanning its QR, or use this Android as the server to play here. You only need to do it once</string>
 </resources>

@@ -731,6 +731,9 @@ private fun Root(activity: MainActivity) {
                         }
                     }
                 },
+                initialTab = if (HomeLayout.startsOnConnection(PairStore.load(context) != null, server.active)) {
+                    dev.pepotech.pepomote.ui.screens.HomeTab.Connection
+                } else dev.pepotech.pepomote.ui.screens.HomeTab.Home,
                 favorites = homeFavorites,
                 last = homeLast,
                 onOpened = { e ->

@@ -1,26 +1,25 @@
 package dev.pepotech.pepomote.control
 
-/** Bloques del inicio: las tarjetas se agrupan por lo que se quiere hacer. */
-enum class HomeGroup { Consoles, Pc, Tools }
+/** Bloques del inicio: los mandos y las otras herramientas. */
+enum class HomeGroup { Controllers, Tools }
 
 /**
  * Cada tarjeta del inicio que abre un modo. «Conectar» y «Servidor» no están
- * aquí: son la fila de conexión, siempre arriba.
+ * aquí: viven en la pestaña Conexión; los ajustes, en la barra de abajo.
  *
  * [pcOnly]: con un servidor Android al otro lado no se ofrece (allí no hay
  * puntero, Wii U ni mando de Xbox virtual).
  */
 enum class HomeEntry(val id: String, val group: HomeGroup, val pcOnly: Boolean = false) {
     // El mando de Wii (puntero): el modo principal, el primero
-    Pointer("pointer", HomeGroup.Consoles, pcOnly = true),
-    Dolphin("dolphin", HomeGroup.Consoles),
-    WiiU("wiiu", HomeGroup.Consoles, pcOnly = true),
-    Switch("switch", HomeGroup.Consoles),
-    RetroArch("retroarch", HomeGroup.Consoles),
-    Nunchuk("nunchuk", HomeGroup.Consoles, pcOnly = true),
-    Gamepad("gamepad", HomeGroup.Pc, pcOnly = true),
-    Kbm("kbm", HomeGroup.Pc),
-    Settings("settings", HomeGroup.Tools);
+    Pointer("pointer", HomeGroup.Controllers, pcOnly = true),
+    Gamepad("gamepad", HomeGroup.Controllers, pcOnly = true),
+    Dolphin("dolphin", HomeGroup.Controllers),
+    WiiU("wiiu", HomeGroup.Controllers, pcOnly = true),
+    Switch("switch", HomeGroup.Controllers),
+    RetroArch("retroarch", HomeGroup.Controllers),
+    Nunchuk("nunchuk", HomeGroup.Controllers, pcOnly = true),
+    Kbm("kbm", HomeGroup.Tools);
 
     companion object {
         fun byId(id: String?): HomeEntry? = entries.firstOrNull { it.id == id }
@@ -51,8 +50,15 @@ object HomeLayout {
         return available(androidReceiver).filter { it.group == group && it !in favs }
     }
 
-    /** Ajustes no se fija ni se «continúa»: no es un modo. */
-    fun canPin(entry: HomeEntry): Boolean = entry != HomeEntry.Settings
+    /** Todo lo que hay en el inicio es un modo: se puede fijar y «continuar». */
+    @Suppress("UNUSED_PARAMETER")
+    fun canPin(entry: HomeEntry): Boolean = true
+
+    /**
+     * Con qué pestaña se abre la app: sin nada vinculado ni servidor en marcha,
+     * por Conexión (hay que vincular o alojar antes de jugar).
+     */
+    fun startsOnConnection(paired: Boolean, serverRunning: Boolean): Boolean = !paired && !serverRunning
 
     /** Fija o quita; al fijar va al final, y si no cabe, sale el más antiguo. */
     fun toggle(saved: List<String>, entry: HomeEntry): List<String> {

@@ -1264,7 +1264,8 @@ internal fun GamePadCollapsibleHeader(
 ) {
     CollapsibleHeader(
         link = link,
-        label = GamePadHeaderText.handle(
+        // Por Bluetooth no hay enlace con el receptor: la pastilla dice lo que es
+        label = LocalBtPad.current?.title ?: GamePadHeaderText.handle(
             connected = link is UiLink.Connected,
             connecting = link is UiLink.Connecting,
             // el modo que se quiere: Wii U ya se lee aunque falte el eco
