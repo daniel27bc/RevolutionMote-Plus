@@ -6,10 +6,14 @@ Estado a 13 de noviembre de 2026. Rama de trabajo: `feat/v1.4`.
 
 El mando universal por Bluetooth (sin receptor). El primer intento falló en
 la CI por un orden de inicialización en `BtPadReport` (`NEUTRAL` se creaba
-antes que `BUTTONS`); está corregido en el commit siguiente. **Comprueba que
-la CI de ese commit pasa** y mira la captura `22_mando_bluetooth.png` en
-`ci-out/feat/v1.4`: debe verse el mando universal con la cabecera «Mando
-Bluetooth».
+antes que `BUTTONS`); está corregido en el commit siguiente. La CI de ese commit (`fa544fd`) quedó en verde y la
+captura `22_mando_bluetooth.png` de `ci-out/feat/v1.4` muestra el mando
+universal con la cabecera «Mando Bluetooth».
+
+Fallo estético pendiente: con la cabecera plegada, la pastilla de arriba dice
+«Sin conexión» aunque el Bluetooth esté conectado. Sale de
+`GamePadCollapsibleHeader` en `GamePadScreen.kt`, que solo mira el enlace con
+el receptor; debería usar `LocalBtPad` como ya hace la tarjeta.
 
 Cosas del mando Bluetooth que conviene saber:
 
