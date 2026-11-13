@@ -49,6 +49,7 @@ class LinkForegroundService : Service() {
         private const val NOTIF_ID = 1
         private const val ACTION_STOP = "dev.pepotech.pepomote.STOP"
         private const val EXTRA_ROLE = "role"
+        private const val EXTRA_USB = "usb"
         /** Arrancado con startForegroundService (tile): hay que llamar a startForeground sí o sí. */
         private const val EXTRA_FOREGROUND = "foreground"
 
@@ -86,14 +87,17 @@ class LinkForegroundService : Service() {
          * (`background`) o si la app ya no está en primer plano, en primer
          * plano con su notificación.
          */
-        fun start(context: Context, role: String = LinkState.ROLE_WIIMOTE, background: Boolean = false) {
+        fun start(
+            context: Context, role: String = LinkState.ROLE_WIIMOTE, background: Boolean = false, usb: Boolean = false
+        ) {
             dev.pepotech.pepomote.server.ServerForegroundService.stop(context)
             // "Conectando" YA, antes de que el servicio llegue a arrancar: si
             // el intento anterior acabó en Failed, la pantalla del mando aún
             // lo veía y rebotaba al inicio repitiendo el error viejo.
             LinkState.role = role
             LinkState.publish(UiLink.Connecting)
-            val intent = Intent(context, LinkForegroundService::class.java).putExtra(EXTRA_ROLE, role)
+            val intent = Intent(context, LinkForegroundService::class.java)
+                .putExtra(EXTRA_ROLE, role).putExtra(EXTRA_USB, usb)
             if (background) {
                 context.startForegroundService(intent.putExtra(EXTRA_FOREGROUND, true))
             } else {
@@ -125,6 +129,7 @@ class LinkForegroundService : Service() {
 
     /** La comprobación del hueco de silencio tras un Stop ([RumbleMotor.GAP_MS]). */
     private val rumbleGapCheck = Runnable { rumbleTick() }
+    private var usb = false
     private var attempt = 0
     private var role = LinkState.ROLE_WIIMOTE
 
@@ -190,6 +195,7 @@ class LinkForegroundService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        usb = intent?.getBooleanExtra(EXTRA_USB, false) == true
         role = intent?.getStringExtra(EXTRA_ROLE) ?: LinkState.ROLE_WIIMOTE
         LinkState.role = role
 
@@ -213,7 +219,13 @@ class LinkForegroundService : Service() {
         ButtonState.reset()
 
         attempt = 0
-        connect(pairing)
+        if (usb) {
+            val gen = generation
+            Thread({
+                val target = relocate(pairing, usbOnly = true)
+                mainHandler.post { if (gen == generation) connect(target) }
+            }, "pepomote-usb-discovery").start()
+        } else connect(pairing)
         return START_NOT_STICKY
     }
 
@@ -256,6 +268,14 @@ class LinkForegroundService : Service() {
     }
 
     private fun connect(pairing: Pairing) {
+        val source = if (usb) dev.pepotech.pepomote.net.UsbNetwork.sourceFor(pairing.host) else null
+        if (usb && source == null) {
+            if (phase == Phase.Initial) {
+                LinkState.publish(UiLink.Failed("usb", getString(R.string.usb_missing)))
+                stopSelf()
+            } else dropped(pairing)
+            return
+        }
         var confirmedPairing = pairing
         attempt++
         val gen = ++generation
@@ -269,6 +289,7 @@ class LinkForegroundService : Service() {
             ownNunchuk = AppPrefs.ownNunchuk(this),
             // Stored Wii U preference, also while Switch is active. This does not open ScreenLink.
             screenOnly = AppPrefs.gamePadFullScreen(this),
+            source = source,
             callbacks = object : ControlClient.Callbacks {
                 override fun onOk(ok: ControlClient.Ok) {
                     // El handshake crea una sola pareja motor/socket por conexión.
@@ -280,7 +301,15 @@ class LinkForegroundService : Service() {
                     val pcName = ok.name.takeIf { it.isNotBlank() } ?: pairing.pcName
                     confirmedPairing = pairing.copy(pcName = pcName, platform = ok.platform,
                         token = ok.pairToken ?: pairing.token)
-                    if (confirmedPairing != pairing) PairStore.confirm(this@LinkForegroundService, pairing, confirmedPairing)
+                    if (source != null && confirmedPairing != pairing) {
+                        val saved = PairStore.current(this@LinkForegroundService)
+                        if (saved != null && saved.token == pairing.token) {
+                            // Guarda el token confirmado, conservando la IP de la conexión habitual.
+                            PairStore.confirm(this@LinkForegroundService, saved, confirmedPairing.copy(host = saved.host, port = saved.port))
+                        }
+                    } else if (source == null && confirmedPairing != pairing) {
+                        PairStore.confirm(this@LinkForegroundService, pairing, confirmedPairing)
+                    }
                     // Sesión nueva: el receptor numera los RUMBLE desde cero. Va
                     // ANTES de crear el UdpSender: su hilo nace en el constructor
                     // y ningún RUMBLE de esta sesión debe adelantar al reinicio
@@ -288,6 +317,7 @@ class LinkForegroundService : Service() {
                     resetRumble()
                     val sender = UdpSender(
                         pairing.host, ok.udpPort, ok.sessionId,
+                        source = source,
                         onRumble = { rumble ->
                             // Del hilo del socket al principal: el motor solo se toca ahí
                             mainHandler.post { if (gen == generation) onRumble(rumble) }
@@ -377,7 +407,7 @@ class LinkForegroundService : Service() {
                     }
                     // Doble pantalla: la pantalla GamePad abre el canal cuando
                     // toca; va al mismo puerto que este control. Un Nunchuk no tiene.
-                    if (!nunchuk && ok.mode == LinkState.MODE_CEMU) ScreenLink.bind(pairing.host, pairing.port, ok.sessionId)
+                    if (!nunchuk && ok.mode == LinkState.MODE_CEMU) ScreenLink.bind(pairing.host, pairing.port, ok.sessionId, source)
                     UiSounds.init(this@LinkForegroundService)
                     UiSounds.connect()
                     // "Pulsar la diana" automáticamente al conectar: recentra
@@ -413,11 +443,12 @@ class LinkForegroundService : Service() {
                         val retryGen = ++generation
                         updateNotification(getString(R.string.notif_retrying, attempt, MAX_ATTEMPTS))
                         Thread({
-                            val next = relocate(confirmedPairing)
+                            val next = relocate(confirmedPairing, source != null)
                             mainHandler.post { if (retryGen == generation) connect(next) }
                         }, "pepomote-retry").start()
                     } else {
-                        LinkState.publish(UiLink.Failed(code, msg))
+                        val failure = if (source == null) msg else getString(R.string.usb_receiver_missing)
+                        LinkState.publish(UiLink.Failed(if (source == null) code else "usb", failure))
                         stopSelf()
                     }
                 }
@@ -444,7 +475,7 @@ class LinkForegroundService : Service() {
                             restorePrefs(mode)
                         }
                         if (mode == LinkState.MODE_CEMU) {
-                            sessionId?.let { ScreenLink.bind(pairing.host, pairing.port, it) }
+                            sessionId?.let { ScreenLink.bind(pairing.host, pairing.port, it, source) }
                         } else ScreenLink.unbind()
                     }
                 }
@@ -515,7 +546,8 @@ class LinkForegroundService : Service() {
         teardownLink()
         ButtonState.reset()
         if (Reconnect.giveUp(droppedAtMs, now)) {
-            LinkState.publish(UiLink.Failed("io", getString(R.string.lost_connection, pairing.pcName)))
+            val failure = if (usb) getString(R.string.usb_receiver_missing) else getString(R.string.lost_connection, pairing.pcName)
+            LinkState.publish(UiLink.Failed(if (usb) "usb" else "io", failure))
             stopSelf()
             return
         }
@@ -529,10 +561,11 @@ class LinkForegroundService : Service() {
 
     private fun scheduleReconnect(pairing: Pairing) {
         val gen = generation
+        val usbOnly = usb
         val r = Runnable {
             if (gen != generation) return@Runnable
             Thread({
-                val next = relocate(pairing)
+                val next = relocate(pairing, usbOnly)
                 mainHandler.post { if (gen == generation) connect(next) }
             }, "pepomote-reconnect").start()
         }
@@ -551,14 +584,16 @@ class LinkForegroundService : Service() {
      * actualiza solo y el usuario no tiene que volver a escanear el QR.
      * El token no cambia: vive en el PC.
      */
-    private fun relocate(pairing: Pairing): Pairing {
+    private fun relocate(pairing: Pairing, usbOnly: Boolean): Pairing {
         // En cuanto contesta el PC con ese nombre desde otro sitio, vale: no
         // hace falta esperar al final del sondeo
         val found = try {
             runBlocking {
-                Discovery.scan(1200)
+                val nearby = if (usbOnly) Discovery.scanUsb(1200) else Discovery.scan(1200)
+                nearby
                     .mapNotNull { seen ->
-                        seen.firstOrNull { it.name == pairing.pcName && (it.host != pairing.host || it.tcpPort != pairing.port) }
+                        seen.firstOrNull { it.name == pairing.pcName && it.platform == pairing.platform &&
+                            (usbOnly || it.host != pairing.host || it.tcpPort != pairing.port) }
                     }
                     .firstOrNull()
             }
@@ -566,7 +601,7 @@ class LinkForegroundService : Service() {
             null
         } ?: return pairing
         val moved = pairing.copy(host = found.host, port = found.tcpPort)
-        PairStore.save(this, moved)
+        if (!usbOnly) PairStore.save(this, moved)
         return moved
     }
 

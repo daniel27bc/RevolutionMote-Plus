@@ -126,6 +126,7 @@ class MainActivity : ComponentActivity() {
 
     internal var currentScreen by mutableStateOf(Screen.Home)
     internal var directDsuPlaying by mutableStateOf(false)
+    internal var pairUsb by mutableStateOf(false)
 
     /** true = se entró al mando por la tarjeta Dolphin (pantalla solo-Dolphin). */
     internal var controllerDolphinOnly by mutableStateOf(false)
@@ -148,7 +149,8 @@ class MainActivity : ComponentActivity() {
     internal var pairVersion by mutableIntStateOf(0)
 
     /** A la pantalla Conectar (escáner QR), con explicación si viene de un rechazo. */
-    internal fun openPair(reason: String? = null) {
+    internal fun openPair(reason: String? = null, usb: Boolean = false) {
+        pairUsb = usb
         pairReason = reason
         currentScreen = Screen.Pair
     }
@@ -168,8 +170,8 @@ class MainActivity : ComponentActivity() {
             if (previous != null && PairList.isTemporaryCode(previous)) {
                 PairStore.forget(this, previous.token)
                 pairVersion++
-                openPair(getString(R.string.server_code_failed))
-            } else openPair(getString(R.string.re_pair_reason, pc))
+                openPair(getString(R.string.server_code_failed), usb = pairUsb)
+            } else openPair(getString(R.string.re_pair_reason, pc), usb = pairUsb)
         } else if (LinkFailure.offerAnotherPc(failure.code, PairStore.all(this).size)) {
             // Con varios PCs guardados, un PC que no responde no es el final:
             // a Conectar a elegir otro (lo pedido se conserva)
@@ -255,12 +257,12 @@ class MainActivity : ComponentActivity() {
      * Un PC de «Tus PCs»: pasa a ser el actual y se conecta con él, con el
      * mismo papel y modo que se habían pedido.
      */
-    internal fun onSavedPcChosen(p: Pairing) {
+    internal fun onSavedPcChosen(p: Pairing, usb: Boolean = false) {
         adaptToReceiver(p)
         PairStore.select(this, p.token)
         pairVersion++
         pairReason = null
-        LinkForegroundService.start(this, linkRole)
+        LinkForegroundService.start(this, linkRole, usb = usb)
         if (linkRole == LinkState.ROLE_WIIMOTE) LinkState.pendingMode?.let { LinkState.requestMode(it) }
         currentScreen = if (linkRole == LinkState.ROLE_NUNCHUK) Screen.Nunchuk else Screen.Controller
     }
@@ -465,7 +467,7 @@ class MainActivity : ComponentActivity() {
         // Servicio ANTES del diálogo de permiso: pedirlo primero dejaba el
         // arranque del servicio compitiendo con el diálogo del sistema y el
         // primer emparejamiento fallaba en algunos OEMs.
-        LinkForegroundService.start(this, linkRole)
+        LinkForegroundService.start(this, linkRole, usb = pairUsb)
         if (linkRole == LinkState.ROLE_WIIMOTE) LinkState.pendingMode?.let { LinkState.requestMode(it) }
         currentScreen = if (linkRole == LinkState.ROLE_NUNCHUK) Screen.Nunchuk else Screen.Controller
     }
@@ -728,6 +730,12 @@ private fun Root(activity: MainActivity) {
                 onNewPairing = { activity.currentScreen = Screen.Settings },
                 onServer = { activity.openServer() },
                 onDirectDsu = { activity.openDirectDsu() },
+                onUsb = {
+                    activity.linkRole = LinkState.ROLE_WIIMOTE
+                    LinkState.clearIntent()
+                    LinkState.pendingMode = null
+                    activity.openPair(usb = true)
+                },
                 androidReceiver = androidReceiver,
                 serverRunning = server.active,
                 update = update,
@@ -806,6 +814,7 @@ private fun Root(activity: MainActivity) {
             val current = remember(activity.pairVersion) { PairStore.current(context)?.token }
             PairScreen(
                 reason = activity.pairReason,
+                usb = activity.pairUsb,
                 onScanQr = { scanQr() },
                 onBack = {
                     LinkState.pendingMode = null // lo pedido antes del QR ya no va
@@ -815,13 +824,17 @@ private fun Root(activity: MainActivity) {
                 currentToken = current,
                 // El PC de la sesión abierta sale en verde al momento, sin sondeo
                 linkedToken = PairList.linkedToken(saved, current, (link as? UiLink.Connected)?.pcName),
-                onChoose = { activity.onSavedPcChosen(it) },
+                onChoose = { activity.onSavedPcChosen(it, usb = activity.pairUsb) },
                 onPairLink = { activity.onPairContent(it) },
                 onForget = { activity.onForgetPc(it) },
+                discoverReceivers = {
+                    if (activity.pairUsb) dev.pepotech.pepomote.net.Discovery.scanUsb()
+                    else dev.pepotech.pepomote.net.Discovery.scan()
+                },
                 onDiscovered = { receiver, code ->
                     val pairing = Pairing(receiver.host, receiver.tcpPort, code, receiver.name, receiver.platform)
                     PairStore.save(context, pairing)
-                    activity.onSavedPcChosen(pairing)
+                    activity.onSavedPcChosen(pairing, usb = activity.pairUsb)
                 }
             )
         }

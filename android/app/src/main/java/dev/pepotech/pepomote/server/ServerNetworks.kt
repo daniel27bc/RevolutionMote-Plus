@@ -75,5 +75,5 @@ internal object ServerNetworks {
     }
 
     private val wifiInterface = Regex("(?:wlan|swlan|ap|softap|wifi)\\d*")
-    private val localInterface = Regex("(?:wlan|swlan|ap|softap|wifi|eth|en|rndis|usb|bnep|br|bridge)\\d*")
+    private val localInterface = Regex("(?:wlan|swlan|ap|softap|wifi|eth|en|rndis|usb|ncm|bnep|br|bridge)\\d*")
 }

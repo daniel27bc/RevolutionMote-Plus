@@ -47,11 +47,24 @@ object Discovery {
      */
     fun scan(timeoutMs: Int = 1500): Flow<List<ReceiverInfo>> = scan(timeoutMs, PORT, null)
 
+    internal fun scanUsb(timeoutMs: Int = 1500): Flow<List<ReceiverInfo>> = flow {
+        val found = linkedMapOf<String, ReceiverInfo>()
+        for (network in UsbNetwork.active()) {
+            scan(timeoutMs, PORT, listOf(network.broadcast), network.address).collect { receivers ->
+                for (receiver in receivers) if (network.reaches(receiver.host)) found[receiver.host] = receiver
+                emit(found.values.toList())
+            }
+        }
+        emit(found.values.toList())
+    }.flowOn(Dispatchers.IO)
+
     /** [targets] null = los broadcast de la red; los tests sondean el loopback. */
-    internal fun scan(timeoutMs: Int, port: Int, targets: List<InetAddress>?): Flow<List<ReceiverInfo>> = flow {
+    internal fun scan(
+        timeoutMs: Int, port: Int, targets: List<InetAddress>?, source: InetAddress? = null
+    ): Flow<List<ReceiverInfo>> = flow {
         val found = LinkedHashMap<String, ReceiverInfo>()
         val socket = try {
-            DatagramSocket().apply {
+            DatagramSocket(java.net.InetSocketAddress(source, 0)).apply {
                 broadcast = true
                 soTimeout = 300
             }

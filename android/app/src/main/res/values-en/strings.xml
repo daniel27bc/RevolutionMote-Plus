@@ -895,4 +895,9 @@
     <string name="dsu_direct_no_network">Connect to a local network to start the controller.</string>
     <string name="dsu_direct_start">Start on %1$s:%2$d</string>
     <string name="dsu_direct_error">The DSU server stopped. Check the network and try again.</string>
+    <string name="usb_title">USB connection</string>
+    <string name="usb_sub">Use USB tethering</string>
+    <string name="usb_instructions">Connect a data cable to the PC and enable USB tethering in Android. Open the receiver and choose your computer.</string>
+    <string name="usb_missing">No receiver is available on the cable network. Check that USB tethering is enabled in Android.</string>
+    <string name="usb_receiver_missing">The receiver is not responding over USB. Check that it is running and that the PC accepts connections on the USB network.</string>
 </resources>

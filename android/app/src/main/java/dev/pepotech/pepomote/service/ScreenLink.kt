@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
  * huérfanos: el cliente anterior se cierra antes de crear otro.
  */
 object ScreenLink {
-    private data class Endpoint(val host: String, val port: Int, val sessionId: Int)
+    private data class Endpoint(val host: String, val port: Int, val sessionId: Int, val source: java.net.InetAddress?)
     private data class Request(val width: Int, val height: Int)
 
     private val _client = MutableStateFlow<ScreenClient<Bitmap>?>(null)
@@ -35,8 +35,8 @@ object ScreenLink {
 
     /** El servicio, con el `ok` de un mando (un Nunchuk no tiene pantalla). */
     @Synchronized
-    fun bind(host: String, port: Int, sessionId: Int) {
-        endpoint = Endpoint(host, port, sessionId)
+    fun bind(host: String, port: Int, sessionId: Int, source: java.net.InetAddress? = null) {
+        endpoint = Endpoint(host, port, sessionId, source)
         reconcile()
     }
 
@@ -79,7 +79,7 @@ object ScreenLink {
         if (wanted != null) {
             _client.value = ScreenClient(
                 wanted.first.host, wanted.first.port, wanted.first.sessionId,
-                wanted.second.width, wanted.second.height, BitmapDecoder()
+                wanted.second.width, wanted.second.height, BitmapDecoder(), source = wanted.first.source
             ).also { it.start() }
         }
     }

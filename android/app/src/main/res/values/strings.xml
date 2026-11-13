@@ -896,4 +896,9 @@
     <string name="dsu_direct_no_network">Conéctate a una red local para iniciar el mando.</string>
     <string name="dsu_direct_start">Iniciar en %1$s:%2$d</string>
     <string name="dsu_direct_error">No se pudo mantener el servidor DSU. Comprueba la red y vuelve a iniciarlo.</string>
+    <string name="usb_title">Conexión por cable</string>
+    <string name="usb_sub">Usa la conexión USB compartida</string>
+    <string name="usb_instructions">Conecta un cable de datos al PC y activa «Compartir conexión por USB» en Android. Abre el receptor y elige tu equipo.</string>
+    <string name="usb_missing">No hay un receptor en la red del cable. Comprueba que Android esté compartiendo la conexión por USB.</string>
+    <string name="usb_receiver_missing">El receptor no responde por USB. Comprueba que esté abierto y que el PC acepte conexiones en la red del cable.</string>
 </resources>

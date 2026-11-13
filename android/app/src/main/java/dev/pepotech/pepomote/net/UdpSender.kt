@@ -20,9 +20,10 @@ class UdpSender(
      * el hilo del socket: quien lo recibe se encarga de saltar de hilo.
      */
     private val onRumble: ((PmpCodec.Rumble) -> Unit)? = null,
+    source: InetAddress? = null,
     private val onRtt: (Float) -> Unit
 ) {
-    private val socket = DatagramSocket().apply {
+    private val socket = DatagramSocket(InetSocketAddress(source, 0)).apply {
         // DSCP EF (46): la Wi-Fi (WMM) mete estos datagramas en la cola de
         // voz, por delante del tráfico normal → menos jitter con la red
         // cargada. Si el sistema lo ignora o lo prohíbe, no pasa nada.

@@ -79,6 +79,7 @@ fun PairScreen(
     onDiscovered: (ReceiverInfo, String) -> Unit = { _, _ -> },
     onPairLink: (String) -> Unit = {},
     discoverReceivers: () -> Flow<List<ReceiverInfo>> = { Discovery.scan() },
+    usb: Boolean = false,
 ) {
     var receivers by remember { mutableStateOf(listOf<ReceiverInfo>()) }
     var scanning by remember { mutableStateOf(true) }
@@ -161,12 +162,19 @@ fun PairScreen(
     ) {
         Spacer(Modifier.height(24.dp))
         Text(
-            if (reason != null) stringResource(R.string.pair_title_other) else stringResource(R.string.channel_connect),
+            stringResource(when {
+                usb -> R.string.usb_title
+                reason != null -> R.string.pair_title_other
+                else -> R.string.channel_connect
+            }),
             style = MaterialTheme.typography.headlineMedium
         )
         Text(
-            if (saved.isEmpty()) stringResource(R.string.pair_sub_scan)
-            else stringResource(R.string.pair_sub_saved),
+            stringResource(when {
+                usb -> R.string.usb_instructions
+                saved.isEmpty() -> R.string.pair_sub_scan
+                else -> R.string.pair_sub_saved
+            }),
             style = MaterialTheme.typography.bodyMedium
         )
         if (reason != null) {

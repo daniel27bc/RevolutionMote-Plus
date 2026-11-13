@@ -51,7 +51,8 @@ class ScreenClient<I : Any>(
     private val dataTimeoutMs: Int = DATA_TIMEOUT_MS,
     private val shownFallbackMs: Long = SHOWN_FALLBACK_MS,
     private val retryAfterDropMs: Long = RETRY_AFTER_DROP_MS,
-    private val retryUnavailableMs: Long = RETRY_UNAVAILABLE_MS
+    private val retryUnavailableMs: Long = RETRY_UNAVAILABLE_MS,
+    private val source: java.net.InetAddress? = null
 ) {
     companion object {
         /** Resolución nativa de la pantalla del GamePad: nunca se pide más. */
@@ -206,6 +207,7 @@ class ScreenClient<I : Any>(
         try {
             if (!running) return false
             s.tcpNoDelay = true
+            source?.let { s.bind(InetSocketAddress(it, 0)) }
             s.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
             s.soTimeout = replyTimeoutMs
             val input = s.getInputStream()

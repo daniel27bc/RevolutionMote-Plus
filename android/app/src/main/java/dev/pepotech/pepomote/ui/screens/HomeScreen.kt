@@ -104,7 +104,8 @@ fun HomeScreen(
     onDeviceConnect: (String) -> Unit = {},
     onDeviceDisconnect: () -> Unit = {},
     onDeviceForget: (String) -> Unit = {},
-    onDirectDsu: (() -> Unit)? = null
+    onDirectDsu: (() -> Unit)? = null,
+    onUsb: (() -> Unit)? = null
 ) {
     // Qué hace cada tarjeta de modo (las de siempre; aquí solo se reparten)
     val open: (HomeEntry) -> Unit = { e ->
@@ -315,6 +316,15 @@ fun HomeScreen(
                     )
                 }
                 item(key = "server") { serverCard() }
+                if (onUsb != null) item(key = "usb") {
+                    ChannelCard(
+                        title = stringResource(R.string.usb_title),
+                        subtitle = stringResource(R.string.usb_sub),
+                        glyph = ChannelGlyph.GamePad,
+                        accent = PepoColors.Blue,
+                        onClick = onUsb
+                    )
+                }
                 if (onDirectDsu != null) item(key = "dsu-direct") {
                     ChannelCard(
                         title = stringResource(R.string.dsu_direct_title),

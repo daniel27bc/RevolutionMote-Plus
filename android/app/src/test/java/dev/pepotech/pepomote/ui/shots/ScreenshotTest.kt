@@ -170,6 +170,14 @@ class ScreenshotTest {
         )
     }
 
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun conexionUsb() = shot("26_conexion_usb") {
+        dev.pepotech.pepomote.ui.screens.PairScreen(
+            onScanQr = {}, onBack = {}, usb = true,
+            discoverReceivers = { kotlinx.coroutines.flow.flowOf(emptyList()) }
+        )
+    }
+
     // Igual que la captura 01 (misma pantalla y tamaño): solo cambia la cabecera
     @Test fun mandoBluetooth() {
         AppPrefs.setGyroWarnShown(compose.activity)

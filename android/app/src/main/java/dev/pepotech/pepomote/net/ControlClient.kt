@@ -27,7 +27,8 @@ class ControlClient(
     /** Mando con su propio Nunchuk (`"nunchuk":"own"` en el hello; solo rol mando). */
     private val ownNunchuk: Boolean = false,
     /** Modo Wii U: el móvil solo hace de pantalla táctil (`"screen_only":true` en el hello; solo rol mando). */
-    private val screenOnly: Boolean = false
+    private val screenOnly: Boolean = false,
+    private val source: java.net.InetAddress? = null
 ) {
     /** Lo que confirma el receptor en el `ok`. */
     data class Ok(
@@ -126,10 +127,11 @@ class ControlClient(
     private val thread = Thread({
         try {
             val s = Socket()
+            socket = s
+            source?.let { s.bind(InetSocketAddress(it, 0)) }
             s.tcpNoDelay = true
             s.connect(InetSocketAddress(host, port), 4000)
             s.soTimeout = 7000
-            socket = s
             val w = BufferedWriter(OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8))
             writer = w
             val r = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
@@ -232,6 +234,7 @@ class ControlClient(
             if (running) callbacks.onError("io", e.message ?: "error de conexión")
         } finally {
             running = false
+            try { socket?.close() } catch (_: java.io.IOException) { }
             callbacks.onClosed()
         }
     }, "pepomote-control").apply { start() }
