@@ -154,6 +154,9 @@ pub struct Config {
     pub sens_deg: f32,
     /// true = posicionamiento absoluto (recomendado); false = relativo (juegos).
     pub abs_mode: bool,
+    /// Permitir que un móvil vinculado lea o escriba el portapapeles de Windows.
+    #[serde(default)]
+    pub share_clipboard: bool,
     /// Configurar Dolphin solo (mandos multijugador) al conectar/desconectar.
     #[serde(default = "default_true")]
     pub auto_dolphin: bool,
@@ -261,6 +264,7 @@ impl Default for Config {
         Self {
             sens_deg: 40.0,
             abs_mode: true,
+            share_clipboard: false,
             auto_dolphin: true,
             auto_cemu: true,
             auto_eden: true,

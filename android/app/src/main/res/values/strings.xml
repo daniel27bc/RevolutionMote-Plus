@@ -876,4 +876,16 @@
     <string name="conn_use">Usar</string>
     <string name="conn_forget">Olvidar</string>
     <string name="conn_wake_sub">Lo despierta por la red (Wake-on-LAN)</string>
+    <string name="clipboard_title">Portapapeles</string>
+    <string name="clipboard_to_pc">Enviar al PC</string>
+    <string name="clipboard_from_pc">Traer del PC</string>
+    <string name="clipboard_connect">Conecta con el receptor del PC.</string>
+    <string name="clipboard_receiver">Necesitas un receptor de Windows compatible con portapapeles.</string>
+    <string name="clipboard_enable_pc">Activa «Compartir el portapapeles» en los ajustes del receptor de Windows.</string>
+    <string name="clipboard_empty">El portapapeles no contiene texto.</string>
+    <string name="clipboard_invalid">No se pudo transferir el texto. El límite es de 64 KiB.</string>
+    <string name="clipboard_unavailable">No se pudo completar la transferencia. Inténtalo de nuevo.</string>
+    <string name="clipboard_waiting">Transfiriendo…</string>
+    <string name="clipboard_sent">Texto copiado en el PC.</string>
+    <string name="clipboard_received">Texto copiado en el móvil.</string>
 </resources>

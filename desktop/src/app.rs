@@ -1159,6 +1159,14 @@ impl PepoMoteApp {
                 );
                 info_icon(ui, tr!("cfg.update_check_help"));
             });
+            #[cfg(windows)]
+            ui.horizontal(|ui| {
+                ui.checkbox(
+                    &mut config.share_clipboard,
+                    RichText::new(tr!("cfg.share_clipboard")).size(13.0),
+                );
+                info_icon(ui, tr!("cfg.share_clipboard_help"));
+            });
             self.updater.settings(ui);
         });
 

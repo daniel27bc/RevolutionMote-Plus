@@ -35,6 +35,7 @@ class ControlClientTest {
                     val ok = replies.poll(3, TimeUnit.SECONDS) ?: error("No desktop confirmation")
                     assertEquals("permanent-desktop-token", ok.pairToken)
                     assertEquals(ReceiverCapabilities.DESKTOP, ok.platform)
+                    assertFalse(ok.supportsClipboard)
                 }
             } finally { client.close() }
         }

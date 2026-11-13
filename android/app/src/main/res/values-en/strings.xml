@@ -875,4 +875,16 @@
     <string name="conn_use">Use</string>
     <string name="conn_forget">Forget</string>
     <string name="conn_wake_sub">Wakes it over the network (Wake-on-LAN)</string>
+    <string name="clipboard_title">Clipboard</string>
+    <string name="clipboard_to_pc">Send to PC</string>
+    <string name="clipboard_from_pc">Get from PC</string>
+    <string name="clipboard_connect">Connect to the PC receiver.</string>
+    <string name="clipboard_receiver">You need a Windows receiver with clipboard support.</string>
+    <string name="clipboard_enable_pc">Turn on Share clipboard in the Windows receiver settings.</string>
+    <string name="clipboard_empty">The clipboard contains no text.</string>
+    <string name="clipboard_invalid">Could not transfer the text. The limit is 64 KiB.</string>
+    <string name="clipboard_unavailable">Could not complete the transfer. Try again.</string>
+    <string name="clipboard_waiting">Transferring…</string>
+    <string name="clipboard_sent">Text copied on the PC.</string>
+    <string name="clipboard_received">Text copied on the phone.</string>
 </resources>

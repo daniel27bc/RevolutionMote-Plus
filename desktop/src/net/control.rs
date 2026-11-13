@@ -12,11 +12,63 @@ use crate::input::text_plan;
 use crate::state::{pad_state, PadState, player_number, KbmEvent, LinkStatus, Mode, PendingText, PlayerInfo, Role, SharedState, SwitchPad, MAX_KBM_QUEUE, MAX_TEXT_QUEUE};
 use rand::Rng;
 use serde_json::{json, Value};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{IpAddr, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use crate::tr;
+
+// Un texto de 64 KiB puede ocupar hasta seis veces más en JSON (escapes).
+const MAX_CONTROL_LINE: u64 = 512 * 1024;
+#[cfg(any(windows, test))]
+const MAX_CLIPBOARD_BYTES: usize = 64 * 1024;
+
+fn read_control_line(reader: &mut impl BufRead, line: &mut String) -> std::io::Result<usize> {
+    let count = reader.take(MAX_CONTROL_LINE).read_line(line)?;
+    if count as u64 == MAX_CONTROL_LINE && !line.ends_with('\n') {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Línea de control demasiado larga"));
+    }
+    Ok(count)
+}
+
+#[cfg(any(windows, test))]
+fn valid_clipboard_text(text: &str) -> bool {
+    !text.is_empty() && text.len() <= MAX_CLIPBOARD_BYTES && !text.contains('\0')
+}
+
+#[cfg(windows)]
+fn clipboard_reply(request: &Value, allowed: bool) -> Option<Value> {
+    let id = request["id"].as_str().filter(|id| !id.is_empty() && id.len() <= 36)?;
+    let error = |code| json!({"m":"clipboard","id":id,"ok":false,"error":code});
+    if !allowed {
+        return Some(error("disabled"));
+    }
+
+    // Windows abre un único portapapeles global. Serializar las peticiones de
+    // distintos móviles evita que dos hilos del receptor se estorben.
+    static LOCK: Mutex<()> = Mutex::new(());
+    let _guard = LOCK.lock_tolerant();
+    let Ok(mut clipboard) = arboard::Clipboard::new() else {
+        return Some(error("unavailable"));
+    };
+    Some(match request["op"].as_str() {
+        Some("get") => match clipboard.get_text() {
+            Ok(text) if valid_clipboard_text(&text) => json!({"m":"clipboard","id":id,"ok":true,"text":text}),
+            Ok(text) if text.is_empty() => error("empty"),
+            Ok(_) => error("invalid_text"),
+            Err(arboard::Error::ContentNotAvailable) => error("empty"),
+            Err(_) => error("unavailable"),
+        },
+        Some("set") => match request["text"].as_str().filter(|text| valid_clipboard_text(text)) {
+            Some(text) => match clipboard.set_text(text) {
+                Ok(()) => json!({"m":"clipboard","id":id,"ok":true}),
+                Err(_) => error("unavailable"),
+            },
+            None => error("invalid_text"),
+        },
+        _ => error("unavailable"),
+    })
+}
 
 /// PEPOMOTE_DEBUG=1: traza del canal de control (hello/slot/modo/bye).
 fn debug() -> bool {
@@ -147,7 +199,7 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
 
     // Primer mensaje: hello (canal de control) o screen (canal de pantalla)
     line.clear();
-    if reader.read_line(&mut line).is_err() || line.trim().is_empty() {
+    if read_control_line(&mut reader, &mut line).is_err() || line.trim().is_empty() {
         return;
     }
     let hello: Value = match serde_json::from_str(line.trim()) {
@@ -315,6 +367,7 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
                         // RevolutionMote+: teclado y ratón a la vez que el mando
                         // (mensaje `kbm`)
                         "kbm":true,
+                        "clipboard":cfg!(windows) && role == Role::Wiimote,
                         // Vibración de los juegos: si este PC puede mandarla
                         // (ready / driver / denied / unsupported), para la
                         // línea de Ajustes del móvil
@@ -333,7 +386,7 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
     // Bucle de control hasta que este móvil se vaya
     loop {
         line.clear();
-        match reader.read_line(&mut line) {
+        match read_control_line(&mut reader, &mut line) {
             Ok(0) => break,
             Ok(_) => {}
             Err(_) => break, // 5 s sin nada (el latido es 1 Hz): muerto
@@ -532,6 +585,16 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
                     }
                 }
             }
+            #[cfg(windows)]
+            Some("clipboard") if role == Role::Wiimote => {
+                if !sessions.lock_tolerant().contains_key(&session_id) {
+                    break;
+                }
+                let allowed = shared.lock_tolerant().config.share_clipboard;
+                if let Some(reply) = clipboard_reply(&msg, allowed) {
+                    let _ = send(&writer, &reply);
+                }
+            }
             Some("kbm") => {
                 // Teclado y ratón (RevolutionMote+): lote de eventos
                 // [["mv",dx,dy], ["btn",0..2,down], ["wh",n], ["key","KeyW",down], ["rel"]]
@@ -628,6 +691,23 @@ fn parse_kbm(v: &serde_json::Value) -> Option<KbmEvent> {
 mod kbm_tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn portapapeles_mide_bytes_y_conserva_texto_multilinea() {
+        assert!(valid_clipboard_text("línea 1\n🎮"));
+        assert!(valid_clipboard_text(&"á".repeat(MAX_CLIPBOARD_BYTES / 2)));
+        assert!(!valid_clipboard_text(&"á".repeat(MAX_CLIPBOARD_BYTES / 2 + 1)));
+        assert!(!valid_clipboard_text(""));
+        assert!(!valid_clipboard_text("antes\0después"));
+    }
+
+    #[test]
+    fn canal_de_control_limita_lineas_incompletas() {
+        let mut line = String::new();
+        let mut reader = std::io::Cursor::new(vec![b'x'; MAX_CONTROL_LINE as usize + 1]);
+        assert!(read_control_line(&mut reader, &mut line).is_err());
+        assert_eq!(line.len(), MAX_CONTROL_LINE as usize);
+    }
 
     #[test]
     fn eventos_kbm() {

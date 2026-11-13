@@ -157,6 +157,11 @@ class ScreenshotTest {
         AppPrefs.setKbmTransport(compose.activity, "")
     }
 
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun portapapeles() = shot("24_portapapeles") {
+        dev.pepotech.pepomote.ui.screens.ClipboardDialog(ready = true, connected = true, onDismiss = {})
+    }
+
     // Igual que la captura 01 (misma pantalla y tamaño): solo cambia la cabecera
     @Test fun mandoBluetooth() {
         AppPrefs.setGyroWarnShown(compose.activity)

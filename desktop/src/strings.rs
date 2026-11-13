@@ -151,6 +151,8 @@ pub const TABLE: &[(&str, &str, &str)] = &[
     ("win.badge_pro", "J{0} · Pro", "P{0} · Pro"),
     ("win.badge_wiimote", "J{0} · Mando Wii", "P{0} · Wii Remote"),
     ("win.badge_player", "J{0}", "P{0}"),
+    ("cfg.share_clipboard", "Compartir el portapapeles", "Share clipboard"),
+    ("cfg.share_clipboard_help", "Permite que los móviles vinculados lean y escriban texto en el portapapeles del PC.", "Allows paired phones to read and write text on the PC clipboard."),
     // --- reparación (Linux)
     (
         "fix.uinput_missing",

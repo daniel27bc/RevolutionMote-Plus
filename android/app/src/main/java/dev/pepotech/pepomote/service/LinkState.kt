@@ -7,6 +7,8 @@ import android.os.SystemClock
 import dev.pepotech.pepomote.control.ButtonState
 import dev.pepotech.pepomote.sensor.MotionEngine
 import dev.pepotech.pepomote.net.ReceiverCapabilities
+import dev.pepotech.pepomote.control.ClipboardTransfer
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -64,7 +66,8 @@ sealed class UiLink {
          * su consola se elige la plantilla de mando. Se conserva al cambiar de
          * modo (solo cuenta en RetroArch).
          */
-        val game: RetroGame? = null
+        val game: RetroGame? = null,
+        val supportsClipboard: Boolean = false
     ) : UiLink()
 
     data class Failed(val code: String, val msg: String) : UiLink()
@@ -172,6 +175,11 @@ object LinkState {
      */
     @Volatile
     var sendText: ((String) -> Unit)? = null
+
+    @Volatile
+    var requestClipboard: ((String, String?) -> Unit)? = null
+
+    internal val clipboardReplies = MutableSharedFlow<ClipboardTransfer.Reply>(extraBufferCapacity = 1)
 
     /** Lote de eventos de teclado y ratón al receptor (solo si lo entiende). */
     @Volatile

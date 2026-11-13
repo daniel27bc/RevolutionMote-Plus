@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -99,6 +100,7 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit, initialPanel: KbmPanel = K
     var isDefault by remember { mutableStateOf(transport.isNotEmpty()) }
     var mouse by remember { mutableStateOf(AppPrefs.globalMouse(context)) }
     var showSettings by remember { mutableStateOf(false) }
+    var showClipboard by remember { mutableStateOf(false) }
     // Qué hay en el hueco grande: touchpad, multimedia, numérico o presentar
     var panel by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialPanel) }
     DisposableEffect(panel) {
@@ -195,6 +197,7 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit, initialPanel: KbmPanel = K
             KbmPanelChips(panel) { panel = it }
             Spacer(Modifier.height(6.dp))
             val appBackend = transport == KbmTransport.APP
+            val openClipboard: (() -> Unit)? = if (appBackend) ({ showClipboard = true }) else null
             val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
                 android.content.res.Configuration.ORIENTATION_LANDSCAPE
             val clicks: @Composable (Modifier) -> Unit = { m ->
@@ -222,7 +225,7 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit, initialPanel: KbmPanel = K
                     ) {
                         clicks(Modifier.fillMaxWidth())
                         SpecialKeys()
-                        TextSender()
+                        TextSender(openClipboard)
                     }
                 }
             } else {
@@ -233,7 +236,7 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit, initialPanel: KbmPanel = K
                 Spacer(Modifier.height(8.dp))
                 SpecialKeys()
                 Spacer(Modifier.height(8.dp))
-                TextSender()
+                TextSender(openClipboard)
             }
         }
 
@@ -250,6 +253,12 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit, initialPanel: KbmPanel = K
                 },
                 onDismiss = { if (transport.isEmpty()) onBack() else asking = false }
             )
+        }
+        if (showClipboard) {
+            ClipboardDialog(
+                ready = transport == KbmTransport.APP && !asking && connected?.supportsClipboard == true,
+                connected = connected != null
+            ) { showClipboard = false }
         }
         if (showSettings) {
             EditorDialog({ showSettings = false }) {
@@ -453,7 +462,7 @@ private fun SpecialKeys() {
 
 /** Escribir un texto y mandarlo de golpe. */
 @Composable
-private fun TextSender() {
+private fun TextSender(openClipboard: (() -> Unit)?) {
     var text by remember { mutableStateOf("") }
     Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(
@@ -473,6 +482,15 @@ private fun TextSender() {
             Kbm.text(text)
             text = ""
         }) { IconLabel(R.drawable.ms_keyboard, stringResource(R.string.kbm_send), PepoColors.Blue) }
+        if (openClipboard != null) {
+            val clipboardLabel = stringResource(R.string.clipboard_title)
+            IconButton(
+                onClick = openClipboard,
+                modifier = Modifier.semantics { contentDescription = clipboardLabel }
+            ) {
+                Ico(R.drawable.ms_content_copy, PepoColors.Blue)
+            }
+        }
     }
 }
 

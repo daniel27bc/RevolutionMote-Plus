@@ -1,5 +1,6 @@
 package dev.pepotech.pepomote.net
 
+import dev.pepotech.pepomote.control.ClipboardTransfer
 import dev.pepotech.pepomote.control.TextInput
 import dev.pepotech.pepomote.service.PadPreference
 import dev.pepotech.pepomote.service.RetroGame
@@ -71,7 +72,8 @@ class ControlClient(
          * juegos ("ready", "driver", "denied", "unsupported"); se guarda tal
          * cual y Ajustes lo traduce. null = receptor sin vibración.
          */
-        val rumble: String? = null
+        val rumble: String? = null,
+        val supportsClipboard: Boolean = false
     )
 
     interface Callbacks {
@@ -98,6 +100,7 @@ class ControlClient(
 
         /** Aviso transitorio del receptor (banner ~6 s). */
         fun onNotice(text: String)
+        fun onClipboardReply(reply: ClipboardTransfer.Reply) {}
         fun onClosed()
     }
 
@@ -106,6 +109,7 @@ class ControlClient(
     @Volatile
     private var confirmedMode = "pointer"
     @Volatile private var confirmedPlatform = ReceiverCapabilities.DESKTOP
+    @Volatile private var confirmedClipboard = false
     private var socket: Socket? = null
     private var writer: BufferedWriter? = null
 
@@ -161,6 +165,8 @@ class ControlClient(
                     "ok" -> {
                         confirmedPlatform = ReceiverCapabilities.platform(msg.optString("platform"))
                         confirmedMode = msg.optString("mode", "pointer")
+                        confirmedClipboard = confirmedPlatform == ReceiverCapabilities.DESKTOP &&
+                            msg.optBoolean("clipboard", false)
                         if (confirmedPlatform == ReceiverCapabilities.ANDROID) {
                             confirmedMode = ReceiverCapabilities.select(null, confirmedMode, confirmedPlatform,
                                 false, supportsMode(msg, "switch"), supportsMode(msg, "retroarch"))
@@ -188,7 +194,8 @@ class ControlClient(
                                 supportsFrameRotation = msg.optBoolean("frame_rotation", false),
                                 supportsRetroArch = supportsMode(msg, "retroarch"),
                                 supportsGamepad = supportsMode(msg, "gamepad"),
-                                rumble = msg.optString("rumble", "").takeIf { it.isNotBlank() }
+                                rumble = msg.optString("rumble", "").takeIf { it.isNotBlank() },
+                                supportsClipboard = confirmedClipboard
                             )
                         )
                     }
@@ -213,6 +220,9 @@ class ControlClient(
                     "nunchuk" -> callbacks.onNunchukChanged(msg.optBoolean("own", false))
                     "screen_only" -> callbacks.onScreenOnlyChanged(msg.optBoolean("on", false))
                     "game" -> callbacks.onGameChanged(RetroGame.parse(msg))
+                    "clipboard" -> if (confirmedClipboard) {
+                        ClipboardTransfer.reply(msg)?.let(callbacks::onClipboardReply)
+                    }
                     "hotkey" -> Unit // eco de la tecla rápida de RetroArch: informativo
                     "notice" -> msg.optString("text").takeIf { it.isNotBlank() }?.let(callbacks::onNotice)
                     else -> Unit // mensaje desconocido: se ignora
@@ -290,6 +300,10 @@ class ControlClient(
 
     /** Teclado y ratón (receptor RevolutionMote+): un lote de eventos `kbm`. */
     fun sendKbm(events: org.json.JSONArray) = sendJson(JSONObject().put("m", "kbm").put("ev", events))
+
+    fun requestClipboard(id: String, text: String?) {
+        if (confirmedClipboard) ClipboardTransfer.request(id, text)?.let(::sendJson)
+    }
 
     private fun sendJson(obj: JSONObject) = sendLine(obj.toString())
 

@@ -16,6 +16,7 @@ import androidx.core.app.ServiceCompat
 import dev.pepotech.pepomote.MainActivity
 import dev.pepotech.pepomote.R
 import dev.pepotech.pepomote.control.AppPrefs
+import dev.pepotech.pepomote.control.ClipboardTransfer
 import dev.pepotech.pepomote.control.GameRumble
 import dev.pepotech.pepomote.control.RumbleCommand
 import dev.pepotech.pepomote.control.RumbleMotor
@@ -326,6 +327,9 @@ class LinkForegroundService : Service() {
                         }
                     }
                     LinkState.sendText = { t -> if (ok.textInput) control?.sendText(t) }
+                    LinkState.requestClipboard = if (ok.supportsClipboard) ({ id, text ->
+                        if (gen == generation) control?.requestClipboard(id, text)
+                    }) else null
                     LinkState.sendKbm = if (ok.supportsKbm) ({ ev -> control?.sendKbm(ev) }) else null
                     LinkState.sendNunchuk = { own -> control?.sendNunchuk(own) }
                     LinkState.sendScreenOnly = { on ->
@@ -355,7 +359,8 @@ class LinkForegroundService : Service() {
                             supportsKbm = ok.supportsKbm,
                             supportsRetroArch = ok.supportsRetroArch,
                             supportsGamepad = ok.supportsGamepad,
-                            rumble = ok.rumble
+                            rumble = ok.rumble,
+                            supportsClipboard = ok.supportsClipboard
                         )
                     )
                     val requestedMode = LinkState.pendingMode
@@ -472,6 +477,10 @@ class LinkForegroundService : Service() {
                     if (gen != generation) return
                     // Ajuste «Avisos del PC en pantalla»: apagado, ni banner
                     if (AppPrefs.receiverNotices(this@LinkForegroundService)) LinkState.publishNotice(text)
+                }
+
+                override fun onClipboardReply(reply: ClipboardTransfer.Reply) {
+                    if (gen == generation) LinkState.clipboardReplies.tryEmit(reply)
                 }
 
                 override fun onClosed() {
@@ -671,6 +680,7 @@ class LinkForegroundService : Service() {
         LinkState.sendMode = null
         LinkState.sendPad = null
         LinkState.sendText = null
+        LinkState.requestClipboard = null
         LinkState.sendKbm = null
         LinkState.sendNunchuk = null
         LinkState.sendScreenOnly = null
