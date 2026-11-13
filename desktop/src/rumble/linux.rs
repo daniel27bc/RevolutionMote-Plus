@@ -1,5 +1,5 @@
 //! Mando virtual por uinput con force feedback (Linux). Dolphin lo lista
-//! como `evdev/0/PepoMote Wiimote N` (salidas `Strong`/`Weak` del efecto
+//! como `evdev/0/RevolutionMote+ Wiimote N` (salidas `Strong`/`Weak` del efecto
 //! rumble) solo si parece un mando de verdad: al menos dos ejes u ocho
 //! botones (así lo filtra su backend evdev), y con ellos udev lo etiqueta
 //! como joystick y da acceso al usuario de la sesión (`uaccess`), que es lo
@@ -413,12 +413,12 @@ mod tests {
     fn la_expresion_de_dolphin_y_el_nodo_de_cemu_llevan_el_nombre() {
         assert_eq!(
             motor_expression_named(0),
-            "`evdev/0/PepoMote Wiimote 1:Strong`|`evdev/0/PepoMote Wiimote 1:Weak`"
+            "`evdev/0/RevolutionMote+ Wiimote 1:Strong`|`evdev/0/RevolutionMote+ Wiimote 1:Weak`"
         );
         let n = cemu_node_named(1, 2);
         assert!(n.contains("<api>SDLController</api>"));
         assert!(n.contains("<uuid>0_0600"));
-        assert!(n.contains("PepoMote J2 vibración"));
+        assert!(n.contains("RevolutionMote+ J2 vibración"));
         // sin mando creado (tests: sin hub) no se escribe nada
         assert!(motor_expression(0).is_none());
         assert!(cemu_node(1, 2).is_none());

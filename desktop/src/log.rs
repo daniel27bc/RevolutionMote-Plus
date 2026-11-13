@@ -82,7 +82,7 @@ pub fn line(msg: &str) {
     // stderr DESPUÉS del archivo y sin `eprintln!`: con stderr cerrado
     // (terminal que se fue, tubería rota) `eprintln!` entra en pánico, y si
     // eso pasa dentro del hook de pánico el proceso aborta sin dejar rastro
-    let _ = writeln!(std::io::stderr(), "[pepomote] {msg}");
+    let _ = writeln!(std::io::stderr(), "[RevolutionMote+] {msg}");
 }
 
 #[macro_export]

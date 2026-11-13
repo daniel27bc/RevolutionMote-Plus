@@ -341,7 +341,7 @@ pub fn type_text(text: &str) -> bool {
     capture::type_text(text)
 }
 
-/// ¿Cemu está abierto como administrador y PepoMote no? Windows no deja
+/// ¿Cemu está abierto como administrador y RevolutionMote+ no? Windows no deja
 /// entonces escribirle (en ningún Windows) ni, antes de Windows 11 24H2,
 /// capturar su ventana. Solo pasa en Windows.
 pub fn cemu_admin_blocked() -> bool {

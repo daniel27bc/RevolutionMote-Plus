@@ -13,7 +13,7 @@ un muerto» hasta que el hijo lo suelta (2 s). El receptor AISLADO (puertos
 propios, configuración propia, PEPOMOTE_SMOKE) tiene que esperar, cogerlo y
 llegar a crear el inyector; se comprueba en su receptor.log.
 
-Uso: python e2e_port_linger.py <PepoMote.exe> [directorio de trabajo]
+Uso: python e2e_port_linger.py <RevolutionMote.exe> [directorio de trabajo]
 En Linux sin ventana añade PEPOMOTE_NO_UI=1 al entorno (el receptor no sale
 solo y se cierra desde aquí). Sale con 0 si pasa y con 1 si falla."""
 import os

@@ -1,12 +1,12 @@
 """e2e (solo Windows): la ventana del receptor aparece SIEMPRE.
 
 Dos usuarios (1.13.2, Brasil y Perú, con el exe en una carpeta llamada
-«PepoMote») veían «se abre un milisegundo y se cierra; solo está en el
+«RevolutionMote+») veían «se abre un milisegundo y se cierra; solo está en el
 Administrador de tareas / en la bandeja». Aquí se comprueba cada causa con
 receptores AISLADOS (puertos y configuración propios; nunca los de defecto):
 
 - carpeta: ventana pintada, se cierra con la X (se esconde en la bandeja),
-  encima hay otra ventana titulada «PepoMote» (lo que es el Explorador de
+  encima hay otra ventana titulada «RevolutionMote+» (lo que es el Explorador de
   Windows 10 abierto en esa carpeta), y se vuelve a abrir el exe: la ventana
   tiene que volver y la otra ventana no se toca (antes la desmaximizaba y la
   nuestra no volvía nunca). `carpeta_min`: lo mismo con la ventana minimizada.
@@ -27,7 +27,7 @@ receptores AISLADOS (puertos y configuración propios; nunca los de defecto):
   copia, la colgada le deja el sitio y la nueva pinta con Direct3D.
 - En todos: ninguna ventana visible de la sonda en ningún momento.
 
-Uso: python e2e_window_windows.py <PepoMote.exe> [directorio] [--cases a,b] [--old]
+Uso: python e2e_window_windows.py <RevolutionMote.exe> [directorio] [--cases a,b] [--old]
 `--old` = el exe es anterior al arreglo (solo tiene sentido `carpeta`: ahí
 tiene que FALLAR). Sale con 0 si pasa y con 1 si falla."""
 import ctypes
@@ -113,9 +113,9 @@ def image_of(pid: int) -> str:
 
 
 def receiver_window(pid: int):
-    """La ventana principal del receptor (clase de winit, título «PepoMote»)."""
+    """La ventana principal del receptor (clase de winit, título «RevolutionMote+»)."""
     for h, p, cls, title, _vis in top_windows():
-        if p == pid and title == "PepoMote" and cls == "Window Class":
+        if p == pid and title in ("RevolutionMote+ · Receptor", "RevolutionMote+", "PepoMote") and cls == "Window Class":
             return h
     return None
 
@@ -261,7 +261,7 @@ class ProbeWatch:
 DECOY = r'''
 import sys, tkinter as tk
 r = tk.Tk()
-r.title("PepoMote")
+r.title("RevolutionMote+ · Receptor")
 r.geometry("600x400+80+80")
 r.update()
 r.state("zoomed")
@@ -273,14 +273,14 @@ r.mainloop()
 
 
 def open_decoy(seconds: int = 60):
-    """Una ventana ajena titulada «PepoMote», maximizada y encima de todo lo
+    """Una ventana ajena titulada «RevolutionMote+», maximizada y encima de todo lo
     demás: lo que es el Explorador de Windows 10 en una carpeta con ese nombre."""
     proc = subprocess.Popen([sys.executable, "-c", DECOY, str(seconds * 1000)])
     found = []
 
     def find():
         found.clear()
-        found.extend(h for h, pid, _c, title, vis in top_windows() if pid == proc.pid and title == "PepoMote" and vis)
+        found.extend(h for h, pid, _c, title, vis in top_windows() if pid == proc.pid and title == "RevolutionMote+ · Receptor" and vis)
         return bool(found) and bool(user32.IsZoomed(found[0]))
 
     ok = wait_until(find, 10)
@@ -327,7 +327,7 @@ def case_carpeta(exe: Path, root: Path, check: Checks, old: bool, minimized: boo
             user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
             check(wait_until(lambda: not user32.IsWindowVisible(hwnd), 5), f"[{tag}] la X la escondió en la bandeja")
         decoy, decoy_hwnd = open_decoy()
-        check(decoy_hwnd is not None, f"[{tag}] ventana ajena «PepoMote» maximizada encima")
+        check(decoy_hwnd is not None, f"[{tag}] ventana ajena «RevolutionMote+» maximizada encima")
         code = second_copy(exe, env)
         check(code == 0, f"[{tag}] la segunda copia entregó el testigo y salió (código {code})")
         shown = wait_until(lambda: user32.IsWindowVisible(hwnd) and not user32.IsIconic(hwnd), 3)
@@ -340,9 +340,9 @@ def case_carpeta(exe: Path, root: Path, check: Checks, old: bool, minimized: boo
             check(not decoy_ok, f"[{tag}] (exe anterior) la ventana ajena salió desmaximizada")
         else:
             check(shown, f"[{tag}] la ventana volvió a la vista en menos de 3 s")
-            check(decoy_ok, f"[{tag}] la ventana ajena «PepoMote» sigue maximizada (no se tocó)")
+            check(decoy_ok, f"[{tag}] la ventana ajena «RevolutionMote+» sigue maximizada (no se tocó)")
         text = read_log(cfg)
-        check("Otra copia de PepoMote pide mostrar la ventana" in text, f"[{tag}] la primera copia recibió la petición")
+        check("Otra copia de RevolutionMote+ pide mostrar la ventana" in text, f"[{tag}] la primera copia recibió la petición")
     finally:
         stop(decoy)
         stop(receiver, grace=0 if old else 35)
@@ -528,7 +528,7 @@ def case_nada(exe: Path, root: Path, check: Checks) -> None:
         box = find_error_box(receiver.pid)
         check(box is not None, f"[nada] salió el mensaje de error ({box[1] if box else '-'})")
         if box is not None:
-            check("PepoMote" in box[1], "[nada] el mensaje lleva el título de PepoMote")
+            check("RevolutionMote+" in box[1], "[nada] el mensaje lleva el título de RevolutionMote+")
             # Se cierra como lo haría una persona: pulsando su botón
             button = user32.FindWindowExW(box[0], None, "Button", None)
             user32.PostMessageW(button, BM_CLICK, 0, 0)

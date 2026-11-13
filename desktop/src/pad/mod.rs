@@ -6,7 +6,7 @@
 //! botones del móvil llegan hasta él.
 //!
 //! No hay nada que configurar en el juego. El mando lo crea el sistema, así
-//! que todo programa lo ve solo, sin que PepoMote tenga que escribir ningún
+//! que todo programa lo ve solo, sin que RevolutionMote+ tenga que escribir ningún
 //! fichero de nadie (a diferencia de los modos de emulador).
 //!
 //! - [`mapping`] traduce el INPUT a un estado de mando. Puro.

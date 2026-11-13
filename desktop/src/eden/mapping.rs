@@ -201,7 +201,7 @@ pub(super) fn restore_keys(current: &str, backup: &str, guid: &str, port: u16) -
         copy_keys(&mut body, controls(&saved), &managed_keys(i));
     }
     let expected = server_list(controls(&saved), port).join(",");
-    // Si el usuario ha cambiado la lista mientras usaba PepoMote, conservarla
+    // Si el usuario ha cambiado la lista mientras usaba RevolutionMote+, conservarla
     // entera: quitar nuestro servidor renumeraría los mandos añadidos después.
     // El servidor extra sin bindings es inocuo; perder esos bindings no lo es.
     if qt_effective(&body, GLOBALS[0], "127.0.0.1:26760") == expected {

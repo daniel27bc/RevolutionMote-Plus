@@ -32,7 +32,7 @@ pub fn ax_trusted() -> bool {
     unsafe { AXIsProcessTrusted() }
 }
 
-/// Pide Accesibilidad con el diálogo del sistema («PepoMote quiere controlar
+/// Pide Accesibilidad con el diálogo del sistema («RevolutionMote+ quiere controlar
 /// este ordenador…», con el botón que abre Ajustes), una vez por proceso.
 pub fn ax_prompt_once() {
     static ONCE: Once = Once::new();
@@ -102,19 +102,19 @@ pub fn open_settings_pane(anchor: &str) {
         .spawn();
 }
 
-/// El .app que nos contiene (…/PepoMote.app), si corremos desde un bundle.
+/// El .app que nos contiene (…/RevolutionMote+.app), si corremos desde un bundle.
 pub fn bundle_path() -> Option<PathBuf> {
     bundle_of(&std::env::current_exe().ok()?)
 }
 
-/// `…/PepoMote.app/Contents/MacOS/PepoMote` → `…/PepoMote.app`.
+/// `…/RevolutionMote+.app/Contents/MacOS/RevolutionMote` → `…/RevolutionMote+.app`.
 pub fn bundle_of(exe: &Path) -> Option<PathBuf> {
     exe.ancestors()
         .find(|p| p.extension().is_some_and(|e| e == "app"))
         .map(Path::to_path_buf)
 }
 
-/// Relanza PepoMote y sale (tras conceder «Grabación de pantalla» macOS
+/// Relanza RevolutionMote+ y sale (tras conceder «Grabación de pantalla» macOS
 /// exige reiniciar la app). El relanzamiento espera un segundo a que este
 /// proceso suelte el cerrojo de instancia única.
 pub fn relaunch() -> ! {

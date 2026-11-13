@@ -1,13 +1,13 @@
 //! `retroarch.cfg`: texto `clave = "valor"` (una por línea, `#` comenta).
-//! Solo se tocan las claves de PepoMote; el resto del archivo se conserva
+//! Solo se tocan las claves de RevolutionMote+; el resto del archivo se conserva
 //! byte a byte (RetroArch lo reescribe entero al salir, ordenado, y vuelve a
 //! guardar estas mismas claves: son ajustes suyos de siempre).
 use super::link::Ports;
 
-/// Jugadores que se habilitan en RetroArch (uno por slot de PepoMote).
+/// Jugadores que se habilitan en RetroArch (uno por slot de RevolutionMote+).
 pub const USERS: u8 = crate::net::MAX_PLAYERS as u8;
 
-/// Las claves con los valores que PepoMote necesita.
+/// Las claves con los valores que RevolutionMote+ necesita.
 pub fn managed_values(ports: Ports) -> Vec<(String, String)> {
     let mut v = vec![
         ("network_remote_enable".to_owned(), "true".to_owned()),
@@ -83,7 +83,7 @@ pub fn apply(text: &str, values: &[(String, String)]) -> String {
     s
 }
 
-/// ¿Ya está todo como PepoMote lo quiere?
+/// ¿Ya está todo como RevolutionMote+ lo quiere?
 pub fn needs_change(text: &str, values: &[(String, String)]) -> bool {
     values.iter().any(|(k, v)| get(text, k).as_deref() != Some(v.as_str()))
 }

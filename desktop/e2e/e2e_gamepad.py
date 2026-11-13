@@ -5,7 +5,7 @@ si aquí sale un botón, el juego ve ese botón.
 
 Requiere el receptor arrancado con PEPOMOTE_PAIR_CODE=1234 y el driver del
 mando virtual (ViGEmBus) instalado: va dentro del exe y la CI lo instala antes
-con `PepoMote.exe --install-driver`. Sin driver se salta sola y sale con 0
+con `RevolutionMote.exe --install-driver`. Sin driver se salta sola y sale con 0
 (el mapeo ya está cubierto por los tests unitarios), salvo con
 PEPOMOTE_E2E_REQUIRE_GAMEPAD=1 (un PC con el driver, antes de publicar): ahí
 saltarse es un fallo. En la CI de GitHub no hay driver: su Windows Server no
@@ -196,7 +196,7 @@ sess = ok1["session_id"]
 if _get_state is None:
     done("SKIP: sin XInput en este sistema")
 if ok1.get("rumble") != "ready":
-    done(f"SKIP: sin mando virtual (rumble={ok1.get('rumble')!r}); instala el driver con `PepoMote.exe --install-driver`")
+    done(f"SKIP: sin mando virtual (rumble={ok1.get('rumble')!r}); instala el driver con `RevolutionMote.exe --install-driver`")
 
 antes = connected()
 if len(antes) >= 4:

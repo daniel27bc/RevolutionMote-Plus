@@ -9,7 +9,7 @@
 //!
 //! El crate `vigem-client` habla con el driver por IOCTL (Rust puro, sin
 //! ViGEmClient.dll). Sin el driver, `Client::connect` devuelve
-//! `BusNotFound`: PepoMote lo instala él mismo (`vigem_setup`, el
+//! `BusNotFound`: RevolutionMote+ lo instala él mismo (`vigem_setup`, el
 //! instalador oficial viaja dentro del exe) y se reintenta solo.
 
 use super::ring;
@@ -221,7 +221,7 @@ pub fn driver_line() -> String {
     match driver_version() {
         Ok(v) => {
             let viejo = if drops_notices(v) {
-                " (anterior a 1.17.333: pierde avisos de los motores; PepoMote deja varias peticiones esperando)"
+                " (anterior a 1.17.333: pierde avisos de los motores; RevolutionMote+ deja varias peticiones esperando)"
             } else {
                 ""
             };
@@ -453,7 +453,7 @@ mod tests {
         assert!(drops_notices((1, 16, 116, 0)), "el de BetterJoy y x360ce");
         assert!(drops_notices((1, 17, 306, 0)));
         assert!(!drops_notices((1, 17, 333, 0)), "el primero con la cola de avisos");
-        assert!(!drops_notices((1, 21, 442, 0)), "el que instala PepoMote");
+        assert!(!drops_notices((1, 21, 442, 0)), "el que instala RevolutionMote+");
         assert!(!drops_notices((2, 0, 0, 0)));
     }
 

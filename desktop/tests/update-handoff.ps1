@@ -1,4 +1,4 @@
-param([string]$Receiver = "$PSScriptRoot/../target/debug/PepoMote.exe")
+param([string]$Receiver = "$PSScriptRoot/../target/debug/RevolutionMote.exe")
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $validation = Join-Path $repo 'dist/update-validation'
@@ -47,7 +47,7 @@ foreach ($failed in @($false,$true)) {
     $case=Join-Path $root $(if($failed){'rollback'}else{'success'})
     $work=Join-Path $case '.pepomote-update-fixture'
     New-Item -ItemType Directory -Path $work -Force | Out-Null
-    $destination=Join-Path $case 'PepoMote.exe'
+    $destination=Join-Path $case 'RevolutionMote.exe'
     $staged=Join-Path $work 'package'
     $helper=Join-Path $work 'helper.exe'
     Copy-Item -LiteralPath (Join-Path $root 'fixture-1.10.0.exe') -Destination $destination
@@ -58,7 +58,7 @@ foreach ($failed in @($false,$true)) {
     $parent=Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-Command','[Threading.Thread]::Sleep(30000)') -WindowStyle Hidden -PassThru
     try {
         $plan=@{work=$work;destination=$destination;staged=$staged;bundle=$false;version='1.11.0';parent_pid=$parent.Id;launch_args=@();original_sha256=$oldHash;
-            asset=@{name='PepoMote.exe';url='https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.exe';size=(Get-Item -LiteralPath $staged).Length;sha256=$newHash}}
+            asset=@{name='RevolutionMote-Plus-Receptor-Windows-v1.11.0.exe';url='https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus-Receptor-Windows-v1.11.0.exe';size=(Get-Item -LiteralPath $staged).Length;sha256=$newHash}}
         $planPath=Join-Path $work 'plan.json'
         [IO.File]::WriteAllText($planPath,($plan|ConvertTo-Json -Depth 6),[Text.UTF8Encoding]::new($false))
         if($failed){$env:PEPOMOTE_FIXTURE_FAIL='1'}else{Remove-Item Env:PEPOMOTE_FIXTURE_FAIL -ErrorAction SilentlyContinue}

@@ -231,7 +231,7 @@ fn backup(plan: &Plan) -> PathBuf {
 
 fn installed_executable(plan: &Plan) -> PathBuf {
     if plan.bundle {
-        plan.destination.join("Contents/MacOS/PepoMote")
+        plan.destination.join("Contents/MacOS/RevolutionMote")
     } else {
         plan.destination.clone()
     }
@@ -357,7 +357,7 @@ fn rollback(plan: &Plan) -> Result<(), String> {
     reject_links(&plan.destination)?;
     reject_links(&previous)?;
     let backup_executable = if plan.bundle {
-        previous.join("Contents/MacOS/PepoMote")
+        previous.join("Contents/MacOS/RevolutionMote")
     } else {
         previous.clone()
     };
@@ -640,7 +640,7 @@ pub fn prepare(
         .map_err(|e| e.to_string())?;
         executable(&helper)?;
         let original_sha256 = file_hash(&if target.bundle {
-            destination.join("Contents/MacOS/PepoMote")
+            destination.join("Contents/MacOS/RevolutionMote")
         } else {
             destination.clone()
         })?;
@@ -690,7 +690,7 @@ fn unpack_bundle(package: &Path, work: &Path, cancel: &AtomicBool) -> Result<Pat
         if relative.starts_with("__MACOSX") {
             continue;
         }
-        if !relative.starts_with("PepoMote.app")
+        if !relative.starts_with("RevolutionMote+.app")
             || f.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000)
         {
             return Err("Unexpected bundle entry / symbolic link".into());
@@ -727,8 +727,8 @@ fn unpack_bundle(package: &Path, work: &Path, cancel: &AtomicBool) -> Result<Pat
             .map_err(|e| e.to_string())?;
         }
     }
-    let app = root.join("PepoMote.app");
-    if !app.join("Contents/MacOS/PepoMote").is_file() || !app.join("Contents/Info.plist").is_file()
+    let app = root.join("RevolutionMote+.app");
+    if !app.join("Contents/MacOS/RevolutionMote").is_file() || !app.join("Contents/Info.plist").is_file()
     {
         return Err("Incomplete application bundle".into());
     }
@@ -809,7 +809,7 @@ pub fn commit(plan: &Plan) -> Result<(), String> {
         std::thread::sleep(Duration::from_millis(50));
     }
     let _ = durable_write(&plan.work.join("abort"), b"abort");
-    Err("Update helper did not confirm restart; PepoMote remains open. Please retry".into())
+    Err("Update helper did not confirm restart; RevolutionMote+ remains open. Please retry".into())
 }
 
 fn validate_plan(plan: &Plan) -> Result<(), String> {
@@ -937,7 +937,7 @@ mod tests {
             arch: arch.into(),
             mobile,
             musl,
-            executable: "/home/test/PepoMote".into(),
+            executable: "/home/test/RevolutionMote".into(),
             appimage: None,
             managed: false,
         }
@@ -956,7 +956,7 @@ mod tests {
             );
         }
         let mut r = runtime("linux", "x86_64", false, false);
-        r.appimage = Some("/home/test/PepoMote.AppImage".into());
+        r.appimage = Some("/home/test/RevolutionMote+.AppImage".into());
         let t = select_target(&r).unwrap();
         assert_eq!(t.key, "linux-x86_64-appimage");
         assert_eq!(t.destination, r.appimage.unwrap());
@@ -965,10 +965,10 @@ mod tests {
         r.managed = true;
         assert!(select_target(&r).is_err());
         let mut r = runtime("macos", "aarch64", false, false);
-        r.executable = "/Applications/PepoMote.app/Contents/MacOS/PepoMote".into();
+        r.executable = "/Applications/RevolutionMote+.app/Contents/MacOS/RevolutionMote".into();
         let t = select_target(&r).unwrap();
         assert!(t.bundle);
-        assert_eq!(t.destination, PathBuf::from("/Applications/PepoMote.app"));
+        assert_eq!(t.destination, PathBuf::from("/Applications/RevolutionMote+.app"));
     }
     #[cfg(windows)]
     #[test]
@@ -976,7 +976,7 @@ mod tests {
         let Some(program_files) = std::env::var_os("ProgramFiles") else {
             return;
         };
-        let path = PathBuf::from(program_files).join("PepoMote/PepoMote.exe");
+        let path = PathBuf::from(program_files).join("RevolutionMote+/RevolutionMote.exe");
         assert!(system_path(&path));
         assert!(system_path(&PathBuf::from(format!(
             "\\\\?\\{}",
@@ -986,7 +986,7 @@ mod tests {
     #[test]
     fn verified_stream_rejects_corruption_short_extra_and_cancelled_bytes() {
         let a = Asset {
-            name: "PepoMote.exe".into(),
+            name: "RevolutionMote.exe".into(),
             url: String::new(),
             size: 3,
             sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".into(),
@@ -1022,9 +1022,9 @@ mod tests {
         let work = root.join(".pepomote-update-test");
         fs::create_dir(&work).unwrap();
         let destination = root.join(if cfg!(windows) {
-            "PepoMote.exe"
+            "RevolutionMote.exe"
         } else {
-            "PepoMote"
+            "RevolutionMote"
         });
         let staged = work.join("package");
         fs::write(&staged, content).unwrap();
@@ -1134,10 +1134,10 @@ mod tests {
         for entries in [
             vec!["../outside"],
             vec![
-                "PepoMote.app/Contents/Info.plist",
-                "PepoMote.app/Contents/Info.plist",
+                "RevolutionMote+.app/Contents/Info.plist",
+                "RevolutionMote+.app/Contents/Info.plist",
             ],
-            vec!["PepoMote.app/Contents/Info.plist"],
+            vec!["RevolutionMote+.app/Contents/Info.plist"],
         ] {
             let root = scratch();
             let package = root.join("archive.zip");

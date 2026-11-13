@@ -77,7 +77,7 @@ pub(crate) fn ini_key(line: &str) -> Option<&str> {
 }
 
 /// Escribe el INI solo si cambia algo. El backup `.pepomote.bak` se hace UNA
-/// vez (el archivo tal como estaba antes de que PepoMote lo tocara nunca):
+/// vez (el archivo tal como estaba antes de que RevolutionMote+ lo tocara nunca):
 /// re-copiarlo en cada pasada lo habría sustituido por nuestra propia versión.
 pub(crate) fn write_if_changed(path: &Path, original: &str, new: String) -> Result<(), String> {
     if original == new {

@@ -2,7 +2,7 @@
 //! luz) por el «mando en red» de RetroArch, y sus teclas rápidas van por la
 //! interfaz de comandos. Sin driver de mando virtual y sin DSU: RetroArch
 //! trae las dos cosas de serie en Windows, Linux, macOS y Android; solo hay
-//! que activarlas en `retroarch.cfg`, y eso lo hace PepoMote con RetroArch
+//! que activarlas en `retroarch.cfg`, y eso lo hace RevolutionMote+ con RetroArch
 //! cerrado (lo reescribe entero al salir), igual que con Eden.
 mod cfg;
 mod consoles;
@@ -38,7 +38,7 @@ fn backup_path(path: &Path) -> PathBuf {
     path.with_extension("cfg.pepomote.bak")
 }
 
-/// Escribe las claves de PepoMote en `path` (copia de seguridad la primera
+/// Escribe las claves de RevolutionMote+ en `path` (copia de seguridad la primera
 /// vez). Devuelve si hubo que cambiar algo.
 fn write_config(path: &Path, ports: Ports) -> Result<bool, String> {
     let original = read_config(path)?;

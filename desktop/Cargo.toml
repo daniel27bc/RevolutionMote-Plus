@@ -1,13 +1,13 @@
 [package]
-name = "pepomote"
+name = "revolutionmote"
 version = "1.13.3"
 edition = "2021"
 license = "GPL-3.0-or-later"
-description = "PepoMote receiver — turns your Android phone into a Wii-style pointer/controller for your PC"
-repository = "https://github.com/pepitolas13/PepoMote"
+description = "RevolutionMote+ receiver — turns your Android phone into a Wii-style pointer/controller for your PC"
+repository = "https://github.com/daniel27bc/RevolutionMote-Plus"
 
 [[bin]]
-name = "PepoMote"
+name = "RevolutionMote"
 path = "src/main.rs"
 
 [build-dependencies]

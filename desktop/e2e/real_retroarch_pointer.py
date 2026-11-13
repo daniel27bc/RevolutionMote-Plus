@@ -1,7 +1,7 @@
 """Windows integration with a real RetroArch and the no-ROM diagnostic core.
 
 rustc --edition 2021 --crate-type cdylib fixtures/pointer_core.rs -o pointer_libretro.dll
-python real_retroarch_pointer.py <PepoMote.exe> <retroarch.exe> <pointer_libretro.dll>
+python real_retroarch_pointer.py <RevolutionMote.exe> <retroarch.exe> <pointer_libretro.dll>
 
 Creates fresh settings, ports and logs. Never edits the supplied RetroArch.
 The test opens its own fullscreen window and moves/clicks inside that window.

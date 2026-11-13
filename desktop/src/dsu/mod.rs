@@ -214,7 +214,7 @@ pub fn port() -> u16 {
 
 pub fn start(shared: SharedState) -> Option<Arc<Dsu>> {
     let port = port();
-    // Otro servidor DSU (DS4Windows, BetterJoy, un PepoMote colgado) en el
+    // Otro servidor DSU (DS4Windows, BetterJoy, un RevolutionMote+ colgado) en el
     // mismo puerto: se le cierra y se recupera el puerto
     let socket = match crate::ports::bind_udp(&shared, "127.0.0.1", port, "DSU") {
         Ok(s) => s,
@@ -222,7 +222,7 @@ pub fn start(shared: SharedState) -> Option<Arc<Dsu>> {
             // Aquí no se insiste (esto corre en el hilo principal, antes de
             // la ventana): la espera de `bind_udp` cubre el puerto que suelta
             // un receptor recién cerrado; si sigue ocupado, se dice (también
-            // en el log) y el DSU queda apagado hasta reabrir PepoMote
+            // en el log) y el DSU queda apagado hasta reabrir RevolutionMote+
             let e = format!("{e} {}", crate::tr!("port.reopen"));
             crate::log_line!("{e}");
             shared.lock_tolerant().last_error = Some(e);

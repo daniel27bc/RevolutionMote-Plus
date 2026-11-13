@@ -184,7 +184,7 @@ pub fn window_ready(painted: bool, focused: bool) {
 /// Nombre del mando virtual del jugador del slot (Dolphin en Linux lo ve
 /// como `evdev/0/<nombre>`; en la lista de mandos de cualquier programa).
 pub fn pad_name(slot: u8) -> String {
-    format!("PepoMote Wiimote {}", slot + 1)
+    format!("RevolutionMote+ Wiimote {}", slot + 1)
 }
 
 /// Identidad USB del mando virtual (bus virtual, ids neutros y fijos: así
@@ -1141,7 +1141,7 @@ pub fn cemu_node(slot: u8, player: u8) -> Option<String> {
 /// muertas por defecto de Cemu.
 pub(crate) fn cemu_node_with(api: &str, uuid: &str, player: u8) -> String {
     format!(
-        "\t<controller>\n\t\t<api>{api}</api>\n\t\t<uuid>{uuid}</uuid>\n\t\t<display_name>PepoMote J{player} vibración</display_name>\n\t\t<rumble>1</rumble>\n\t\t<axis>\n\t\t\t<deadzone>0.25</deadzone>\n\t\t\t<range>1</range>\n\t\t</axis>\n\t\t<rotation>\n\t\t\t<deadzone>0.25</deadzone>\n\t\t\t<range>1</range>\n\t\t</rotation>\n\t\t<trigger>\n\t\t\t<deadzone>0.25</deadzone>\n\t\t\t<range>1</range>\n\t\t</trigger>\n\t\t<mappings>\n\t\t</mappings>\n\t</controller>\n"
+        "\t<controller>\n\t\t<api>{api}</api>\n\t\t<uuid>{uuid}</uuid>\n\t\t<display_name>RevolutionMote+ J{player} vibración</display_name>\n\t\t<rumble>1</rumble>\n\t\t<axis>\n\t\t\t<deadzone>0.25</deadzone>\n\t\t\t<range>1</range>\n\t\t</axis>\n\t\t<rotation>\n\t\t\t<deadzone>0.25</deadzone>\n\t\t\t<range>1</range>\n\t\t</rotation>\n\t\t<trigger>\n\t\t\t<deadzone>0.25</deadzone>\n\t\t\t<range>1</range>\n\t\t</trigger>\n\t\t<mappings>\n\t\t</mappings>\n\t</controller>\n"
     )
 }
 
@@ -1251,7 +1251,7 @@ pub fn install_driver_now() {
     }
 }
 
-/// `PepoMote.exe --install-driver` (la CI): instala y sale.
+/// `RevolutionMote.exe --install-driver` (la CI): instala y sale.
 pub fn install_driver_from_args() -> bool {
     #[cfg(windows)]
     {
@@ -1592,13 +1592,13 @@ mod tests {
     #[test]
     fn crc16_arc_y_guid_de_sdl() {
         assert_eq!(sdl_crc16(b"123456789"), 0xBB3D, "valor de comprobación de CRC-16/ARC");
-        let g = sdl_guid(0x06, "PepoMote Wiimote 1", PAD_VENDOR, PAD_PRODUCT, PAD_VERSION);
+        let g = sdl_guid(0x06, "RevolutionMote+ Wiimote 1", PAD_VENDOR, PAD_PRODUCT, PAD_VERSION);
         assert_eq!(g.len(), 32);
         assert!(g.starts_with("0600"), "bus virtual");
         assert_eq!(&g[8..16], "45500000", "vendor PE y ceros");
         assert_eq!(&g[16..24], "4d500000", "product PM y ceros");
         assert_eq!(&g[24..32], "01000000", "version 1 y ceros");
-        let crc = sdl_crc16(b"PepoMote Wiimote 1").to_le_bytes();
+        let crc = sdl_crc16(b"RevolutionMote+ Wiimote 1").to_le_bytes();
         assert_eq!(&g[4..8], format!("{:02x}{:02x}", crc[0], crc[1]));
     }
 
@@ -1607,7 +1607,7 @@ mod tests {
         let n = cemu_node_with("XInput", "2", 3);
         assert!(n.contains("<api>XInput</api>"));
         assert!(n.contains("<uuid>2</uuid>"));
-        assert!(n.contains("<display_name>PepoMote J3 vibración</display_name>"));
+        assert!(n.contains("<display_name>RevolutionMote+ J3 vibración</display_name>"));
         assert!(n.contains("<rumble>1</rumble>"));
         assert!(!n.contains("<entry>"));
         assert!(!n.contains("<motion>"));

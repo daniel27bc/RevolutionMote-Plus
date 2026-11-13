@@ -8,14 +8,14 @@
 //! colgarse o reventar dentro de OpenGL, cosa que no se puede cortar desde
 //! el mismo proceso.
 //!
-//! Por eso OpenGL se prueba FUERA y ANTES: `PepoMote.exe --probe-window`
+//! Por eso OpenGL se prueba FUERA y ANTES: `RevolutionMote.exe --probe-window`
 //! (la sonda) crea la ventana invisible con OpenGL, pasa por lo que se
 //! cuelga o revienta en un driver malo (formato de píxel, contexto, carga de
 //! GL, compilación de shaders) y sale antes del primer fotograma, sin
 //! enseñar nada, contestando una línea. El receptor la lanza en paralelo con
 //! su arranque y, si no contesta en `PROBE_BUDGET`, pinta con Direct3D. Lo
 //! que salió se recuerda por la huella de la gráfica (tarjetas, su driver y
-//! la versión de PepoMote): con la misma huella no hay sonda. Una marca en
+//! la versión de RevolutionMote+): con la misma huella no hay sonda. Una marca en
 //! settings.json delata el arranque que no llegó a pintar (colgado o
 //! cerrado a la fuerza), y la copia colgada deja el sitio a la siguiente
 //! (ver `singleton.rs`).
@@ -249,7 +249,7 @@ pub fn registry_subkey(device_key: &str) -> Option<&str> {
 }
 
 /// La huella: tarjetas (nombre, id y versión del driver, sin repetir) y la
-/// versión de PepoMote.
+/// versión de RevolutionMote+.
 pub fn fingerprint_of(adapters: &[Adapter]) -> String {
     let mut parts: Vec<String> = adapters
         .iter()
@@ -258,7 +258,7 @@ pub fn fingerprint_of(adapters: &[Adapter]) -> String {
     parts.sort();
     parts.dedup();
     let cards = if parts.is_empty() { "sin tarjetas".to_owned() } else { parts.join(" + ") };
-    format!("{cards} · PepoMote {}", env!("CARGO_PKG_VERSION"))
+    format!("{cards} · RevolutionMote+ {}", env!("CARGO_PKG_VERSION"))
 }
 
 /// Las tarjetas en una línea, para el log y `--diag`.
@@ -353,7 +353,7 @@ fn reg_exists(subkey: &str, value: &str) -> bool {
 // ------------------------------------------------------------------------
 // La sonda (proceso hijo)
 
-/// ¿Es este proceso la sonda? (`PepoMote.exe --probe-window`)
+/// ¿Es este proceso la sonda? (`RevolutionMote.exe --probe-window`)
 pub fn probe_from_args() -> bool {
     std::env::args_os().nth(1).is_some_and(|a| a == PROBE_ARG)
 }
@@ -371,11 +371,11 @@ pub fn run_probe() -> ! {
     let viewport = egui::ViewportBuilder::default()
         .with_inner_size([460.0, 640.0])
         .with_min_inner_size([360.0, 480.0])
-        .with_title("PepoMote sonda");
+        .with_title("RevolutionMote+ sonda");
     let options = native_options(Renderer::OpenGl, viewport);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         eframe::run_native(
-            "PepoMote sonda",
+            "RevolutionMote+ sonda",
             options,
             Box::new(|cc| {
                 // Aquí eframe ya tiene formato de píxel, contexto, GL cargado
@@ -491,7 +491,7 @@ impl Probe {
                         Ok(Some(_)) | Err(_) => return,
                         Ok(None) if t.elapsed() >= Duration::from_secs(30) => {
                             // Un hilo atascado dentro del driver (espera del
-                            // núcleo) la tiene viva: queda otro «PepoMote» en
+                            // núcleo) la tiene viva: queda otro «RevolutionMote+» en
                             // el Administrador de tareas, que se sepa por qué
                             crate::log_line!(
                                 "Sonda de la ventana: sigue viva 30 s después de matarla (PID {}): atascada dentro del driver de la gráfica",
@@ -545,7 +545,7 @@ pub fn direct3d_options() -> eframe::egui_wgpu::WgpuConfiguration {
         supported_backends: backends,
         power_preference: wgpu::PowerPreference::LowPower,
         device_descriptor: std::sync::Arc::new(|adapter: &wgpu::Adapter| wgpu::DeviceDescriptor {
-            label: Some("PepoMote"),
+            label: Some("RevolutionMote+"),
             required_features: wgpu::Features::empty(),
             required_limits: wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits()),
             memory_hints: wgpu::MemoryHints::MemoryUsage,
@@ -907,7 +907,7 @@ mod tests {
         assert_eq!(one, fingerprint_of(&[b.clone(), a.clone(), a.clone()]));
         assert!(one.contains("Intel|PCI\\VEN_8086|31.0"));
         assert!(one.contains("NVIDIA|PCI\\VEN_10DE|?"));
-        assert!(one.ends_with(&format!("PepoMote {}", env!("CARGO_PKG_VERSION"))));
+        assert!(one.ends_with(&format!("RevolutionMote+ {}", env!("CARGO_PKG_VERSION"))));
         let other_driver = Adapter { driver: Some("32.0".into()), ..a.clone() };
         assert_ne!(one, fingerprint_of(&[other_driver, b]));
         assert!(fingerprint_of(&[]).starts_with("sin tarjetas"));
@@ -920,7 +920,7 @@ mod tests {
         // En cualquier Windows (con o sin driver): no revienta y da una huella
         let cards = adapters();
         let fp = fingerprint_of(&cards);
-        assert!(fp.contains("PepoMote"));
+        assert!(fp.contains("RevolutionMote+"));
         assert!(!describe_adapters(&cards).is_empty());
     }
 }

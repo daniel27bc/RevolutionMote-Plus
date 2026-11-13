@@ -23,7 +23,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: receptor-windows
-          path: desktop/target/release/PepoMote.exe
+          path: desktop/target/release/RevolutionMote.exe
 
   release:
     needs: receptor-windows
@@ -74,7 +74,19 @@ jobs:
           import hashlib, json, os, datetime
           tag = os.environ["TAG"]; v = tag.lstrip("v")
           repo = os.environ["GITHUB_REPOSITORY"]
-          data = open("RevolutionMote-Plus.apk", "rb").read()
+          files = {
+              "android-universal": "RevolutionMote-Plus.apk",
+              "windows-x86_64": f"RevolutionMote-Plus-Receptor-Windows-{tag}.exe",
+          }
+          with open("receptor/RevolutionMote.exe", "rb") as source, open(files["windows-x86_64"], "wb") as target:
+              target.write(source.read())
+          assets = {}
+          for platform, name in files.items():
+              data = open(name, "rb").read()
+              assets[platform] = {
+                  "name": name, "url": f"https://github.com/{repo}/releases/download/v{v}/{name}",
+                  "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+              }
           notes = {"es": ["Nueva versión de RevolutionMote+."], "en": ["New RevolutionMote+ version."]}
           extra = f"docs/releases/{tag}.notes.json"
           if os.path.exists(extra):
@@ -84,10 +96,7 @@ jobs:
               "published_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "release_url": f"https://github.com/{repo}/releases/tag/v{v}",
               "notes": notes,
-              "assets": {"android-universal": {
-                  "name": "RevolutionMote-Plus.apk",
-                  "url": f"https://github.com/{repo}/releases/download/v{v}/RevolutionMote-Plus.apk",
-                  "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}},
+              "assets": assets,
           }
           json.dump(m, open("update.json", "w", encoding="utf-8"), ensure_ascii=False)
           PY
@@ -95,7 +104,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp receptor/PepoMote.exe "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe"
           NOTES=docs/releases/${TAG}.md
           [ -f "$NOTES" ] || NOTES=/dev/null
           # Un solo APK por release: RevolutionMote-Plus.apk (el nombre fijo que

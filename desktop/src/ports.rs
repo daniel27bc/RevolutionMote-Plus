@@ -1,7 +1,7 @@
 //! Puertos ocupados: si el DSU (26760) o el canal del móvil (26761) ya los
-//! tiene otro proceso, PepoMote no funciona y nadie sabe por qué. Aquí se
+//! tiene otro proceso, RevolutionMote+ no funciona y nadie sabe por qué. Aquí se
 //! averigua QUIÉN los tiene (otro servidor DSU como DS4Windows o BetterJoy,
-//! o un PepoMote antiguo que se quedó colgado), se cierra ese proceso y se
+//! o un RevolutionMote+ antiguo que se quedó colgado), se cierra ese proceso y se
 //! vuelve a abrir el puerto. Se deja dicho en la ventana y en los móviles.
 //!
 //! Un puerto en manos de un proceso que YA NO EXISTE (el receptor que acaba

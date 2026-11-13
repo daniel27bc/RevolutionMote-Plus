@@ -51,7 +51,8 @@ No hace falta compilar en local: lo hace GitHub Actions.
    y, si falla, `gh run view <id> --log-failed`.
 4. El APK de prueba, `BUILD.txt` y las capturas de pantalla quedan en la rama
    `ci-out/<rama>` (por ejemplo `ci-out/feat/v1.4`). El receptor de Windows
-   sale como artefacto `PepoMote-windows` del run de `desktop`.
+   sale como artefacto `RevolutionMote-Plus-windows` del run de `desktop`, junto con el DMG de macOS (`RevolutionMote-Plus-macos`).
+   El flujo `ios` genera `RevolutionMote-Plus-ios` con el IPA sin firmar.
 
 Para ver un cambio de interfaz, añade una captura en
 `android/app/src/test/.../ui/shots/ScreenshotTest.kt` y mírala en `ci-out`.

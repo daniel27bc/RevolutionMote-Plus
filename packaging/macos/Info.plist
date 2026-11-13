@@ -5,15 +5,15 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>es</string>
 	<key>CFBundleExecutable</key>
-	<string>PepoMote</string>
+	<string>RevolutionMote</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.pepotech.pepomote.receiver</string>
+	<string>dev.daniel27bc.revolutionmote.receiver</string>
 	<key>CFBundleName</key>
-	<string>PepoMote</string>
+	<string>RevolutionMote+</string>
 	<key>CFBundleDisplayName</key>
-	<string>PepoMote</string>
+	<string>RevolutionMote+</string>
 	<key>CFBundleIconFile</key>
-	<string>PepoMote</string>
+	<string>RevolutionMote</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -33,12 +33,12 @@
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>PepoMote habla con tu móvil por la red local (Wi-Fi). / PepoMote talks to your phone over the local network (Wi-Fi).</string>
+	<string>RevolutionMote+ habla con tu móvil por la red local (Wi-Fi). / RevolutionMote+ talks to your phone over the local network (Wi-Fi).</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_pepomote._tcp</string>
 	</array>
 	<key>NSHumanReadableCopyright</key>
-	<string>GPL-3.0-or-later · PepoTech</string>
+	<string>GPL-3.0-or-later · PepoTech y daniel27bc</string>
 </dict>
 </plist>

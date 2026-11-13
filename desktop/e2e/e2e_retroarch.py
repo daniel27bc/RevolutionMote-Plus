@@ -437,7 +437,7 @@ def main():
 
     # --- clock: the receiver probes the command interface once RetroArch answers
     eventually(lambda: ra.probes >= 5, "receiver probes the command interface")
-    eventually(lambda: any("PepoMote" in m for m in ra.snapshot()[3]), "SHOW_MSG on the RetroArch screen")
+    eventually(lambda: any("RevolutionMote+" in m for m in ra.snapshot()[3]), "SHOW_MSG on the RetroArch screen")
     since = ra.frames
     time.sleep(1.0)
     frames, hist, _, _, _ = ra.snapshot()

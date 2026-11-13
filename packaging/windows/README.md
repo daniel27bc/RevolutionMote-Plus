@@ -3,8 +3,8 @@
 `ViGEmBus_1.22.0_x64_x86_arm64.exe` es el instalador **oficial y sin
 modificar** de ViGEmBus, el driver de bus que crea el mando de Xbox 360
 virtual con el que funcionan el mando universal y la vibración de los juegos.
-Va embebido en `PepoMote.exe` (`desktop/src/rumble/vigem_setup.rs`) y
-PepoMote lo instala él mismo la primera vez que arranca, con la única ventana
+Va embebido en `RevolutionMote.exe` (`desktop/src/rumble/vigem_setup.rs`) y
+RevolutionMote+ lo ofrece la primera vez que eliges el mando Xbox virtual, con la única ventana
 de permiso de administrador que Windows exige para cualquier driver.
 
 - Origen: <https://github.com/nefarius/ViGEmBus/releases/tag/v1.22.0>

@@ -1,4 +1,4 @@
-//! Configuración de Eden para los mandos Switch de PepoMote.
+//! Configuración de Eden para los mandos Switch de RevolutionMote+.
 mod keyboard;
 mod mapping;
 mod paths;

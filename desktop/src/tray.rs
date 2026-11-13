@@ -473,24 +473,24 @@ mod tests {
 
     #[test]
     fn el_tooltip_dice_cuantos_en_que_modo_y_quienes() {
-        assert_eq!(tooltip(&snap(0, Mode::Pointer, &[])), "PepoMote · esperando al móvil");
-        assert_eq!(tooltip(&snap(1, Mode::Pointer, &["Pixel 8"])), "PepoMote · 1 móvil · Puntero\nPixel 8");
+        assert_eq!(tooltip(&snap(0, Mode::Pointer, &[])), "RevolutionMote+ · esperando al móvil");
+        assert_eq!(tooltip(&snap(1, Mode::Pointer, &["Pixel 8"])), "RevolutionMote+ · 1 móvil · Puntero\nPixel 8");
         assert_eq!(
             tooltip(&snap(2, Mode::Dolphin, &["Pixel 8", "OnePlus 6T"])),
-            "PepoMote · 2 móviles · Dolphin\nPixel 8, OnePlus 6T"
+            "RevolutionMote+ · 2 móviles · Dolphin\nPixel 8, OnePlus 6T"
         );
-        assert_eq!(tooltip(&snap(3, Mode::Cemu, &[])), "PepoMote · 3 móviles · Wii U");
-        assert_eq!(tooltip(&snap(1, Mode::Switch, &["Pixel 8"])), "PepoMote · 1 móvil · Switch\nPixel 8");
+        assert_eq!(tooltip(&snap(3, Mode::Cemu, &[])), "RevolutionMote+ · 3 móviles · Wii U");
+        assert_eq!(tooltip(&snap(1, Mode::Switch, &["Pixel 8"])), "RevolutionMote+ · 1 móvil · Switch\nPixel 8");
     }
 
     #[test]
     fn el_tooltip_anuncia_la_version_nueva() {
         let mut s = snap(0, Mode::Pointer, &[]);
         s.update = Some(Version([1, 6, 0]));
-        assert_eq!(tooltip(&s), "PepoMote · esperando al móvil\nNueva versión 1.6.0…");
+        assert_eq!(tooltip(&s), "RevolutionMote+ · esperando al móvil\nNueva versión 1.6.0…");
         let mut s = snap(1, Mode::Cemu, &["Pixel 8"]);
         s.update = Some(Version([2, 0, 0]));
-        assert_eq!(tooltip(&s), "PepoMote · 1 móvil · Wii U\nPixel 8\nNueva versión 2.0.0…");
+        assert_eq!(tooltip(&s), "RevolutionMote+ · 1 móvil · Wii U\nPixel 8\nNueva versión 2.0.0…");
     }
 
     #[test]

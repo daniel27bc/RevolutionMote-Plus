@@ -1,13 +1,13 @@
 """Manual end-to-end check against a REAL RetroArch (not run in CI).
 
-Drives an isolated PepoMote receiver with a simulated phone and a real
+Drives an isolated RevolutionMote+ receiver with a simulated phone and a real
 RetroArch you point it at, and looks at what RetroArch does: retroarch.cfg
 written and backed up, probes answered, no GET_STATUS sent to a 1.22.2 (it
 would crash it), the RetroPad reaching the core (screenshots of the board),
 Home opening the menu, SAVE_STATE / SCREENSHOT / fast-forward hotkeys, and
 the automatic mode switch when RetroArch is opened.
 
-    python real_retroarch.py <PepoMote.exe> <RetroArch folder> --wipe \
+    python real_retroarch.py <RevolutionMote.exe> <RetroArch folder> --wipe \
         [--core <2048 core>] [--game <rom> --game-core <core> --console <id>]
 
 Use a scratch copy of RetroArch (the official zip extracted anywhere): with
@@ -335,7 +335,7 @@ def main():
                 p1.tap(BTN_UP)
             time.sleep(0.5)
             shot1 = shot(p1)
-            check(shot0 != shot1, "board changed after Left/Up taps sent through PepoMote (RetroPad d-pad reaches the core)")
+            check(shot0 != shot1, "board changed after Left/Up taps sent through RevolutionMote+ (RetroPad d-pad reaches the core)")
             # and with no input, two screenshots are identical (so the diff above is the input)
             check(shot(p1) == shot(p1), "without input the board stays put (control)")
 

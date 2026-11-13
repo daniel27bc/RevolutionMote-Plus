@@ -98,7 +98,7 @@ impl WinInjector {
     /// hilo, el de la telemetría, si el hilo en primer plano no atendía
     /// mensajes: cursor y DSU parados) ni la pulsación de ALT (activaba
     /// barras de menú y dejaba ALT «pegado» en juegos): las dos cosas solo
-    /// entraban con PepoMote sin foco, que es justo cuando fallaba.
+    /// entraban con RevolutionMote+ sin foco, que es justo cuando fallaba.
     fn activate_window_under_cursor(&self) {
         unsafe {
             let mut pt = POINT::default();
@@ -225,7 +225,7 @@ impl Injector for WinInjector {
                 static ONCE: std::sync::Once = std::sync::Once::new();
                 ONCE.call_once(|| {
                     let _ = std::fs::write(
-                        "C:\\PepoMote\\abs_debug.txt",
+                        "C:\\RevolutionMote+\\abs_debug.txt",
                         format!(
                             "nx={nx} ny={ny}\nSM_CX={} SM_CY={}\nvx={vx} vy={vy} vw={vw} vh={vh}\npx={px} py={py} ax={ax} ay={ay}\n",
                             GetSystemMetrics(SM_CXSCREEN),

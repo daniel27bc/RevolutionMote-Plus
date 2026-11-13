@@ -32,7 +32,7 @@ pub fn dns_label(name: &str) -> String {
     }
     let out: String = out.trim_matches('-').chars().take(63).collect();
     if out.is_empty() {
-        "pepomote".to_owned()
+        "revolutionmote".to_owned()
     } else {
         out
     }
@@ -59,7 +59,7 @@ pub fn run(shared: SharedState, pairing: PairingInfo) {
     props.insert("pv".to_owned(), "1".to_owned());
     props.insert("name".to_owned(), pairing.name.clone());
 
-    let instance = format!("PepoMote-{}", pairing.name);
+    let instance = format!("RevolutionMote-{}", pairing.name);
     let host = format!("{}.local.", dns_label(&pairing.name));
     let info = match ServiceInfo::new(
         "_pepomote._tcp.local.",
@@ -98,8 +98,8 @@ mod tests {
         assert_eq!(dns_label("MacBook de Dani"), "macbook-de-dani");
         assert_eq!(dns_label("  Mac mini (2024) de Ángel  "), "mac-mini-2024-de-angel");
         assert_eq!(dns_label("PC de Peña"), "pc-de-pena");
-        assert_eq!(dns_label("---"), "pepomote");
-        assert_eq!(dns_label(""), "pepomote");
+        assert_eq!(dns_label("---"), "revolutionmote");
+        assert_eq!(dns_label(""), "revolutionmote");
         assert_eq!(dns_label(&"a".repeat(80)).len(), 63);
     }
 }

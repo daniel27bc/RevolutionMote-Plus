@@ -16,7 +16,7 @@ use crate::tr;
 /// foto del fotograma anterior.
 const LOCK_WAIT: Duration = Duration::from_millis(200);
 
-pub struct PepoMoteApp {
+pub struct ReceiverApp {
     updater: crate::update::UpdateUi,
     shared: SharedState,
     pairing: PairingInfo,
@@ -60,7 +60,7 @@ pub struct PepoMoteApp {
     ax_ok: bool,
     #[cfg(target_os = "macos")]
     ax_checked: Instant,
-    /// Windows: el aviso de que la X deja PepoMote en la bandeja está a la
+    /// Windows: el aviso de que la X deja RevolutionMote+ en la bandeja está a la
     /// vista (la primera X; hasta pulsar «Entendido» o «Salir del todo»).
     #[cfg(windows)]
     close_notice: bool,
@@ -69,7 +69,7 @@ pub struct PepoMoteApp {
     tray_notice_seen: bool,
 }
 
-impl PepoMoteApp {
+impl ReceiverApp {
     /// `start_hidden` (--minimized): en macOS la ventana existe pero oculta y
     /// la app queda sin icono en el Dock hasta «Mostrar» (Windows ni siquiera
     /// llega aquí hasta entonces).
@@ -266,7 +266,7 @@ impl Snapshot {
     }
 }
 
-impl eframe::App for PepoMoteApp {
+impl eframe::App for ReceiverApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Latido: el vigilante apunta si este hilo deja de entrar aquí
         crate::launch::mark_frame();
@@ -417,7 +417,7 @@ impl eframe::App for PepoMoteApp {
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         ui.vertical_centered(|ui| {
-                            ui.add_space(8.0);
+                            ui.add_space(12.0);
                             ui.label(
                                 RichText::new("RevolutionMote+")
                                     .size(34.0)
@@ -437,10 +437,8 @@ impl eframe::App for PepoMoteApp {
                                 ui.add_space(10.0);
                             }
 
-                            self.ui_repair(ui, &snap);
-
                             if snap.player_count == 0 {
-                                self.ui_qr(ui, 280.0, tr!("win.waiting"), &snap.pair_code);
+                                self.ui_qr(ui, 224.0, tr!("win.waiting"), &snap.pair_code);
                             } else {
                                 ui_players(ui, &snap);
                                 if snap.mode == Mode::Dolphin {
@@ -456,7 +454,9 @@ impl eframe::App for PepoMoteApp {
                                 }
                                 if snap.player_count < crate::net::MAX_PLAYERS {
                                     ui.add_space(12.0);
-                                    self.ui_qr(ui, 170.0, tr!("win.another_player"), &snap.pair_code);
+                                    egui::CollapsingHeader::new(tr!("win.another_player")).show(ui, |ui| {
+                                        ui.vertical_centered(|ui| self.ui_qr(ui, 170.0, tr!("win.scan"), &snap.pair_code));
+                                    });
                                 }
                             }
 
@@ -513,7 +513,7 @@ fn hide_to_tray(ctx: &egui::Context) {
 }
 
 #[cfg(windows)]
-impl PepoMoteApp {
+impl ReceiverApp {
     /// El aviso de la bandeja, ya visto: no vuelve a salir.
     fn accept_close_notice(&mut self) {
         self.close_notice = false;
@@ -527,7 +527,7 @@ impl PepoMoteApp {
         crate::launch::ui_step(Step::Egui);
     }
 
-    /// La primera X: PepoMote sigue en la bandeja para que el móvil siga
+    /// La primera X: RevolutionMote+ sigue en la bandeja para que el móvil siga
     /// conectado; «Entendido» esconde la ventana como siempre y «Salir del
     /// todo» cierra el receptor.
     fn ui_close_notice(&mut self, ctx: &egui::Context) {
@@ -556,7 +556,7 @@ impl PepoMoteApp {
     }
 }
 
-impl PepoMoteApp {
+impl ReceiverApp {
     /// macOS: los permisos que hacen falta (Accesibilidad para mover el
     /// cursor y pulsar teclas; Grabación de pantalla solo para la doble
     /// pantalla de Cemu), con el botón que abre el panel de Ajustes. La
@@ -577,7 +577,7 @@ impl PepoMoteApp {
         egui::Frame::none()
             .fill(theme::card())
             .stroke(Stroke::new(1.5_f32, theme::warn()))
-            .rounding(theme::RADIUS)
+            .rounding(Rounding::same(theme::RADIUS))
             .inner_margin(12.0)
             .show(ui, |ui| {
                 if need_ax {
@@ -760,18 +760,19 @@ impl PepoMoteApp {
     }
 
     fn ui_qr(&self, ui: &mut egui::Ui, size: f32, caption: &str, pair_code: &(String, Duration)) {
+        ui.label(RichText::new(caption).size(16.0).strong().color(theme::text()));
+        ui.add_space(8.0);
         draw_qr_card(ui, &self.qr_modules, self.qr_width, size);
         ui.add_space(8.0);
-        ui.label(RichText::new(caption).size(13.0).color(theme::text_dim()));
         ui.label(
-            RichText::new(format!("{} : {}", self.pairing.host, self.pairing.port))
+            RichText::new(tr!("win.address", self.pairing.host, self.pairing.port))
                 .size(11.0)
                 .color(theme::text_dim()),
         );
         // Sin cámara (Linux móvil): código de 4 dígitos, un solo uso, 120 s
         let (code, left) = pair_code;
         ui.add_space(4.0);
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new(tr!("win.no_camera_code")).size(12.0).color(theme::text_dim()));
             ui.label(RichText::new(code).size(20.0).strong().color(theme::text()));
             ui.label(
@@ -1241,130 +1242,107 @@ fn sparkline(ui: &mut egui::Ui, values: &[f32]) {
 }
 
 fn ui_players(ui: &mut egui::Ui, snap: &Snapshot) {
-    let card_w = 340.0f32.min(ui.available_width());
-    let row_h = 34.0;
-    let head_h = 62.0;
-    let card_h = head_h + row_h * snap.player_count as f32 + 14.0;
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(card_w, card_h), egui::Sense::hover());
-    ui.painter().rect(
-        rect,
-        Rounding::same(theme::RADIUS),
-        theme::card(),
-        Stroke::new(1.5_f32, theme::card_border()),
-    );
-
-    let mut child = ui.child_ui(
-        rect.shrink(16.0),
-        egui::Layout::top_down(egui::Align::Min),
-        None,
-    );
-    let mode_txt = match snap.mode {
-        Mode::Pointer => tr!("win.mode_pointer"),
-        Mode::Dolphin => tr!("win.mode_dolphin"),
-        Mode::Cemu => tr!("win.mode_cemu"),
-        Mode::Switch => tr!("win.mode_switch"),
-        Mode::RetroArch => tr!("win.mode_retroarch"),
-        Mode::Gamepad => tr!("win.mode_gamepad"),
-    };
-    let cemu = snap.mode == Mode::Cemu;
-    let cemu_layout = crate::state::cemu_layout(&snap.players);
-    child.label(RichText::new(mode_txt).size(13.0).color(theme::blue()));
-    child.horizontal(|ui| {
-        // Latido: un punto verde que respira mientras llegan paquetes
-        let (dot, _) = ui.allocate_exact_size(Vec2::splat(10.0), egui::Sense::hover());
-        let color = if snap.pps > 0.0 {
-            let c = theme::ok();
-            Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), breath_alpha(ui.input(|i| i.time)))
-        } else {
-            theme::text_dim()
-        };
-        ui.painter().circle_filled(dot.center(), 4.0, color);
-        ui.label(
-            RichText::new(tr!("win.pps", snap.pps.round() as i64, snap.sensor_hz.round() as i64))
-                .size(11.0)
-                .color(theme::text_dim()),
-        );
-        if snap.rtt_hist.len() >= 2 {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| sparkline(ui, &snap.rtt_hist));
-        }
-    });
-    child.add_space(4.0);
-
-    let layout = crate::state::player_layout(&snap.players);
-    for (i, slot) in snap.players.iter().enumerate() {
-        let Some(p) = slot else { continue };
-        let pad_state = crate::state::pad_state(snap.mode,&snap.players,i as u8);
-        let number = pad_state.player;
-        let badge = if snap.mode==Mode::Switch {
-            if p.role==crate::state::Role::Nunchuk {tr!("win.badge_nunchuk_switch") .to_owned()}
-            else {tr!("win.badge_switch_pro", number)}
-        } else if snap.mode == Mode::RetroArch {
-            if p.role == crate::state::Role::Nunchuk {
-                tr!("win.badge_nunchuk_retroarch").to_owned()
-            } else {
-                match p.retro_pad {
-                    crate::retroarch::RetroPadKind::RetroPad => match p.retro_layout {
-                        Some(l) if l != "retropad" => tr!("win.badge_retro_console", number, crate::retroarch::layout_name(l)),
-                        _ => tr!("win.badge_retropad", number),
-                    },
-                    crate::retroarch::RetroPadKind::Nes => tr!("win.badge_retro_nes", number),
-                    crate::retroarch::RetroPadKind::Gun => tr!("win.badge_retro_gun", number),
-                }
-            }
-        } else if p.role == crate::state::Role::Nunchuk {
-            if cemu && !cemu_layout.iter().any(|c| c.nunchuk_slot == Some(i as u8)) {
-                tr!("win.badge_nunchuk_unused", number)
-            } else if !cemu && !layout.iter().any(|(_, n)| *n == Some(i as u8)) {
-                // su jugador lleva el Nunchuk en el mismo móvil
-                tr!("win.badge_nunchuk_spare", number)
-            } else {
-                tr!("win.badge_nunchuk", number)
-            }
-        } else if !cemu && p.own_nunchuk {
-            tr!("win.badge_player_nunchuk", number)
-        } else if cemu {
-            match cemu_layout.iter().find(|c| c.dsu_slot == Some(i as u8)).map(|c| (c.kind, c.screen_only)) {
-                Some((crate::state::PadKind::GamePad, true)) => tr!("win.badge_screen_only", number),
-                Some((crate::state::PadKind::GamePad, false)) => tr!("win.badge_gamepad", number),
-                Some((crate::state::PadKind::Pro, _)) => tr!("win.badge_pro", number),
-                Some((crate::state::PadKind::Wiimote, _)) => tr!("win.badge_wiimote", number),
-                None => tr!("win.badge_player", number),
-            }
-        } else {
-            tr!("win.badge_player", number)
-        };
-        child.horizontal(|ui| {
-            ui.label(
-                RichText::new(badge)
-                    .size(13.0)
-                    .strong()
-                    .color(theme::ON_ACCENT)
-                    .background_color(theme::blue()),
-            );
-            let name = if p.model.is_empty() {
-                p.name.clone()
-            } else {
-                p.model.clone()
+    egui::Frame::default()
+        .fill(theme::card())
+        .stroke(Stroke::new(1.5, theme::card_border()))
+        .rounding(theme::RADIUS)
+        .inner_margin(14.0)
+        .show(ui, |child| {
+            child.set_max_width(child.available_width().min(500.0));
+            let mode_txt = match snap.mode {
+                Mode::Pointer => tr!("win.mode_pointer"),
+                Mode::Dolphin => tr!("win.mode_dolphin"),
+                Mode::Cemu => tr!("win.mode_cemu"),
+                Mode::Switch => tr!("win.mode_switch"),
+                Mode::RetroArch => tr!("win.mode_retroarch"),
+                Mode::Gamepad => tr!("win.mode_gamepad"),
             };
-            ui.label(RichText::new(name).size(13.0).color(theme::text()));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let rtt = p
-                    .rtt_ms
-                    .map(|r| format!("{r:.0} ms"))
-                    .unwrap_or_else(|| "—".into());
+            let cemu = snap.mode == Mode::Cemu;
+            let cemu_layout = crate::state::cemu_layout(&snap.players);
+            child.label(RichText::new(mode_txt).size(13.0).color(theme::blue()));
+            child.horizontal(|ui| {
+                // Latido: un punto verde que respira mientras llegan paquetes
+                let (dot, _) = ui.allocate_exact_size(Vec2::splat(10.0), egui::Sense::hover());
+                let color = if snap.pps > 0.0 {
+                    let c = theme::ok();
+                    Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), breath_alpha(ui.input(|i| i.time)))
+                } else {
+                    theme::text_dim()
+                };
+                ui.painter().circle_filled(dot.center(), 4.0, color);
                 ui.label(
-                    RichText::new(format!("{}% · {rtt}", p.battery_pct))
-                        .size(12.0)
+                    RichText::new(tr!("win.pps", snap.pps.round() as i64, snap.sensor_hz.round() as i64))
+                        .size(11.0)
                         .color(theme::text_dim()),
                 );
-                // Apunta por inclinación (sin giroscopio real): que se sepa
-                if p.tilt && p.role == crate::state::Role::Wiimote {
-                    ui.label(RichText::new(tr!("win.tilt")).size(12.0).color(theme::text_dim()))
-                        .on_hover_text(tr!("win.tilt_tip"));
+                if snap.rtt_hist.len() >= 2 {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| sparkline(ui, &snap.rtt_hist));
                 }
             });
-        });
-    }
+            child.add_space(4.0);
+
+            let layout = crate::state::player_layout(&snap.players);
+            for (i, slot) in snap.players.iter().enumerate() {
+                let Some(p) = slot else { continue };
+                let pad_state = crate::state::pad_state(snap.mode,&snap.players,i as u8);
+                let number = pad_state.player;
+                let badge = if snap.mode==Mode::Switch {
+                    if p.role==crate::state::Role::Nunchuk {tr!("win.badge_nunchuk_switch") .to_owned()}
+                    else {tr!("win.badge_switch_pro", number)}
+                } else if snap.mode == Mode::RetroArch {
+                    if p.role == crate::state::Role::Nunchuk {
+                        tr!("win.badge_nunchuk_retroarch").to_owned()
+                    } else {
+                        match p.retro_pad {
+                            crate::retroarch::RetroPadKind::RetroPad => match p.retro_layout {
+                                Some(l) if l != "retropad" => tr!("win.badge_retro_console", number, crate::retroarch::layout_name(l)),
+                                _ => tr!("win.badge_retropad", number),
+                            },
+                            crate::retroarch::RetroPadKind::Nes => tr!("win.badge_retro_nes", number),
+                            crate::retroarch::RetroPadKind::Gun => tr!("win.badge_retro_gun", number),
+                        }
+                    }
+                } else if p.role == crate::state::Role::Nunchuk {
+                    if cemu && !cemu_layout.iter().any(|c| c.nunchuk_slot == Some(i as u8)) {
+                        tr!("win.badge_nunchuk_unused", number)
+                    } else if !cemu && !layout.iter().any(|(_, n)| *n == Some(i as u8)) {
+                        // su jugador lleva el Nunchuk en el mismo móvil
+                        tr!("win.badge_nunchuk_spare", number)
+                    } else {
+                        tr!("win.badge_nunchuk", number)
+                    }
+                } else if !cemu && p.own_nunchuk {
+                    tr!("win.badge_player_nunchuk", number)
+                } else if cemu {
+                    match cemu_layout.iter().find(|c| c.dsu_slot == Some(i as u8)).map(|c| (c.kind, c.screen_only)) {
+                        Some((crate::state::PadKind::GamePad, true)) => tr!("win.badge_screen_only", number),
+                        Some((crate::state::PadKind::GamePad, false)) => tr!("win.badge_gamepad", number),
+                        Some((crate::state::PadKind::Pro, _)) => tr!("win.badge_pro", number),
+                        Some((crate::state::PadKind::Wiimote, _)) => tr!("win.badge_wiimote", number),
+                        None => tr!("win.badge_player", number),
+                    }
+                } else {
+                    tr!("win.badge_player", number)
+                };
+                child.separator();
+                child.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new(badge).size(13.0).strong().color(theme::blue()));
+                    let name = if p.name.is_empty() { &p.model } else { &p.name };
+                    let label = ui.add(egui::Label::new(RichText::new(name.as_str()).size(13.0).color(theme::text())).wrap());
+                    if !p.model.is_empty() && p.model.as_str() != name.as_str() {
+                        label.on_hover_text(p.model.as_str());
+                    }
+                });
+                child.horizontal_wrapped(|ui| {
+                    let rtt = p.rtt_ms.map(|r| format!("{r:.0} ms")).unwrap_or_else(|| "—".into());
+                    ui.label(RichText::new(format!("{}% · {rtt}", p.battery_pct)).size(12.0).color(theme::text_dim()));
+                    if p.tilt && p.role == crate::state::Role::Wiimote {
+                        ui.label(RichText::new(tr!("win.tilt")).size(12.0).color(theme::text_dim()))
+                            .on_hover_text(tr!("win.tilt_tip"));
+                    }
+                });
+            }
+    });
 }
 
 fn build_qr(url: &str) -> (Vec<bool>, usize) {

@@ -78,7 +78,7 @@ fn main() {
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     log_line!(
-        "PepoMote {} arranca · {} {} · args {:?} · XDG_SESSION_TYPE={} WAYLAND_DISPLAY={} DISPLAY={} XDG_CURRENT_DESKTOP={} · ventana: {}",
+        "RevolutionMote+ {} arranca · {} {} · args {:?} · XDG_SESSION_TYPE={} WAYLAND_DISPLAY={} DISPLAY={} XDG_CURRENT_DESKTOP={} · ventana: {}",
         env!("CARGO_PKG_VERSION"),
         std::env::consts::OS,
         std::env::consts::ARCH,
@@ -90,7 +90,7 @@ fn main() {
         launch::describe_startup()
     );
 
-    // Instancia única: si ya hay un PepoMote vivo (quizá solo en la
+    // Instancia única: si ya hay un RevolutionMote+ vivo (quizá solo en la
     // bandeja), se le pide que se muestre y este proceso termina. Si el vivo
     // se había colgado antes de pintar con OpenGL, deja el sitio a este.
     #[cfg(windows)]
@@ -98,7 +98,7 @@ fn main() {
     match singleton::acquire() {
         singleton::Singleton::Primary(lock) => singleton::watch(lock),
         singleton::Singleton::TookOver(lock) => {
-            log_line!("El PepoMote abierto se había colgado antes de pintar y me ha dejado el sitio: sigo yo");
+            log_line!("El RevolutionMote+ abierto se había colgado antes de pintar y me ha dejado el sitio: sigo yo");
             #[cfg(windows)]
             {
                 took_over = true;
@@ -107,7 +107,7 @@ fn main() {
         }
         singleton::Singleton::AlreadyRunning => {
             log_line!(
-                "Ya hay un PepoMote escuchando en 127.0.0.1:{}: le he pedido que se muestre y salgo",
+                "Ya hay un RevolutionMote+ escuchando en 127.0.0.1:{}: le he pedido que se muestre y salgo",
                 singleton::port()
             );
             return;
@@ -229,8 +229,8 @@ fn main() {
         .with_min_inner_size([360.0, 480.0])
         .with_title("RevolutionMote+ · Receptor")
         // app_id (Wayland) / WM_CLASS (X11): así el compositor casa la
-        // ventana con PepoMote.desktop (icono, agrupación, reglas)
-        .with_app_id("PepoMote")
+        // ventana con RevolutionMote.desktop (icono, agrupación, reglas)
+        .with_app_id("RevolutionMote")
         .with_visible(!hidden_window)
         .with_icon(egui::IconData {
             rgba: icon::logo_rgba(64),
@@ -265,11 +265,11 @@ fn main() {
                 return Err("fallo simulado (PEPOMOTE_SMOKE_FAIL_FIRST)".to_owned());
             }
             eframe::run_native(
-                "PepoMote",
+                "RevolutionMote+ · Receptor",
                 options,
                 Box::new(move |cc| {
                     singleton::set_ctx(cc.egui_ctx.clone());
-                    Ok(Box::new(app::PepoMoteApp::new(cc, shared, pairing, start_hidden)))
+                    Ok(Box::new(app::ReceiverApp::new(cc, shared, pairing, start_hidden)))
                 }),
             )
             .map_err(|e| format!("{e} ({e:?})"))
@@ -306,7 +306,7 @@ fn run_window_windows(
                 return Err("fallo simulado (PEPOMOTE_SMOKE_FAIL_FIRST)".to_owned());
             }
             eframe::run_native(
-                "PepoMote",
+                "RevolutionMote+ · Receptor",
                 options,
                 Box::new(move |cc| {
                     c.store(true, Ordering::SeqCst);
@@ -314,7 +314,7 @@ fn run_window_windows(
                     gpu::fake_window_hang_if_requested();
                     singleton::set_ctx(cc.egui_ctx.clone());
                     singleton::remember_window(cc);
-                    Ok(Box::new(app::PepoMoteApp::new(cc, s, p, start_hidden)))
+                    Ok(Box::new(app::ReceiverApp::new(cc, s, p, start_hidden)))
                 }),
             )
             .map_err(|e| format!("{e} ({e:?})"))

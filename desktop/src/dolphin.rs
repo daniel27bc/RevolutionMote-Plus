@@ -34,7 +34,7 @@ static CONFIGURE_LOCK: Mutex<()> = Mutex::new(());
 /// lento de la mano o lo que mete el motor de vibración: el MotionPlus
 /// emulado se iba solo hasta la siguiente pausa. La zona muerta sigue.
 /// {DEV} = índice de pad del cliente DSU (slot).
-const MAPPING: &str = "Device = DSUClient/{DEV}/PepoMote
+const MAPPING: &str = "Device = DSUClient/{DEV}/RevolutionMote+
 Source = 1
 Buttons/A = Cross
 Buttons/B = Circle
@@ -119,24 +119,24 @@ fn ir_passthrough(roll: bool) -> String {
 /// stick, C/Z (L1/R1 de ese pad) y su acelerómetro real (Dolphin lo usa tal
 /// cual para agitar/inclinar). Ver protocol/DSU.md.
 const NUNCHUK_MAPPING: &str = "Extension = Nunchuk
-Nunchuk/Buttons/C = `DSUClient/{NDEV}/PepoMote:L1`
-Nunchuk/Buttons/Z = `DSUClient/{NDEV}/PepoMote:R1`
-Nunchuk/Stick/Up = `DSUClient/{NDEV}/PepoMote:Left Y+`
-Nunchuk/Stick/Down = `DSUClient/{NDEV}/PepoMote:Left Y-`
-Nunchuk/Stick/Left = `DSUClient/{NDEV}/PepoMote:Left X-`
-Nunchuk/Stick/Right = `DSUClient/{NDEV}/PepoMote:Left X+`
-Nunchuk/IMUAccelerometer/Up = `DSUClient/{NDEV}/PepoMote:Accel Up`
-Nunchuk/IMUAccelerometer/Down = `DSUClient/{NDEV}/PepoMote:Accel Down`
-Nunchuk/IMUAccelerometer/Left = `DSUClient/{NDEV}/PepoMote:Accel Left`
-Nunchuk/IMUAccelerometer/Right = `DSUClient/{NDEV}/PepoMote:Accel Right`
-Nunchuk/IMUAccelerometer/Forward = `DSUClient/{NDEV}/PepoMote:Accel Forward`
-Nunchuk/IMUAccelerometer/Backward = `DSUClient/{NDEV}/PepoMote:Accel Backward`
+Nunchuk/Buttons/C = `DSUClient/{NDEV}/RevolutionMote+:L1`
+Nunchuk/Buttons/Z = `DSUClient/{NDEV}/RevolutionMote+:R1`
+Nunchuk/Stick/Up = `DSUClient/{NDEV}/RevolutionMote+:Left Y+`
+Nunchuk/Stick/Down = `DSUClient/{NDEV}/RevolutionMote+:Left Y-`
+Nunchuk/Stick/Left = `DSUClient/{NDEV}/RevolutionMote+:Left X-`
+Nunchuk/Stick/Right = `DSUClient/{NDEV}/RevolutionMote+:Left X+`
+Nunchuk/IMUAccelerometer/Up = `DSUClient/{NDEV}/RevolutionMote+:Accel Up`
+Nunchuk/IMUAccelerometer/Down = `DSUClient/{NDEV}/RevolutionMote+:Accel Down`
+Nunchuk/IMUAccelerometer/Left = `DSUClient/{NDEV}/RevolutionMote+:Accel Left`
+Nunchuk/IMUAccelerometer/Right = `DSUClient/{NDEV}/RevolutionMote+:Accel Right`
+Nunchuk/IMUAccelerometer/Forward = `DSUClient/{NDEV}/RevolutionMote+:Accel Forward`
+Nunchuk/IMUAccelerometer/Backward = `DSUClient/{NDEV}/RevolutionMote+:Accel Backward`
 ";
 
 /// Jugadores a configurar: (slot DSU del Wiimote, slot DSU de su Nunchuk).
 pub type Layout = [(u8, Option<u8>)];
 
-const DSU_ENTRY: &str = "PepoMote:127.0.0.1:26760";
+const DSU_ENTRY: &str = "RevolutionMote+:127.0.0.1:26760";
 
 // ---------------------------------------------------------------------------
 // Dónde guarda Dolphin su configuración (la misma lógica que Dolphin)
@@ -490,7 +490,7 @@ pub fn config_dirs_with(cfg_dolphin_dir: &str) -> Vec<UserDir> {
         .collect()
 }
 
-/// `PepoMote --dolphin-dirs`: qué carpetas de Dolphin ve este equipo (para
+/// `RevolutionMote+ --dolphin-dirs`: qué carpetas de Dolphin ve este equipo (para
 /// diagnosticar un Dolphin que no se deja configurar). Devuelve true si el
 /// argumento estaba (el receptor no arranca).
 pub fn print_dirs_from_args() -> bool {
@@ -616,7 +616,7 @@ pub fn ensure_emulated_adapter(cfg_dir: &Path) -> Result<(), String> {
 
 /// Dolphin.ini: [Input] BackgroundInput = True. Sin él, Dolphin ignora el
 /// mando (el DSU del móvil incluido) en cuanto su ventana pierde el foco: con
-/// la ventana de PepoMote (o cualquier otra) seleccionada, «deja de
+/// la ventana de RevolutionMote+ (o cualquier otra) seleccionada, «deja de
 /// funcionar». Con la ventana de Dolphin en primer plano no cambia nada.
 pub fn ensure_background_input(cfg_dir: &Path) -> Result<(), String> {
     set_ini_key(&cfg_dir.join("Dolphin.ini"), "Input", "BackgroundInput", "True")
@@ -703,6 +703,10 @@ pub fn ensure_dsu_server(cfg_dir: &Path) -> Result<(), String> {
             }
         }
     }
+    // Actualiza solo la entrada local que generaban los receptores anteriores.
+    entries = entries.split(';')
+        .map(|entry| if entry == "PepoMote:127.0.0.1:26760" { DSU_ENTRY } else { entry })
+        .collect::<Vec<_>>().join(";");
     if !entries.contains(DSU_ENTRY) {
         if !entries.is_empty() && !entries.ends_with(';') {
             entries.push(';');
@@ -719,7 +723,7 @@ pub fn ensure_dsu_server(cfg_dir: &Path) -> Result<(), String> {
     write_if_changed(&path, &original, serialize_ini(&ini))
 }
 
-/// Perfiles manuales PepoMote-P1..P4 (fallback si alguien mapea a mano).
+/// Perfiles manuales RevolutionMote+-P1..P4 (fallback si alguien mapea a mano).
 fn write_profiles(cfg_dir: &Path, n_players: usize) {
     write_profiles_with(cfg_dir, n_players, crate::rumble::motor_expression)
 }
@@ -741,9 +745,9 @@ fn write_profiles_with(cfg_dir: &Path, n_players: usize, motor: impl Fn(u8) -> O
                 acc
             });
         let name = if slot == 0 {
-            "PepoMote.ini".to_owned()
+            "RevolutionMote+.ini".to_owned()
         } else {
-            format!("PepoMote-P{}.ini", slot + 1)
+            format!("RevolutionMote+-P{}.ini", slot + 1)
         };
         let _ = std::fs::write(dir.join(name), body);
     }
@@ -946,9 +950,9 @@ mod tests {
         write_wiimotes_with(&dir, &wm(2), |_| None).unwrap();
         let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
         assert!(!out.contains("Rumble/Motor"), "{out}");
-        assert!(out.contains("[Wiimote1]\nDevice = DSUClient/0/PepoMote"), "{out}");
+        assert!(out.contains("[Wiimote1]\nDevice = DSUClient/0/RevolutionMote+"), "{out}");
         write_profiles_with(&dir, 4, |_| None);
-        for name in ["PepoMote.ini", "PepoMote-P2.ini", "PepoMote-P3.ini", "PepoMote-P4.ini"] {
+        for name in ["RevolutionMote+.ini", "RevolutionMote+-P2.ini", "RevolutionMote+-P3.ini", "RevolutionMote+-P4.ini"] {
             let p = std::fs::read_to_string(dir.join("Profiles").join("Wiimote").join(name)).unwrap();
             assert!(!p.contains("Rumble/Motor"), "{name}: {p}");
         }
@@ -969,8 +973,8 @@ mod tests {
         assert!(!w2.contains("Rumble/Motor"), "{w2}");
         assert_eq!(out.matches("Rumble/Motor").count(), 1);
         write_profiles_with(&dir, 2, motor);
-        let p1 = std::fs::read_to_string(dir.join("Profiles").join("Wiimote").join("PepoMote.ini")).unwrap();
-        let p2 = std::fs::read_to_string(dir.join("Profiles").join("Wiimote").join("PepoMote-P2.ini")).unwrap();
+        let p1 = std::fs::read_to_string(dir.join("Profiles").join("Wiimote").join("RevolutionMote+.ini")).unwrap();
+        let p2 = std::fs::read_to_string(dir.join("Profiles").join("Wiimote").join("RevolutionMote+-P2.ini")).unwrap();
         assert!(p1.contains("Rumble/Motor = `XInput/2/Gamepad:Motor L`"), "{p1}");
         assert!(!p2.contains("Rumble/Motor"), "{p2}");
     }
@@ -1068,9 +1072,9 @@ mod tests {
         let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
 
         assert!(out.contains("[Wiimote1]"));
-        assert!(out.contains("Device = DSUClient/0/PepoMote"));
+        assert!(out.contains("Device = DSUClient/0/RevolutionMote+"));
         assert!(out.contains("[Wiimote2]"));
-        assert!(out.contains("Device = DSUClient/1/PepoMote"));
+        assert!(out.contains("Device = DSUClient/1/RevolutionMote+"));
         // slots sin móvil: Source = 0 (ningún mando de más en pantalla),
         // conservando las demás líneas; lo ajeno, intacto
         assert!(out.contains("[Wiimote3]
@@ -1106,7 +1110,7 @@ Source = 0
         write_wiimotes(&dir, &wm(3)).unwrap();
         assert_eq!(std::fs::read_to_string(&bak).unwrap(), original);
         let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
-        assert!(out.contains("Device = DSUClient/2/PepoMote"));
+        assert!(out.contains("Device = DSUClient/2/RevolutionMote+"));
     }
 
     #[test]
@@ -1128,11 +1132,11 @@ Source = 0
         write_wiimotes(&dir, &wm(2)).unwrap();
         let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
         assert!(out.contains("[Wiimote1]
-Device = DSUClient/0/PepoMote
+Device = DSUClient/0/RevolutionMote+
 Source = 1
 "));
         assert!(out.contains("[Wiimote2]
-Device = DSUClient/1/PepoMote
+Device = DSUClient/1/RevolutionMote+
 Source = 1
 "));
         assert!(out.contains("[Wiimote3]
@@ -1145,11 +1149,11 @@ Source = 0
         write_wiimotes(&dir, &wm(1)).unwrap();
         let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
         assert!(out.contains("[Wiimote1]
-Device = DSUClient/0/PepoMote
+Device = DSUClient/0/RevolutionMote+
 Source = 1
 "));
         assert!(out.contains("[Wiimote2]
-Device = DSUClient/1/PepoMote
+Device = DSUClient/1/RevolutionMote+
 Source = 0
 "), "{out}");
         assert_eq!(out.matches("Source = 1").count(), 1);
@@ -1166,16 +1170,16 @@ Source = 0
         write_wiimotes(&dir, &[(0, Some(3))]).unwrap();
         let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
         assert!(out.contains("[Wiimote1]
-Device = DSUClient/0/PepoMote
+Device = DSUClient/0/RevolutionMote+
 Source = 1
 "), "{out}");
         assert!(out.contains("Extension = Nunchuk
 "), "{out}");
-        assert!(out.contains("Nunchuk/Buttons/C = `DSUClient/3/PepoMote:L1`
+        assert!(out.contains("Nunchuk/Buttons/C = `DSUClient/3/RevolutionMote+:L1`
 "));
-        assert!(out.contains("Nunchuk/Stick/Up = `DSUClient/3/PepoMote:Left Y+`
+        assert!(out.contains("Nunchuk/Stick/Up = `DSUClient/3/RevolutionMote+:Left Y+`
 "));
-        assert!(out.contains("Nunchuk/IMUAccelerometer/Forward = `DSUClient/3/PepoMote:Accel Forward`
+        assert!(out.contains("Nunchuk/IMUAccelerometer/Forward = `DSUClient/3/RevolutionMote+:Accel Forward`
 "));
         assert!(!out.contains("Extension = None"));
         assert!(out.contains("[Wiimote2]
@@ -1193,10 +1197,10 @@ Source = 0
         write_wiimotes(&dir, &[(0, Some(3)), (1, Some(2))]).unwrap();
         let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
         assert!(out.contains("[Wiimote2]
-Device = DSUClient/1/PepoMote
+Device = DSUClient/1/RevolutionMote+
 Source = 1
 "), "{out}");
-        assert!(out.contains("Nunchuk/Buttons/Z = `DSUClient/2/PepoMote:R1`
+        assert!(out.contains("Nunchuk/Buttons/Z = `DSUClient/2/RevolutionMote+:R1`
 "));
         assert_eq!(out.matches("Extension = Nunchuk").count(), 2);
     }
@@ -1208,18 +1212,18 @@ Source = 1
         write_wiimotes(&dir, &[(0, Some(0))]).unwrap();
         let out = std::fs::read_to_string(dir.join("WiimoteNew.ini")).unwrap();
         assert!(out.contains("[Wiimote1]
-Device = DSUClient/0/PepoMote
+Device = DSUClient/0/RevolutionMote+
 Source = 1
 "), "{out}");
         assert!(out.contains("Extension = Nunchuk
 "), "{out}");
-        assert!(out.contains("Nunchuk/Buttons/C = `DSUClient/0/PepoMote:L1`
+        assert!(out.contains("Nunchuk/Buttons/C = `DSUClient/0/RevolutionMote+:L1`
 "));
-        assert!(out.contains("Nunchuk/Buttons/Z = `DSUClient/0/PepoMote:R1`
+        assert!(out.contains("Nunchuk/Buttons/Z = `DSUClient/0/RevolutionMote+:R1`
 "));
-        assert!(out.contains("Nunchuk/Stick/Left = `DSUClient/0/PepoMote:Left X-`
+        assert!(out.contains("Nunchuk/Stick/Left = `DSUClient/0/RevolutionMote+:Left X-`
 "));
-        assert!(out.contains("Nunchuk/IMUAccelerometer/Up = `DSUClient/0/PepoMote:Accel Up`
+        assert!(out.contains("Nunchuk/IMUAccelerometer/Up = `DSUClient/0/RevolutionMote+:Accel Up`
 "));
         assert_eq!(out.matches("Extension = Nunchuk").count(), 1);
         assert!(!out.contains("Extension = None"));
@@ -1356,14 +1360,14 @@ VID = 1234
         assert!(out.contains("Enabled = True"));
         assert!(!out.contains("Enabled = False"));
         assert!(out.contains("Otro:1.2.3.4:26760"));
-        assert!(out.contains("PepoMote:127.0.0.1:26760"));
+        assert!(out.contains("RevolutionMote+:127.0.0.1:26760"));
         // las claves ajenas de [Server] sobreviven
         assert!(out.contains("IPAddress = 127.0.0.1"));
         assert!(out.contains("Port = 26760"));
 
         ensure_dsu_server(&dir).unwrap();
         let out2 = std::fs::read_to_string(dir.join("DSUClient.ini")).unwrap();
-        assert_eq!(out2.matches("PepoMote:127.0.0.1:26760").count(), 1);
+        assert_eq!(out2.matches("RevolutionMote+:127.0.0.1:26760").count(), 1);
         assert_eq!(out2.matches("Entries").count(), 1);
         assert_eq!(out, out2);
     }

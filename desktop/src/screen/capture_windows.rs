@@ -386,7 +386,7 @@ impl Capturer {
         Ok(Capture::Frame(RawFrame { w, h, bgra }))
     }
 
-    /// ¿Es la ventana de un Cemu abierto como administrador (y PepoMote no)?
+    /// ¿Es la ventana de un Cemu abierto como administrador (y RevolutionMote+ no)?
     /// Se mira una vez por ventana: la elevación de un proceso no cambia y un
     /// Cemu reabierto es otra ventana.
     fn admin_blocked(&mut self, hwnd: HWND) -> bool {
@@ -399,7 +399,7 @@ impl Capturer {
         let blocked = pid_blocked(pid);
         if blocked {
             crate::log_line!(
-                "Pantalla del GamePad: la GamePad View es de un Cemu abierto como administrador (PID {pid}) y PepoMote no lo está: Windows no deja esconderla ni escribirle"
+                "Pantalla del GamePad: la GamePad View es de un Cemu abierto como administrador (PID {pid}) y RevolutionMote+ no lo está: Windows no deja esconderla ni escribirle"
             );
         }
         self.admin = Some((hwnd, pid, blocked));
@@ -438,15 +438,15 @@ fn window_pid(hwnd: HWND) -> u32 {
     pid
 }
 
-/// ¿Windows aísla este proceso de PepoMote? Pasa cuando está abierto como
-/// administrador y PepoMote no (UIPI): no deja mover sus ventanas ni
+/// ¿Windows aísla este proceso de RevolutionMote+? Pasa cuando está abierto como
+/// administrador y RevolutionMote+ no (UIPI): no deja mover sus ventanas ni
 /// mandarles teclas, y según el Windows tampoco capturarlas. Lo que no se
 /// pueda saber no bloquea nada.
 fn pid_blocked(pid: u32) -> bool {
     pid != 0 && elevation_blocks(is_elevated(pid), self_elevated())
 }
 
-/// La decisión: el otro proceso elevado y PepoMote no.
+/// La decisión: el otro proceso elevado y RevolutionMote+ no.
 fn elevation_blocks(other: Option<bool>, me: Option<bool>) -> bool {
     other == Some(true) && me == Some(false)
 }
@@ -463,7 +463,7 @@ fn is_elevated(pid: u32) -> Option<bool> {
     }
 }
 
-/// ¿PepoMote está abierto como administrador? No cambia en toda su vida.
+/// ¿RevolutionMote+ está abierto como administrador? No cambia en toda su vida.
 fn self_elevated() -> Option<bool> {
     static ME: OnceLock<Option<bool>> = OnceLock::new();
     *ME.get_or_init(|| unsafe { token_elevated(GetCurrentProcess()) })
@@ -487,7 +487,7 @@ unsafe fn token_elevated(process: HANDLE) -> Option<bool> {
 }
 
 /// Para el teclado del móvil: ¿el Cemu abierto está como administrador (y
-/// PepoMote no)? Entonces sus teclas no le llegarían.
+/// RevolutionMote+ no)? Entonces sus teclas no le llegarían.
 pub fn cemu_admin_blocked() -> bool {
     let (pad, main) = cemu_windows();
     pad.or(main).is_some_and(|h| pid_blocked(window_pid(h)))

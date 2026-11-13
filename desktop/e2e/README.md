@@ -4,7 +4,7 @@ Pruebas de extremo a extremo contra un receptor REAL: TCP/UDP del protocolo
 PMP, cliente DSU como el de Dolphin/Cemu/Eden, y los archivos de configuración que
 escribe. Necesitan Python 3 (sin dependencias).
 
-En Windows, `python desktop/e2e/run_switch_preview.py desktop/target/release/PepoMote.exe`
+En Windows, `python desktop/e2e/run_switch_preview.py desktop/target/release/RevolutionMote.exe`
 ejecuta las cinco suites aisladas: RetroArch, Eden, Cemu, Nunchuk y puntero IR
 de Wii. Es la misma selección que usa la CI de Windows y la preparación de
 la release. Son comprobaciones con clientes/emuladores simulados por sockets;
@@ -23,7 +23,7 @@ PEPOMOTE_RETROARCH_DIR=<dir>\retroarch
 PEPOMOTE_PORT=26771 PEPOMOTE_DSU_PORT=26770
 PEPOMOTE_RETROARCH_PORT=26773 PEPOMOTE_RETROARCH_CMD_PORT=26778
 PEPOMOTE_PAIR_CODE=1234 PEPOMOTE_ASSUME_EMULATOR_CLOSED=1 PEPOMOTE_NO_TRAY=1
-PepoMote.exe
+RevolutionMote.exe
 ```
 
 y con las mismas `PEPOMOTE_PORT`, `PEPOMOTE_DSU_PORT` y `PEPOMOTE_DOLPHIN_DIR`
@@ -56,7 +56,7 @@ en el entorno:
   y al cambiar; Mega Drive, NES, extensión sobre núcleo multisistema,
   miembro `#` de un zip, núcleo sin ficha por nombre, desconocido → `null`,
   JSON a medias, misma entrada sin re-anuncio, eco de `pad.layout`).
-- `python real_retroarch.py <PepoMote.exe> <carpeta RetroArch> --wipe --core <núcleo 2048> [--game <rom> --game-core <núcleo> --console <id>]`
+- `python real_retroarch.py <RevolutionMote.exe> <carpeta RetroArch> --wipe --core <núcleo 2048> [--game <rom> --game-core <núcleo> --console <id>]`
   — a mano, fuera de la CI: lo mismo contra un RetroArch DE VERDAD (una copia
   del zip oficial, nunca tu instalación: borra su `retroarch.cfg`, saves,
   states y capturas) con el núcleo 2048 fuera de su carpeta: cfg y copia,
@@ -81,7 +81,7 @@ en el entorno:
   el botón, que no se configura ningún emulador y que al irse el móvil el
   mando se desenchufa. **Necesita el driver del mando virtual (ViGEmBus)**,
   que va dentro del exe: la CI lo instala antes con
-  `PepoMote.exe --install-driver` lo instala en un PC; en la CI NO se instala:
+  `RevolutionMote.exe --install-driver` lo instala en un PC; en la CI NO se instala:
   el Windows Server de GitHub no trae el driver de clase del mando de Xbox 360
   (`xusb22`), un mando de ViGEm nunca está listo allí y el receptor se queda
   «terminando» (medido: el paso del e2e colgado media hora), así que ahí se
@@ -120,16 +120,16 @@ en el entorno:
   escribe en el mando mientras tanto (en el PC de Daniel llega un 0/0 ajeno
   cada veinte segundos o así; lo único abierto que toca mandos es la Xbox
   Game Bar), la prueba de encender y callar se repite.
-- `python e2e_port_linger.py <PepoMote.exe> [dir]` — arranca él solo un
+- `python e2e_port_linger.py <RevolutionMote.exe> [dir]` — arranca él solo un
   receptor aislado con el puerto UDP del móvil todavía en manos de un proceso
   que acaba de morir (un padre lo abre, un hijo lo hereda y el padre muere):
   lo que pasa al actualizar en caliente o al cerrar y abrir deprisa. El
   receptor debe esperar a que se suelte, cogerlo y llegar al inyector; hasta
   la 1.13.0 se rendía a la primera y se quedaba con «Inyección: ninguna».
   Se cierra solo; en Linux sin ventana añade `PEPOMOTE_NO_UI=1`.
-- `python e2e_window_windows.py <PepoMote.exe> [dir] [--cases a,b] [--old]`
+- `python e2e_window_windows.py <RevolutionMote.exe> [dir] [--cases a,b] [--old]`
   (solo Windows): la ventana aparece siempre. Receptores aislados que abren
-  ventanas de verdad: la X esconde y una ventana ajena titulada «PepoMote»
+  ventanas de verdad: la X esconde y una ventana ajena titulada «RevolutionMote+»
   (lo que es el Explorador de Windows 10 en una carpeta con ese nombre) no
   impide que vuelva al abrir el exe otra vez (`--old` contra la 1.13.2: ahí
   tiene que fallar); el aviso de la primera X; y la ventana con OpenGL o
@@ -138,13 +138,13 @@ en el entorno:
   mismo proceso, marca del arranque que no pintó, nada que pinte (mensaje
   de error, sale con 2) y la copia colgada que deja el sitio (necesita un
   OpenGL que funcione: no en el runner de GitHub, que no tiene GPU).
-- `python e2e_driver_prompt.py <PepoMote.exe> [dir] [--cases a,b]` (solo
+- `python e2e_driver_prompt.py <RevolutionMote.exe> [dir] [--cases a,b]` (solo
   Windows): abrir el receptor o usar el touchpad no ofrece ViGEmBus. Al
   elegir el mando Xbox, el aviso espera a que la ventana esté delante.
   El intento se recuerda en ajustes. El instalador simulado cancela sin
   solicitar permisos reales.
 
-- `python e2e_ui_hang.py <PepoMote.exe> [dir]` — la ventana se cuelga
+- `python e2e_ui_hang.py <RevolutionMote.exe> [dir]` — la ventana se cuelga
   después de pintar (`PEPOMOTE_FAKE_UI_HANG=1`: el hilo de la ventana se
   duerme en el fotograma 3, con el QR a la vista; `=40`, en el 40) y tiene
   que notarse:
@@ -162,7 +162,7 @@ en el entorno:
   sin Cemu comprueba que llegan estado y keepalive. Al final manda `text`
   (teclado del móvil para el teclado en pantalla de Cemu) y comprueba que la
   sesión sigue viva.
-- `python real_cemu_admin.py <PepoMote.exe> <carpeta> [--seconds 20] [--no-wgc] [--text-at 6] [--expect admin|frames|none]`
+- `python real_cemu_admin.py <RevolutionMote.exe> <carpeta> [--seconds 20] [--no-wgc] [--text-at 6] [--expect admin|frames|none]`
   (solo Windows, a mano): receptor aislado (`PEPOMOTE_CEMU_DIR` propio: la
   configuración de Cemu de verdad no se toca) contra el Cemu que tengas
   abierto, con un móvil simulado en modo Wii U; imprime la línea de tiempo de
@@ -209,12 +209,12 @@ propósito (`PEPOMOTE_FAKE_DRIVER_HANG=1`; vale también en Windows a mano, con
 `PEPOMOTE_SMOKE`) y se exige que la ventana pinte igual y que el log diga
 «Mando virtual: el sondeo del driver no contesta»: es la regresión de la
 ventana negra de la 1.12, cuando ese sondeo iba en el hilo de la ventana.
-`PEPOMOTE_BIN=dist/PepoMote-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1`
+`PEPOMOTE_BIN=dist/RevolutionMote-Plus-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1`
 lo prueba con el AppImage. Necesita `sway` o `Xvfb` + `x11-utils` y las
 bibliotecas de Mesa; deja todo en `/tmp/pepomote-smoke/<modo>`.
 
 Puntero: `PEPOMOTE_RECORD=<archivo>` en el receptor graba cada INPUT del
-Jugador 1 (llegada + paquete crudo) y `PepoMote --replay <archivo> [sens_deg]`
+Jugador 1 (llegada + paquete crudo) y `RevolutionMote+ --replay <archivo> [sens_deg]`
 lo pasa por el motor del puntero y saca un CSV (sensor, llegada, gyro, quat,
 salida) para analizar un gesto real fuera de línea.
 
@@ -224,7 +224,7 @@ de entorno en vez de leer `%APPDATA%` desde Python.
 
 ## Validación local de Switch y regresiones
 
-`python desktop/e2e/run_switch_preview.py desktop/target/release/PepoMote.exe dist/switch-preview/validation/e2e` ejecuta secuencialmente Switch, Wii U y Nunchuk contra un binario ya compilado. Crea directorios y puertos propios, desactiva actualizaciones y bandeja, y termina únicamente sus procesos de prueba. Los overrides `PEPOMOTE_CEMU_DIR` y `PEPOMOTE_EDEN_DIR` impiden buscar instalaciones personales o portátiles. Deja `checks.log` y el log del receptor por suite.
+`python desktop/e2e/run_switch_preview.py desktop/target/release/RevolutionMote.exe dist/switch-preview/validation/e2e` ejecuta secuencialmente Switch, Wii U y Nunchuk contra un binario ya compilado. Crea directorios y puertos propios, desactiva actualizaciones y bandeja, y termina únicamente sus procesos de prueba. Los overrides `PEPOMOTE_CEMU_DIR` y `PEPOMOTE_EDEN_DIR` impiden buscar instalaciones personales o portátiles. Deja `checks.log` y el log del receptor por suite.
 
 `e2e_eden.py` comprueba negociación, Pro Controller por jugador, migración de preferencias antiguas, cambios de modo, botones/sticks/gyro DSU y pulsación/liberación sin sensores en las tres consolas, ausencia de táctil y escritura de `qt-config.ini` con respaldo y secciones ajenas conservadas. La fixture incluye otro servidor DSU para comprobar los índices globales de Eden. Estas pruebas simulan móviles y el cliente DSU; no sustituyen una prueba con Eden, juegos y sensores físicos.
 
@@ -235,7 +235,7 @@ de entorno en vez de leer `%APPDATA%` desde Python.
 prueba sin ROM que registra las llamadas reales Mouse, Lightgun y RetroPad.
 Compílalo con `rustc --edition 2021 --crate-type cdylib
  desktop/e2e/fixtures/pointer_core.rs -o pointer_libretro.dll` y ejecuta
-`py -3 desktop/e2e/real_retroarch_pointer.py <PepoMote.exe>
+`py -3 desktop/e2e/real_retroarch_pointer.py <RevolutionMote.exe>
  <retroarch.exe> <pointer_libretro.dll>`.
 
 La prueba crea ajustes y registros temporales, abre su propia ventana de

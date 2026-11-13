@@ -197,7 +197,7 @@ sess = ok1["session_id"]
 if _set_state is None:
     done("SKIP: sin XInput en este sistema")
 if ok1.get("rumble") != "ready":
-    done(f"SKIP: sin mando virtual (rumble={ok1.get('rumble')!r}); instala el driver con `PepoMote.exe --install-driver`")
+    done(f"SKIP: sin mando virtual (rumble={ok1.get('rumble')!r}); instala el driver con `RevolutionMote.exe --install-driver`")
 antes = connected()
 if len(antes) >= 4:
     done("SKIP: los 4 huecos de XInput están ocupados; no cabe el mando virtual")
@@ -251,7 +251,7 @@ try:
     # 2) Encender y callar: como Dolphin en pausa o con el juego cerrado.
     # En un PC de verdad otros programas también escriben en los mandos
     # XInput: medido en el de Daniel, un 0/0 cada veinte segundos o así que
-    # ni esta prueba ni PepoMote mandan (lo único abierto que toca mandos es
+    # ni esta prueba ni RevolutionMote+ mandan (lo único abierto que toca mandos es
     # la Xbox Game Bar). Ese cero para el móvil antes de tiempo, que es lo
     # correcto, pero no deja medir los 10 s: se repite.
     for intento in range(3):

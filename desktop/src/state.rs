@@ -233,14 +233,14 @@ pub struct Config {
     pub update_latest: Option<crate::update::Version>,
     /// Windows: versión del instalador embebido del driver del mando virtual
     /// que ya se intentó (instalado o cancelado por el usuario): no se
-    /// vuelve a preguntar solo hasta que PepoMote traiga uno más nuevo.
+    /// vuelve a preguntar solo hasta que RevolutionMote+ traiga uno más nuevo.
     #[serde(default)]
     pub vigem_setup_version: Option<String>,
-    /// Windows: ya se enseñó el aviso de que la X deja PepoMote en la bandeja.
+    /// Windows: ya se enseñó el aviso de que la X deja RevolutionMote+ en la bandeja.
     #[serde(default)]
     pub tray_notice_seen: bool,
     /// Windows: con qué pinta la ventana en cada gráfica (huella de las
-    /// tarjetas, su driver y la versión de PepoMote → "opengl" o
+    /// tarjetas, su driver y la versión de RevolutionMote+ → "opengl" o
     /// "direct3d"), las últimas cuatro (el escritorio remoto cambia las
     /// tarjetas). Con la huella recordada no hace falta la sonda. Ver gpu.rs.
     #[serde(default)]
@@ -301,7 +301,28 @@ pub fn config_dir() -> Option<std::path::PathBuf> {
     if let Some(d) = std::env::var_os("PEPOMOTE_CONFIG_DIR") {
         return Some(std::path::PathBuf::from(d));
     }
-    directories::ProjectDirs::from("dev", "pepotech", "PepoMote").map(|d| d.config_dir().to_path_buf())
+    let current = directories::ProjectDirs::from("dev", "daniel27bc", "RevolutionMote")?;
+    let current = current.config_dir().to_path_buf();
+    static MIGRATE: std::sync::Once = std::sync::Once::new();
+    MIGRATE.call_once(|| {
+        if let Some(previous) = directories::ProjectDirs::from("dev", "pepotech", "PepoMote") {
+            // Copia los ajustes y el token una sola vez, sin pisar los nuevos.
+            for name in ["settings.json", "token.txt"] {
+                let destination = current.join(name);
+                let source = previous.config_dir().join(name);
+                if !destination.exists() && source.is_file() && std::fs::create_dir_all(&current).is_ok() {
+                    if let (Ok(data), Ok(mut output)) = (
+                        std::fs::read(&source),
+                        std::fs::OpenOptions::new().write(true).create_new(true).open(destination),
+                    ) {
+                        use std::io::Write;
+                        let _ = output.write_all(&data);
+                    }
+                }
+            }
+        }
+    });
+    Some(current)
 }
 
 impl Config {

@@ -4,7 +4,7 @@ El instalador simulado cancela sin elevar permisos. El modo de touchpad
 no ofrece el driver, el mando Xbox explícito espera a la ventana y el
 resultado se recuerda en ajustes.
 
-Uso: python e2e_driver_prompt.py <PepoMote.exe> [directorio] [--cases a,b]
+Uso: python e2e_driver_prompt.py <RevolutionMote.exe> [directorio] [--cases a,b]
 """
 import ctypes
 import json

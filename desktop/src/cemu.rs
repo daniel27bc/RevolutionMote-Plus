@@ -32,7 +32,7 @@ use std::sync::Mutex;
 static CONFIGURE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Marca de autoría que sobrevive al re-guardado de Cemu.
-const PROFILE_MARK: &str = "<profile>PepoMote</profile>";
+const PROFILE_MARK: &str = "<profile>RevolutionMote+</profile>";
 const DSU_IP: &str = "127.0.0.1";
 const DSU_PORT: u16 = 26760;
 /// Cemu admite hasta 8 mandos (`InputManager::kMaxController`).
@@ -75,7 +75,7 @@ use crate::state::CfgStatus;
 use crate::tr;
 
 /// Wii U GamePad (`VPADController::ButtonId`): (mapping, botón DSU). El
-/// PadData de PepoMote en modo Wii U pone A→Cross, B→Circle, X→Square,
+/// PadData de RevolutionMote+ en modo Wii U pone A→Cross, B→Circle, X→Square,
 /// Y→Triangle, L/R→L1/R1, ZL/ZR→gatillos analógicos, Mic→L2, Pantalla→R2,
 /// clicks→L3/R3, +/−→Options/Share, Home→Touch (dsu/mapping.rs).
 const GAMEPAD: &[(u32, u32)] = &[
@@ -204,8 +204,8 @@ const KEYBOARD_GAMEPAD: &[(u32, u32)] = &[
     (27, 72), // Home → H
 ];
 
-/// Nombre del GamePad por teclado (empieza por «PepoMote»: `is_pepomote_node`).
-const KEYBOARD_GAMEPAD_NAME: &str = "PepoMote GamePad (teclado del PC)";
+/// Nombre del GamePad por teclado (empieza por «RevolutionMote+»: `is_pepomote_node`).
+const KEYBOARD_GAMEPAD_NAME: &str = "RevolutionMote+ GamePad (teclado del PC)";
 
 pub type Layout = [CemuPlayer];
 
@@ -276,13 +276,13 @@ pub fn profile_xml(pl: &CemuPlayer) -> String {
         PadKind::GamePad => {
             out.push_str("\t<type>Wii U GamePad</type>\n");
             let _ = writeln!(out, "\t{PROFILE_MARK}");
-            controller_node(&mut out, slot, &format!("PepoMote J{player} GamePad"), true, GAMEPAD);
+            controller_node(&mut out, slot, &format!("RevolutionMote+ J{player} GamePad"), true, GAMEPAD);
             rumble_node(&mut out, slot, player);
         }
         PadKind::Pro => {
             out.push_str("\t<type>Wii U Pro Controller</type>\n");
             let _ = writeln!(out, "\t{PROFILE_MARK}");
-            controller_node(&mut out, slot, &format!("PepoMote J{player} Pro"), false, PRO);
+            controller_node(&mut out, slot, &format!("RevolutionMote+ J{player} Pro"), false, PRO);
             rumble_node(&mut out, slot, player);
         }
         PadKind::Wiimote => {
@@ -290,9 +290,9 @@ pub fn profile_xml(pl: &CemuPlayer) -> String {
             let _ = writeln!(out, "\t{PROFILE_MARK}");
             let device = if pl.nunchuk_slot.is_some() { DEVICE_MPLS_NUNCHUK } else { DEVICE_MPLS };
             let _ = writeln!(out, "\t<device_type>{device}</device_type>");
-            controller_node(&mut out, slot, &format!("PepoMote J{player} Mando Wii"), true, WIIMOTE);
+            controller_node(&mut out, slot, &format!("RevolutionMote+ J{player} Mando Wii"), true, WIIMOTE);
             if let Some(ns) = pl.nunchuk_slot {
-                controller_node(&mut out, ns, &format!("PepoMote J{player} Nunchuk"), false, NUNCHUK);
+                controller_node(&mut out, ns, &format!("RevolutionMote+ J{player} Nunchuk"), false, NUNCHUK);
             }
             rumble_node(&mut out, slot, player);
         }
@@ -302,7 +302,7 @@ pub fn profile_xml(pl: &CemuPlayer) -> String {
 }
 
 fn is_ours(content: &str) -> bool {
-    content.contains(PROFILE_MARK)
+    content.contains(PROFILE_MARK) || content.contains("<profile>PepoMote</profile>")
 }
 
 fn profile_path(dir: &Path, index: u8) -> PathBuf {
@@ -333,7 +333,7 @@ pub enum Warning {
 /// con el DSU.
 fn screen_only_node(pl: &CemuPlayer, slot: u8) -> String {
     let mut out = String::new();
-    controller_node(&mut out, slot, &format!("PepoMote J{} pantalla", pl.player), false, &[]);
+    controller_node(&mut out, slot, &format!("RevolutionMote+ J{} pantalla", pl.player), false, &[]);
     out
 }
 
@@ -372,11 +372,11 @@ fn tag_text<'a>(block: &'a str, tag: &str) -> Option<&'a str> {
 }
 
 fn is_pepomote_named(block: &str) -> bool {
-    tag_text(block, "display_name").is_some_and(|n| n.starts_with("PepoMote"))
+    tag_text(block, "display_name").is_some_and(|n| n.starts_with("RevolutionMote+") || n.starts_with("PepoMote"))
 }
 
-/// Nuestro nodo, por nombre («PepoMote …») o por servidor (un DSUController
-/// en la ip y puerto de PepoMote): Cemu re-guarda los perfiles al cerrar y
+/// Nuestro nodo, por nombre («RevolutionMote+ …») o por servidor (un DSUController
+/// en la ip y puerto de RevolutionMote+): Cemu re-guarda los perfiles al cerrar y
 /// puede cambiarle el nombre, la ip y el puerto sobreviven.
 fn is_pepomote_node(block: &str) -> bool {
     is_pepomote_named(block)
@@ -1240,9 +1240,9 @@ mod tests {
         let c0 = std::fs::read_to_string(profiles.join("controller0.xml")).unwrap();
         assert!(has_gamepad_type(&c0) && is_ours(&c0) && c0.contains("<api>Keyboard</api>") && !c0.contains("DSUController"), "mando 1 = GamePad por teclado nuestro: {c0}");
         let c1 = std::fs::read_to_string(profiles.join("controller1.xml")).unwrap();
-        assert!(c1.contains("<type>Wiimote</type>") && c1.contains("<uuid>0</uuid>") && c1.contains("PepoMote J1 Mando Wii"), "{c1}");
+        assert!(c1.contains("<type>Wiimote</type>") && c1.contains("<uuid>0</uuid>") && c1.contains("RevolutionMote+ J1 Mando Wii"), "{c1}");
         let c2 = std::fs::read_to_string(profiles.join("controller2.xml")).unwrap();
-        assert!(c2.contains("<type>Wiimote</type>") && c2.contains("<uuid>1</uuid>") && c2.contains("PepoMote J2 Mando Wii"), "{c2}");
+        assert!(c2.contains("<type>Wiimote</type>") && c2.contains("<uuid>1</uuid>") && c2.contains("RevolutionMote+ J2 Mando Wii"), "{c2}");
         let gamepads = (0..MAX_CONTROLLERS)
             .filter_map(|i| std::fs::read_to_string(profile_path(&profiles, i)).ok())
             .filter(|x| has_gamepad_type(x))
@@ -1253,7 +1253,7 @@ mod tests {
         let c0 = std::fs::read_to_string(profiles.join("controller0.xml")).unwrap();
         assert!(has_gamepad_type(&c0) && c0.contains("<uuid>0</uuid>") && c0.contains("<motion>true</motion>"), "{c0}");
         let c1 = std::fs::read_to_string(profiles.join("controller1.xml")).unwrap();
-        assert!(c1.contains("<type>Wiimote</type>") && c1.contains("<uuid>1</uuid>") && c1.contains("PepoMote J2 Mando Wii"), "{c1}");
+        assert!(c1.contains("<type>Wiimote</type>") && c1.contains("<uuid>1</uuid>") && c1.contains("RevolutionMote+ J2 Mando Wii"), "{c1}");
         assert!(!profiles.join("controller2.xml").exists());
         // todos se van: nada nuestro queda
         write_profiles(&dir, &[]).unwrap();
@@ -1527,7 +1527,7 @@ mod tests {
     fn nodo_solo_pantalla_sin_movimiento_ni_botones() {
         let n = screen_only_node(&gamepad_screen(0, 2), 2);
         assert!(n.starts_with("\t<controller>\n\t\t<api>DSUController</api>\n\t\t<uuid>2</uuid>\n"), "{n}");
-        assert!(n.contains("<display_name>PepoMote J1 pantalla</display_name>"));
+        assert!(n.contains("<display_name>RevolutionMote+ J1 pantalla</display_name>"));
         assert!(!n.contains("<motion>"));
         assert!(!n.contains("<entry>"));
         assert!(n.contains("<ip>127.0.0.1</ip>\n\t\t<port>26760</port>"));
@@ -1545,25 +1545,25 @@ mod tests {
         assert!(merged.contains("<type>Wii U GamePad</type>") && merged.contains("<profile>MiMando</profile>"));
         assert!(!is_ours(&merged), "sin la marca: es el perfil del usuario con nuestro nodo");
         assert!(merged.trim_end().ends_with("</controller>\n</emulated_controller>"), "{merged}");
-        assert!(merged.find("PepoMote J1 pantalla").unwrap() > merged.find("XInput").unwrap(), "nuestro nodo va el último");
+        assert!(merged.find("RevolutionMote+ J1 pantalla").unwrap() > merged.find("XInput").unwrap(), "nuestro nodo va el último");
         // idempotente
         assert_eq!(merge_screen_only(&merged, &node).unwrap(), merged);
         // re-guardado por Cemu (4 espacios, nuestro nodo renombrado): siguen siendo 2
-        let resaved = merged.replace('\t', "    ").replace("PepoMote J1 pantalla", "Controller 2");
+        let resaved = merged.replace('\t', "    ").replace("RevolutionMote+ J1 pantalla", "Controller 2");
         let again = merge_screen_only(&resaved, &node).unwrap();
         assert_eq!(again.matches("<controller>").count(), 2, "{again}");
-        assert!(again.contains("PepoMote J1 pantalla") && again.contains("XInput"));
+        assert!(again.contains("RevolutionMote+ J1 pantalla") && again.contains("XInput"));
     }
 
     #[test]
     fn nodos_pepomote_por_nombre_o_por_servidor() {
-        let mine_named = "<controller>\n<api>SDLController</api>\n<display_name>PepoMote J1 GamePad</display_name>\n</controller>\n";
+        let mine_named = "<controller>\n<api>SDLController</api>\n<display_name>RevolutionMote+ J1 GamePad</display_name>\n</controller>\n";
         let mine_server = "<controller>\n<api>DSUController</api>\n<display_name>Controller 3</display_name>\n<ip>127.0.0.1</ip>\n<port>26760</port>\n</controller>\n";
         let other_dsu = "<controller>\n<api>DSUController</api>\n<display_name>Otro DSU</display_name>\n<ip>127.0.0.1</ip>\n<port>26761</port>\n</controller>\n";
         let xinput = "<controller>\n<api>XInput</api>\n<display_name>Controller 1</display_name>\n</controller>\n";
         let xml = format!("<emulated_controller>\n{mine_named}{mine_server}{other_dsu}{xinput}</emulated_controller>\n");
         let stripped = strip_pepomote_nodes(&xml);
-        assert!(!stripped.contains("PepoMote") && !stripped.contains("Controller 3"), "{stripped}");
+        assert!(!stripped.contains("RevolutionMote+") && !stripped.contains("Controller 3"), "{stripped}");
         assert!(stripped.contains("Otro DSU") && stripped.contains("XInput"));
         assert!(has_pepomote_node(&xml) && !has_pepomote_node(&stripped));
         assert!(has_gamepad_type(AJENO) && !has_gamepad_type(&xml));
@@ -1621,7 +1621,7 @@ mod tests {
         let path = profiles.join("controller0.xml");
         std::fs::write(&path, AJENO).unwrap();
         write_profiles(&dir, &[gamepad_screen(0, 0)]).unwrap();
-        let resaved = std::fs::read_to_string(&path).unwrap().replace('\t', "    ").replace("PepoMote J1 pantalla", "Controller 2");
+        let resaved = std::fs::read_to_string(&path).unwrap().replace('\t', "    ").replace("RevolutionMote+ J1 pantalla", "Controller 2");
         std::fs::write(&path, &resaved).unwrap();
         write_profiles(&dir, &[gamepad_screen(0, 0)]).unwrap();
         assert_eq!(std::fs::read_to_string(&path).unwrap().matches("<controller>").count(), 2, "no se acumulan nodos");
@@ -1652,7 +1652,7 @@ mod tests {
         std::fs::write(&path, &merged).unwrap();
         write_profiles(&dir, &[]).unwrap();
         let out = std::fs::read_to_string(&path).unwrap();
-        assert!(!out.contains("PepoMote") && out.contains("XInput"), "{out}");
+        assert!(!out.contains("RevolutionMote+") && out.contains("XInput"), "{out}");
     }
 
     #[test]

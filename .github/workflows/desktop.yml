@@ -3,7 +3,7 @@ name: desktop
 on:
   push:
     branches: [main, next, "feat/**"]
-    paths: ["desktop/**", "pmp/**", "protocol/**", "packaging/linux/**", "packaging/macos/**", ".github/workflows/desktop.yml"]
+    paths: ["desktop/**", "pmp/**", "protocol/**", "packaging/linux/**", "packaging/macos/**", "assets/revolutionmote-icon.png", ".github/workflows/desktop.yml"]
   pull_request:
     paths: ["desktop/**", "pmp/**", "protocol/**", "packaging/linux/**", "packaging/macos/**", ".github/workflows/desktop.yml"]
   workflow_call:
@@ -25,7 +25,7 @@ jobs:
         run: cargo test --release
       - name: Actualización y recuperación con el instalador real (archivos aislados)
         shell: pwsh
-        run: ./desktop/tests/update-handoff.ps1 -Receiver desktop/target/release/PepoMote.exe
+        run: ./desktop/tests/update-handoff.ps1 -Receiver desktop/target/release/RevolutionMote.exe
       # Sin el driver del mando virtual en el runner: el Windows Server de GitHub
       # no trae xusb22 (el driver de clase del mando de Xbox 360), así que un
       # mando de ViGEm nunca está listo allí y el receptor se queda terminando
@@ -39,7 +39,7 @@ jobs:
         timeout-minutes: 12
         env:
           PEPOMOTE_E2E_SUITES: e2e_retroarch,e2e_eden,e2e_cemu,e2e_nunchuk,e2e_dolphin_ir,e2e_gamepad,e2e_rumble
-        run: python desktop/e2e/run_switch_preview.py desktop/target/release/PepoMote.exe dist/e2e
+        run: python desktop/e2e/run_switch_preview.py desktop/target/release/RevolutionMote.exe dist/e2e
       # La ventana de verdad: el e2e de arriba arranca el receptor con
       # --minimized y nunca la crea. El runner no tiene GPU: su OpenGL es el
       # 1.1 de Microsoft, como un PC sin driver de la gráfica, y la ventana
@@ -50,11 +50,11 @@ jobs:
         continue-on-error: true
         env:
           PYTHONIOENCODING: utf-8
-        run: python desktop/e2e/e2e_window_windows.py desktop/target/release/PepoMote.exe dist/e2e-window --cases normal,sin_opengl,sonda_colgada,reintento,marca,nada,carpeta,carpeta_min,aviso
+        run: python desktop/e2e/e2e_window_windows.py desktop/target/release/RevolutionMote.exe dist/e2e-window --cases normal,sin_opengl,sonda_colgada,reintento,marca,nada,carpeta,carpeta_min,aviso
       - name: Procesos del receptor que se quedaron terminando
         if: always()
         shell: pwsh
-        run: Get-Process PepoMote -ErrorAction SilentlyContinue | Format-Table Id, StartTime, HasExited, Responding
+        run: Get-Process RevolutionMote -ErrorAction SilentlyContinue | Format-Table Id, StartTime, HasExited, Responding
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -70,13 +70,13 @@ jobs:
         shell: pwsh
         run: |
           Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-10)} -ErrorAction SilentlyContinue |
-            Where-Object { $_.Message -match 'PepoMote' } |
+            Where-Object { $_.Message -match 'RevolutionMote' } |
             Format-List TimeCreated, Id, ProviderName, Message
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: PepoMote-windows
-          path: desktop/target/release/PepoMote.exe
+          name: RevolutionMote-Plus-windows
+          path: desktop/target/release/RevolutionMote.exe
 
   # Apple Silicon nativo (los runners macos-14/15 son arm64): compila, pasa los
   # tests, empaqueta el .app firmado y el DMG (packaging/macos/bundle.sh) y
@@ -107,14 +107,14 @@ jobs:
         run: bash packaging/macos/bundle.sh
       - name: Smoke --diag (desde el .app)
         run: |
-          out="$(dist/PepoMote.app/Contents/MacOS/PepoMote --diag)"
+          out="$(dist/RevolutionMote+.app/Contents/MacOS/RevolutionMote --diag)"
           echo "$out" | head -30
           echo "$out" | grep -q "diagnóstico"
-          echo "$out" | grep -q "^macOS: bundle: .*PepoMote.app"
+          echo "$out" | grep -q "^macOS: bundle: .*RevolutionMote[+].app"
       - uses: actions/upload-artifact@v4
         with:
-          name: PepoMote-macos
-          path: dist/PepoMote-macOS.dmg
+          name: RevolutionMote-Plus-macos
+          path: dist/RevolutionMote-Plus-macOS.dmg
 
   linux:
     runs-on: ubuntu-22.04
@@ -138,17 +138,17 @@ jobs:
         run: bash packaging/linux/tarball.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: PepoMote-linux
+          name: RevolutionMote-Plus-linux
           path: |
-            dist/PepoMote-x86_64.AppImage
-            dist/PepoMote-linux-x86_64.tar.gz
+            dist/RevolutionMote-Plus-x86_64.AppImage
+            dist/RevolutionMote-Plus-linux-x86_64.tar.gz
       # Solo glibc y libasound pueden ser dependencias duras: cualquier otra
       # (GTK, udev, ssl…) haría que el AppImage no arrancase en una distro
       # que no la tenga
       - name: Dependencias dinámicas del binario
         run: |
-          objdump -p desktop/target/release/PepoMote | grep NEEDED
-          extra=$(objdump -p desktop/target/release/PepoMote | awk '/NEEDED/ {print $2}' \
+          objdump -p desktop/target/release/RevolutionMote | grep NEEDED
+          extra=$(objdump -p desktop/target/release/RevolutionMote | awk '/NEEDED/ {print $2}' \
             | grep -Ev '^(libasound\.so\.2|libgcc_s\.so\.1|libm\.so\.6|libc\.so\.6|libpthread\.so\.0|libdl\.so\.2|librt\.so\.1|ld-linux-x86-64\.so\.2)$' || true)
           [ -z "$extra" ] || { echo "dependencia dinámica nueva: $extra"; exit 1; }
       # La VENTANA de verdad, bajo sway (Wayland) y Xvfb (X11), con el binario
@@ -158,19 +158,24 @@ jobs:
       # colgado a propósito (hang): la ventana tiene que pintar igual.
       - name: Humo de la ventana (sway, Xvfb, AppImage, relanzamiento, driver colgado)
         run: |
-          sudo apt-get install -y --no-install-recommends sway xvfb x11-utils libegl1 libgl1 libgl1-mesa-dri libgles2 libwayland-egl1 libxkbcommon-x11-0 libnotify-bin
+          sudo apt-get install -y --no-install-recommends sway xvfb x11-utils imagemagick libegl1 libgl1 libgl1-mesa-dri libgles2 libwayland-egl1 libxkbcommon-x11-0 libnotify-bin
           bash desktop/e2e/smoke_gui.sh wayland
           bash desktop/e2e/smoke_gui.sh x11
-          PEPOMOTE_BIN=dist/PepoMote-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh wayland
-          PEPOMOTE_BIN=dist/PepoMote-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh x11
+          PEPOMOTE_BIN=dist/RevolutionMote-Plus-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh wayland
+          PEPOMOTE_BIN=dist/RevolutionMote-Plus-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh x11
           bash desktop/e2e/smoke_gui.sh wayland fallback
-          PEPOMOTE_BIN=dist/PepoMote-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh x11 fallback
+          PEPOMOTE_BIN=dist/RevolutionMote-Plus-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 bash desktop/e2e/smoke_gui.sh x11 fallback
           bash desktop/e2e/smoke_gui.sh x11 hang
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: smoke-gui-logs
           path: /tmp/pepomote-smoke/**
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: receptor-capturas
+          path: /tmp/pepomote-smoke/x11/receptor.png
           if-no-files-found: warn
       # Compositor wlroots de verdad, sin GPU: el receptor tiene que elegir el
       # puntero virtual de Wayland y mover el cursor, hacer clic, ir atrás y
@@ -189,7 +194,7 @@ jobs:
       - name: e2e RetroArch (receptor aislado)
         env:
           PEPOMOTE_E2E_SUITES: e2e_retroarch
-        run: python3 desktop/e2e/run_switch_preview.py desktop/target/release/PepoMote
+        run: python3 desktop/e2e/run_switch_preview.py desktop/target/release/RevolutionMote
       - uses: actions/upload-artifact@v4
         if: always()
         with:

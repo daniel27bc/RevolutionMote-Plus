@@ -100,7 +100,7 @@ pub fn run(
     // de un segundo después de cerrar el anterior): `bind_udp` espera a que
     // lo suelte y, si ni así, aquí se insiste cada 2 s en vez de morir. Sin
     // este socket no hay puntero ni inyector: es lo que dejaba «Inyección:
-    // ninguna» en el pie de la ventana hasta reabrir PepoMote.
+    // ninguna» en el pie de la ventana hasta reabrir RevolutionMote+.
     let what = tr!("port.what_phone");
     let socket = crate::ports::bind_insisting(&shared, &format!("{what} UDP {}", pairing.port), || {
         crate::ports::bind_udp(&shared, "0.0.0.0", pairing.port, what)

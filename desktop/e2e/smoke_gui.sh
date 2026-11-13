@@ -7,7 +7,7 @@
 # «hang», el sondeo del driver del mando virtual se cuelga a propósito
 # (PEPOMOTE_FAKE_DRIVER_HANG) y se exige que la ventana pinte igual y que el
 # log diga «no contesta»: la regresión de la ventana negra de la 1.12. Vale con
-# el binario o con el AppImage (PEPOMOTE_BIN=dist/PepoMote-x86_64.AppImage y
+# el binario o con el AppImage (PEPOMOTE_BIN=dist/RevolutionMote-Plus-x86_64.AppImage y
 # APPIMAGE_EXTRACT_AND_RUN=1 donde no hay FUSE). Lo corre la CI (desktop.yml y
 # release.yml); en un Linux con sway o Xvfb va igual. Todo queda en
 # /tmp/pepomote-smoke/<modo>: receptor.out, config/receptor.log, sway.log o
@@ -19,7 +19,7 @@ MODE="${1:-wayland}"
 FALLBACK="${2:-}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-RX="${PEPOMOTE_BIN:-$ROOT/desktop/target/release/PepoMote}"
+RX="${PEPOMOTE_BIN:-$ROOT/desktop/target/release/RevolutionMote}"
 OUT="/tmp/pepomote-smoke/$MODE${FALLBACK:+-$FALLBACK}"
 PORT=26781
 
@@ -58,7 +58,7 @@ if [ "$MODE" = wayland ]; then
     # sway 1.7 no obedece WAYLAND_DISPLAY: crea wayland-N en el runtime dir (aquí solo hay uno)
     export WAYLAND_DISPLAY="$(ls "$XDG_RUNTIME_DIR" | grep -E '^wayland-[0-9]+$' | head -1)"
     echo "   WAYLAND_DISPLAY=$WAYLAND_DISPLAY"
-    seen_window() { swaymsg -t get_tree 2>/dev/null | grep -Eq '"app_id": ?"PepoMote"'; }
+    seen_window() { swaymsg -t get_tree 2>/dev/null | grep -Eq '"app_id": ?"RevolutionMote"'; }
 else
     echo "== Xvfb"
     Xvfb :77 -screen 0 1280x720x24 -nolisten tcp > "$OUT/xvfb.log" 2>&1 &
@@ -69,7 +69,7 @@ else
         sleep 0.2
     done
     xdpyinfo >/dev/null 2>&1 || { echo "Xvfb no arranca:"; cat "$OUT/xvfb.log"; exit 1; }
-    seen_window() { xwininfo -root -tree 2>/dev/null | grep -qi pepomote; }
+    seen_window() { xwininfo -root -tree 2>/dev/null | grep -qi RevolutionMote; }
 fi
 
 echo "== receptor ($MODE${FALLBACK:+, $FALLBACK}) · $RX"
@@ -86,8 +86,17 @@ set +e
 env "${ENV[@]}" timeout 90 "$RX" > "$OUT/receptor.out" 2>&1 &
 RXPID=$!
 SEEN=no
+CAPTURED=no
 while kill -0 "$RXPID" 2>/dev/null; do
-    if seen_window; then SEEN=yes; fi
+    if seen_window; then
+        SEEN=yes
+        if [ "$MODE" = x11 ] && [ -z "$FALLBACK" ] && [ "$CAPTURED" = no ] && command -v import >/dev/null; then
+            window="$(xwininfo -root -tree 2>/dev/null | awk 'index($0, "RevolutionMote+ · Receptor") {print $1; exit}')"
+            if [ -n "$window" ] && grep -q "primer fotograma pintado" "$OUT/config/receptor.log" 2>/dev/null; then
+                if import -window "$window" "$OUT/receptor.png"; then CAPTURED=yes; fi
+            fi
+        fi
+    fi
     sleep 0.3
 done
 wait "$RXPID"
@@ -101,7 +110,7 @@ echo "-- receptor.out:"; tail -15 "$OUT/receptor.out" 2>/dev/null || true
 echo "-- receptor.log:"; grep -E "Ventana|PEPOMOTE_SMOKE|PEPOMOTE_FAKE|Mando virtual|PÁNICO|\[eframe|\[winit|\[glutin|\[egui_glow" "$LOG" 2>/dev/null || true
 [ "$CODE" -eq 0 ] || { echo "FALLO: el receptor salió con $CODE"; exit 1; }
 grep -q "Ventana: primer fotograma pintado" "$LOG" || { echo "FALLO: sin «primer fotograma pintado» en el log"; exit 1; }
-[ "$SEEN" = yes ] || { echo "FALLO: la ventana PepoMote no apareció en el árbol de ventanas"; exit 1; }
+[ "$SEEN" = yes ] || { echo "FALLO: la ventana RevolutionMote+ no apareció en el árbol de ventanas"; exit 1; }
 if [ "$FALLBACK" = fallback ]; then
     grep -q "Ventana: relanzo (intento 2" "$LOG" || { echo "FALLO: el intento 1 falló pero no hubo relanzamiento"; exit 1; }
     grep -q "primer fotograma pintado (intento 2" "$LOG" || { echo "FALLO: el intento 2 no pintó"; exit 1; }

@@ -113,8 +113,8 @@ check(ok1.get("pad") == "gamepad", f"ok.pad del jugador 1 = gamepad ({ok1.get('p
 # 2) modo cemu → eco y perfil controller0.xml (GamePad)
 s1.sendall(b'{"m":"mode","mode":"cemu"}\n'); r = readmsg(f1, "mode")
 check(r and r.get("mode") == "cemu", f"mando: modo cemu aceptado ({r})")
-check(wait_profile(0, lambda x: x and "<type>Wii U GamePad</type>" in x and "<uuid>0</uuid>" in x and "<profile>PepoMote</profile>" in x),
-      "Cemu: controller0.xml = Wii U GamePad del pad 0 (marca PepoMote)")
+check(wait_profile(0, lambda x: x and "<type>Wii U GamePad</type>" in x and "<uuid>0</uuid>" in x and "<profile>RevolutionMote+</profile>" in x),
+      "Cemu: controller0.xml = Wii U GamePad del pad 0 (marca RevolutionMote+)")
 p0 = profile(0) or ""
 check("<motion>true</motion>" in p0 and "<ip>127.0.0.1</ip>" in p0 and "<port>26760</port>" in p0, "Cemu: motion + DSU 127.0.0.1:26760 en el perfil")
 check("<mapping>27</mapping>\n\t\t\t\t<button>16</button>" in p0, "Cemu: Home → Touch (botón 16)")
@@ -188,14 +188,14 @@ r3 = readmsg(f3, "pad", 3.0)
 check(r3 and r3.get("pad") == "wiimote", f"nunchuk: el receptor le avisa de que entra en uso (pad wiimote) ({r3})")
 # Dos Mandos Wii a la vez (Mario Party 10): Cemu necesita un GamePad CON dispositivo en el mando 1 aunque nadie lo sea →
 # controller0.xml = GamePad por teclado del PC (nuestro, api Keyboard, sin DSU), y los Mandos Wii bajan a los mandos 2 y 3
-check(wait_profile(0, lambda x: x and "<type>Wii U GamePad</type>" in x and "<profile>PepoMote</profile>" in x
+check(wait_profile(0, lambda x: x and "<type>Wii U GamePad</type>" in x and "<profile>RevolutionMote+</profile>" in x
                    and "<api>Keyboard</api>" in x and "<uuid>keyboard</uuid>" in x and "DSUController" not in x and x.count("<controller>") == 1),
       "Cemu: controller0.xml = GamePad por teclado del PC (todos son Mando Wii; Cemu lo necesita con dispositivo)")
 check("<mapping>1</mapping>\n\t\t\t\t<button>13</button>" in (profile(0) or ""), "Cemu: GamePad por teclado: A → Intro")
 check(wait_profile(1, lambda x: x and "<type>Wiimote</type>" in x and "<device_type>6</device_type>" in x and x.count("<api>DSUController</api>") == 2
-                   and "<uuid>0</uuid>" in x and "<uuid>3</uuid>" in x and "PepoMote J1 Mando Wii" in x),
+                   and "<uuid>0</uuid>" in x and "<uuid>3</uuid>" in x and "RevolutionMote+ J1 Mando Wii" in x),
       "Cemu: controller1.xml = J1 Wiimote + Nunchuk (device_type 6, pads 0 y 3)")
-check(wait_profile(2, lambda x: x and "<type>Wiimote</type>" in x and "<device_type>5</device_type>" in x and "<uuid>1</uuid>" in x and "PepoMote J2 Mando Wii" in x),
+check(wait_profile(2, lambda x: x and "<type>Wiimote</type>" in x and "<device_type>5</device_type>" in x and "<uuid>1</uuid>" in x and "RevolutionMote+ J2 Mando Wii" in x),
       "Cemu: controller2.xml = J2 Wiimote (pad 1)")
 check(sum(1 for i in range(8) if profile(i) and "<type>Wii U GamePad</type>" in profile(i)) == 1, "Cemu: exactamente un GamePad, y en el mando 1")
 # el Mando Wii en Cemu manda su puntero por el touchpad: con quat identidad tras recentrar → centro
@@ -233,7 +233,7 @@ SUYO = ('<?xml version="1.0" encoding="UTF-8"?>\n<emulated_controller>\n\t<type>
         '\t\t<mappings>\n\t\t</mappings>\n\t</controller>\n</emulated_controller>\n')
 open(os.path.join(PROFILES, "controller1.xml"), "w", encoding="utf-8").write(SUYO)
 s2, f2, ok2 = hello({"token": token, "name": "Mando2E2E"})
-check(wait_profile(2, lambda x: x and "<profile>PepoMote</profile>" in x), "Cemu: el móvil nuevo va al mando 3, que está libre")
+check(wait_profile(2, lambda x: x and "<profile>RevolutionMote+</profile>" in x), "Cemu: el móvil nuevo va al mando 3, que está libre")
 check(profile(1) == SUYO, "Cemu: el mando del otro jugador sigue intacto")
 check(not os.path.exists(os.path.join(PROFILES, "controller1.xml.pepomote.bak")), "Cemu: no ha hecho falta respaldar nada suyo")
 s2.sendall(b'{"m":"bye"}\n'); s2.close()
@@ -280,11 +280,11 @@ open(os.path.join(PROFILES, "controller0.xml"), "w", encoding="utf-8").write(AJE
 if os.path.exists(BAK0): os.remove(BAK0)
 s1, f1, ok1 = hello({"token": token, "name": "MandoE2E", "screen_only": True})
 check(ok1.get("screen_only") is True and ok1.get("pad") == "gamepad", f"solo pantalla: ok.screen_only y pad gamepad ({ok1})")
-check(wait_profile(0, lambda x: x and x.count("<controller>") == 2 and "<api>XInput</api>" in x and "PepoMote J1 pantalla" in x
-                   and "<profile>MiMando</profile>" in x and "<profile>PepoMote</profile>" not in x),
-      "Cemu: controller0.xml fusionado (mando XInput del usuario + DSU del móvil, sin marca PepoMote)")
+check(wait_profile(0, lambda x: x and x.count("<controller>") == 2 and "<api>XInput</api>" in x and "RevolutionMote+ J1 pantalla" in x
+                   and "<profile>MiMando</profile>" in x and "<profile>RevolutionMote+</profile>" not in x),
+      "Cemu: controller0.xml fusionado (mando XInput del usuario + DSU del móvil, sin marca RevolutionMote+)")
 p0 = profile(0) or ""
-ours = p0[p0.find("PepoMote J1 pantalla"):]
+ours = p0[p0.find("RevolutionMote+ J1 pantalla"):]
 check("<motion>" not in ours and "<entry>" not in ours and "<ip>127.0.0.1</ip>" in ours and "<port>26760</port>" in ours,
       "Cemu: nuestro nodo sin movimiento ni botones, con ip y puerto del DSU")
 check(os.path.exists(BAK0) and open(BAK0, encoding="utf-8").read() == AJENO, "Cemu: copia .pepomote.bak del perfil del usuario tal cual")
@@ -297,11 +297,11 @@ check(d is not None and d[56] == 1 and struct.unpack_from("<H", d, 58)[0] == 960
 # apagar: perfil completo nuestro (queda la copia); encender: fusión otra vez desde la copia
 s1.sendall(b'{"m":"screen_only","on":false}\n'); r = readmsg(f1, "screen_only")
 check(r is not None and r.get("on") is False, f"solo pantalla: eco off ({r})")
-check(wait_profile(0, lambda x: x and "<profile>PepoMote</profile>" in x and x.count("<api>DSUController</api>") == 1), "Cemu: apagado → perfil completo nuestro")
+check(wait_profile(0, lambda x: x and "<profile>RevolutionMote+</profile>" in x and x.count("<api>DSUController</api>") == 1), "Cemu: apagado → perfil completo nuestro")
 check(open(BAK0, encoding="utf-8").read() == AJENO, "Cemu: la copia del usuario sigue intacta")
 s1.sendall(b'{"m":"screen_only","on":true}\n'); r = readmsg(f1, "screen_only")
 check(r is not None and r.get("on") is True, f"solo pantalla: eco on ({r})")
-check(wait_profile(0, lambda x: x and x.count("<controller>") == 2 and "<api>XInput</api>" in x and "<profile>PepoMote</profile>" not in x),
+check(wait_profile(0, lambda x: x and x.count("<controller>") == 2 and "<api>XInput</api>" in x and "<profile>RevolutionMote+</profile>" not in x),
       "Cemu: encendido → fusionado otra vez desde la copia")
 # un jugador 2 (sin la opción) es Pro; se va antes que J1
 s2, f2, ok2 = hello({"token": token, "name": "Mando2E2E"})
@@ -332,7 +332,7 @@ if DOLPHIN_DIR:
     wii = os.path.join(DOLPHIN_DIR, "WiimoteNew.ini")
     time.sleep(1.5)
     ini = open(wii, encoding="utf-8").read() if os.path.exists(wii) else ""
-    check("[Wiimote1]" in ini and "Device = DSUClient/0/PepoMote" in ini and ini.count("Source = 1") == 2 and "Extension = None" in ini,
+    check("[Wiimote1]" in ini and "Device = DSUClient/0/RevolutionMote+" in ini and ini.count("Source = 1") == 2 and "Extension = None" in ini,
           "Dolphin (dir aislado): Wiimote1 y Wiimote2 con Source = 1, sin Nunchuk (regresión 1.2)")
 # un modo desconocido cae a puntero (compatibilidad)
 s1.sendall(b'{"m":"mode","mode":"loquesea"}\n'); r = readmsg(f1, "mode")

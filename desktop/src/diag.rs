@@ -1,4 +1,4 @@
-//! `PepoMote --diag`: informe de diagnóstico (sesión, inyección, audio,
+//! `RevolutionMote+ --diag`: informe de diagnóstico (sesión, inyección, audio,
 //! firewall, puertos, cómo está la ventana del receptor abierto y últimas
 //! líneas del log) para pegar en un issue.
 
@@ -31,7 +31,7 @@ pub fn env_or(name: &str) -> String {
 
 pub fn report() -> String {
     let mut out: Vec<String> = Vec::new();
-    out.push(format!("PepoMote {} — diagnóstico", env!("CARGO_PKG_VERSION")));
+    out.push(format!("RevolutionMote+ {} — diagnóstico", env!("CARGO_PKG_VERSION")));
     out.push(format!(
         "SO: {} {}{}",
         std::env::consts::OS,
@@ -137,7 +137,7 @@ pub fn report() -> String {
     out.push(format!(
         "Receptor abierto: {}",
         crate::singleton::query_status(crate::singleton::port(), std::time::Duration::from_millis(600))
-            .unwrap_or_else(|| "no contesta (no hay otro PepoMote abierto, o su cerrojo no responde)".to_owned())
+            .unwrap_or_else(|| "no contesta (no hay otro RevolutionMote+ abierto, o su cerrojo no responde)".to_owned())
     ));
     #[cfg(target_os = "linux")]
     {
@@ -266,7 +266,7 @@ fn ports_section(port: u16, dsu: u16) -> Vec<String> {
                 "{name} {p} ({what}): ocupado por {} (PID {}){}",
                 o.name,
                 o.pid,
-                if o.name.to_lowercase().contains("pepomote") {
+                if o.name.to_lowercase().contains("revolutionmote") {
                     " — es el receptor abierto"
                 } else {
                     ""
@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn el_informe_lleva_version_log_y_secciones() {
         let r = report();
-        assert!(r.starts_with(&format!("PepoMote {} — diagnóstico", env!("CARGO_PKG_VERSION"))));
+        assert!(r.starts_with(&format!("RevolutionMote+ {} — diagnóstico", env!("CARGO_PKG_VERSION"))));
         for section in ["Config:", "Log:", "Sesión:", "Inyección:", "Audio:", "Puertos:", "Últimas 40 líneas del log:"] {
             assert!(r.contains(section), "{section}");
         }

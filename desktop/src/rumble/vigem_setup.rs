@@ -1,12 +1,12 @@
 //! El driver del mando virtual (ViGEmBus) viaja DENTRO del exe: el
 //! instalador oficial firmado de Nefarius (`packaging/windows/`, BSD-3), sin
 //! tocar un byte. Es un driver de núcleo y Windows 10/11 solo carga la firma
-//! original, así que no se recompila ni se modifica: PepoMote lo instala él
+//! original, así que no se recompila ni se modifica: RevolutionMote+ lo instala él
 //! mismo la primera vez que arranca sin él, con la única ventana de permiso
 //! de administrador que Windows exige a cualquier driver, y si el usuario
 //! dice que no, o el instalador falla, no vuelve a intentarlo por su cuenta
 //! con esta versión (queda el botón de la ventana): un instalador que falla
-//! no puede sacar la ventana de permiso en cada arranque. `PepoMote.exe
+//! no puede sacar la ventana de permiso en cada arranque. `RevolutionMote.exe
 //! --install-driver` lo instala desde la línea de comandos (la CI, que corre
 //! como administrador y sin driver).
 
@@ -55,7 +55,7 @@ pub fn should_install(status: Status, tried_version: Option<&str>, skip_env: boo
     status == Status::NeedsDriver && tried_version != Some(SETUP_VERSION) && !skip_env
 }
 
-/// Vuelca el instalador en la carpeta de configuración de PepoMote (se
+/// Vuelca el instalador en la carpeta de configuración de RevolutionMote+ (se
 /// reescribe siempre: 6 MB una vez cada instalación, y así nunca se lanza
 /// un archivo que otro haya tocado).
 fn unpack() -> Result<PathBuf, String> {
@@ -69,7 +69,7 @@ fn unpack() -> Result<PathBuf, String> {
 /// Lanza el instalador embebido elevado (`runas`: la ventana de permiso de
 /// Windows; si el proceso ya es administrador, no pregunta) y espera a que
 /// termine. Bloquea: llamar desde un hilo propio. El permiso va con la
-/// ventana de PepoMote como dueña: sin ella Windows lo trata como de segundo
+/// ventana de RevolutionMote+ como dueña: sin ella Windows lo trata como de segundo
 /// plano y lo deja minimizado en la barra de tareas (sin ventana solo queda
 /// `--install-driver`, desde una consola).
 pub fn install() -> Result<Outcome, String> {

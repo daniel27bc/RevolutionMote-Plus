@@ -583,7 +583,7 @@ pub fn notify_failure(title: &str, body: &str) {
     fn quiet(c: &mut Command) -> &mut Command {
         c.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
     }
-    let notified = quiet(Command::new("notify-send").args(["-u", "critical", "-a", "PepoMote", title, body]))
+    let notified = quiet(Command::new("notify-send").args(["-u", "critical", "-a", "RevolutionMote+", title, body]))
         .status()
         .is_ok_and(|s| s.success());
     if !notified {

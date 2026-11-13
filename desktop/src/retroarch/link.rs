@@ -287,7 +287,7 @@ pub struct Live {
     pub polls_per_sec: f32,
 }
 
-/// Puertos de RetroArch (los de retroarch.cfg que escribe PepoMote).
+/// Puertos de RetroArch (los de retroarch.cfg que escribe RevolutionMote+).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Ports {
     pub base: u16,

@@ -258,7 +258,7 @@ if DOLPHIN_DIR:
     check("IMUIR/Recenter = `Touch Button`" in txt and "IMUPointer" not in txt, "ini: grupo IMUIR (no IMUPointer)")
     check(txt.count("IRPassthrough/Enabled = True") == 2, f"ini: passthrough en los dos mandos ({txt.count('IRPassthrough/Enabled = True')})")
     check(txt.count("cos(") == 2, f"ini: roll solo en el mando sin Nunchuk propio (cos( × {txt.count('cos(')})")
-    check("Nunchuk/Stick/Left = `DSUClient/1/PepoMote:Left X-`" in txt, "ini: el Nunchuk propio lee Left X de su pad")
+    check("Nunchuk/Stick/Left = `DSUClient/1/RevolutionMote+:Left X-`" in txt, "ini: el Nunchuk propio lee Left X de su pad")
 else:
     print("SKIP ini: PEPOMOTE_DOLPHIN_DIR no definido")
 

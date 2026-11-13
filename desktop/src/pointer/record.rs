@@ -7,7 +7,7 @@
 //!   también cada orden RUMBLE que el receptor le manda: así la grabación
 //!   sabe cuándo vibraba el móvil (la vibración sacude el gyro, y el motor
 //!   del puntero lo tiene en cuenta).
-//! - `PepoMote --replay <archivo> [sens_deg]`: pasa la grabación por el motor
+//! - `RevolutionMote --replay <archivo> [sens_deg]`: pasa la grabación por el motor
 //!   del puntero y saca un CSV por stdout (una fila por paquete: tiempo del
 //!   sensor, llegada, salida del motor) para mirarlo con calma. Las órdenes
 //!   RUMBLE grabadas encienden y apagan el motor en la reproducción igual que
@@ -104,7 +104,7 @@ pub fn replay_from_args() -> bool {
         return false;
     };
     let Some(path) = args.get(i + 1) else {
-        eprintln!("uso: PepoMote --replay <archivo> [sens_deg]");
+        eprintln!("uso: RevolutionMote --replay <archivo> [sens_deg]");
         return true;
     };
     let sens: f32 = args.get(i + 2).and_then(|s| s.parse().ok()).unwrap_or(40.0);

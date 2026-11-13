@@ -45,7 +45,7 @@ impl UinputInjector {
         rel.insert(RelativeAxisType::REL_WHEEL_HI_RES);
         let mouse = VirtualDeviceBuilder::new()
             .map_err(explain)?
-            .name("PepoMote Pointer")
+            .name("RevolutionMote+ Pointer")
             .with_relative_axes(&rel)
             .map_err(explain)?
             .with_keys(&buttons)
@@ -58,7 +58,7 @@ impl UinputInjector {
         let abs_info = AbsInfo::new(0, 0, ABS_MAX, 0, 0, 0);
         let abs = VirtualDeviceBuilder::new()
             .map_err(explain)?
-            .name("PepoMote Absolute Pointer")
+            .name("RevolutionMote+ Absolute Pointer")
             .with_absolute_axis(&UinputAbsSetup::new(AbsoluteAxisType::ABS_X, abs_info))
             .map_err(explain)?
             .with_absolute_axis(&UinputAbsSetup::new(AbsoluteAxisType::ABS_Y, abs_info))
@@ -75,7 +75,7 @@ impl UinputInjector {
         }
         let keys = VirtualDeviceBuilder::new()
             .map_err(explain)?
-            .name("PepoMote Keys")
+            .name("RevolutionMote+ Keys")
             .with_keys(&kb)
             .map_err(explain)?
             .build()

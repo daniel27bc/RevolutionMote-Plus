@@ -13,7 +13,7 @@ BTN = dict(A=1 << 0, B=1 << 1, UP=1 << 2, DOWN=1 << 3, LEFT=1 << 4, RIGHT=1 << 5
 
 # OJO: el python de este PC es un paquete MSIX y ve un AppData\Roaming
 # virtualizado (otro token.txt): el token real llega por variable de entorno.
-token = os.environ.get("PEPOMOTE_TOKEN") or open(os.path.join(os.environ["APPDATA"], "pepotech", "PepoMote", "config", "token.txt"), encoding="utf-8").read().strip()
+token = os.environ.get("PEPOMOTE_TOKEN") or open(os.path.join(os.environ["APPDATA"], "daniel27bc", "RevolutionMote", "config", "token.txt"), encoding="utf-8").read().strip()
 s = socket.create_connection((HOST, PORT), timeout=5)
 s.sendall((json.dumps({"m": "hello", "pv": 1, "token": token, "name": "MovilPrueba", "model": "Simulado"}) + "\n").encode())
 f = s.makefile("r", encoding="utf-8")

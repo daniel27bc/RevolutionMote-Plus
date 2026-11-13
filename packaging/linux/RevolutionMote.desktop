@@ -1,10 +1,10 @@
 [Desktop Entry]
-Name=PepoMote
+Name=RevolutionMote+
 Comment=Turn your phone into a Wii-style pointer for your PC
 Comment[es]=Convierte tu móvil en un puntero estilo Wii para tu PC
-Exec=PepoMote
-Icon=pepomote
+Exec=RevolutionMote
+Icon=revolutionmote
 Terminal=false
 Type=Application
-StartupWMClass=PepoMote
+StartupWMClass=RevolutionMote
 Categories=Utility;RemoteAccess;

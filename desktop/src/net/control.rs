@@ -221,7 +221,7 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
     }
     let writer: Writer = Arc::new(Mutex::new(raw_writer));
     if hello["pv"].as_i64() != Some(1) {
-        let _ = send(&writer, &json!({"m":"err","code":"bad_version","msg":"Actualiza PepoMote"}));
+        let _ = send(&writer, &json!({"m":"err","code":"bad_version","msg":"Actualiza RevolutionMote+"}));
         return;
     }
     // Token (QR) o, para móviles sin cámara, el código de 4 dígitos que se

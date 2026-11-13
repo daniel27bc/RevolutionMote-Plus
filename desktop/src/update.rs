@@ -19,12 +19,12 @@ pub fn set_wake(wake: impl Fn() + Send + Sync + 'static) {
     let _ = WAKE.set(Box::new(wake));
 }
 
-pub const REPO: &str = "pepitolas13/PepoMote";
-pub const LATEST_URL: &str = "https://github.com/pepitolas13/PepoMote/releases/latest";
+pub const REPO: &str = "daniel27bc/RevolutionMote-Plus";
+pub const LATEST_URL: &str = "https://github.com/daniel27bc/RevolutionMote-Plus/releases/latest";
 pub const MANIFEST_URL: &str =
-    "https://github.com/pepitolas13/PepoMote/releases/latest/download/update.json";
-/// Fijo y sin versión: GitHub solo ve «un PepoMote», nada más.
-const USER_AGENT: &str = "PepoMote-update-check";
+    "https://github.com/daniel27bc/RevolutionMote-Plus/releases/latest/download/update.json";
+/// Fijo y sin versión: GitHub solo ve «un RevolutionMote+», nada más.
+const USER_AGENT: &str = "RevolutionMote+-update-check";
 /// La primera consulta espera a que la ventana (y el QR) estén en pantalla.
 pub const FIRST_DELAY: Duration = Duration::from_secs(3);
 pub const CHECK_EVERY: Duration = Duration::from_secs(3600);
@@ -80,7 +80,7 @@ impl std::fmt::Display for Version {
 
 /// `https://github.com/…/releases/tag/v1.6.0` → 1.6.0.
 pub fn version_from_location(location: &str) -> Option<Version> {
-    let tag = location.strip_prefix("https://github.com/pepitolas13/PepoMote/releases/tag/")?;
+    let tag = location.strip_prefix("https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/")?;
     let tag = tag.split(['?', '#', '/']).next().unwrap_or("");
     Version::parse(tag)
 }
@@ -213,15 +213,19 @@ fn trusted_redirect(uri: &url::Url, initial: &url::Url) -> bool {
 fn official_download(uri: &url::Url) -> bool {
     let Some(tail) = uri
         .path()
-        .strip_prefix("/pepitolas13/PepoMote/releases/download/v")
+        .strip_prefix("/daniel27bc/RevolutionMote-Plus/releases/download/v")
     else {
         return false;
     };
     let Some((tag, name)) = tail.split_once('/') else {
         return false;
     };
-    Version::parse(tag).is_some_and(|v| v.to_string() == tag)
-        && (name == "update.json" || manifest::TARGETS.iter().any(|(_, asset)| *asset == name))
+    Version::parse(tag).is_some_and(|version| {
+        version.to_string() == tag
+            && (name == "update.json" || manifest::TARGETS.iter().any(|(target, _)| {
+                manifest::release_asset_name(target, &version).as_deref() == Some(name)
+            }))
+    })
 }
 
 pub fn fetch_latest(timeout: Duration) -> Result<manifest::Manifest, String> {
@@ -550,7 +554,7 @@ mod tests {
 
     #[test]
     fn la_location_de_github_da_la_version() {
-        let loc = "https://github.com/pepitolas13/PepoMote/releases/tag/v1.5.0";
+        let loc = "https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/v1.5.0";
         assert_eq!(version_from_location(loc), Some(v(1, 5, 0)));
         assert_eq!(
             version_from_location(&format!("{loc}?x=1")),
@@ -558,7 +562,7 @@ mod tests {
         );
         assert_eq!(version_from_location(&format!("{loc}/")), Some(v(1, 5, 0)));
         assert_eq!(
-            version_from_location("https://github.com/pepitolas13/PepoMote/releases"),
+            version_from_location("https://github.com/daniel27bc/RevolutionMote-Plus/releases"),
             None
         );
         assert_eq!(version_from_location(""), None);
@@ -598,7 +602,7 @@ mod tests {
     fn la_url_de_la_release() {
         assert_eq!(
             release_url(&v(1, 6, 0)),
-            "https://github.com/pepitolas13/PepoMote/releases/tag/v1.6.0"
+            "https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/v1.6.0"
         );
     }
 
@@ -610,7 +614,7 @@ mod tests {
     #[test]
     fn redirects_stay_on_github_https_and_the_exact_asset() {
         let initial = url::Url::parse(
-            "https://github.com/pepitolas13/PepoMote/releases/download/v2.0.0/PepoMote.exe",
+            "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v2.0.0/RevolutionMote-Plus-Receptor-Windows-v2.0.0.exe",
         )
         .unwrap();
         assert!(trusted_redirect(&initial, &initial));
@@ -620,9 +624,9 @@ mod tests {
             &initial
         ));
         for bad in [
-            "http://github.com/pepitolas13/PepoMote/releases/download/v2.0.0/PepoMote.exe",
-            "https://github.com/pepitolas13/PepoMote/releases/download/v2.0.1/PepoMote.exe",
-            "https://github.com/pepitolas13/Other/releases/download/v2.0.0/PepoMote.exe",
+            "http://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v2.0.0/RevolutionMote-Plus-Receptor-Windows-v2.0.0.exe",
+            "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v2.0.1/RevolutionMote-Plus-Receptor-Windows-v2.0.0.exe",
+            "https://github.com/pepitolas13/Other/releases/download/v2.0.0/RevolutionMote-Plus-Receptor-Windows-v2.0.0.exe",
             "https://evil.example/file",
             "https://user@objects.githubusercontent.com/file",
         ] {

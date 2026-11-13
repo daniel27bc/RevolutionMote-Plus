@@ -23,7 +23,7 @@ use std::time::{Duration, Instant};
 /// la regla udev y da acceso al usuario actual sin cerrar sesión. Con `;` a
 /// propósito: si modprobe falla, el resto se aplica igual y udevadm/setfacl
 /// dicen por qué.
-pub const UINPUT_MANUAL_CMD: &str = r#"sudo sh -c 'modprobe uinput; printf "uinput\n" > /etc/modules-load.d/pepomote.conf; printf "KERNEL==\"uinput\", SUBSYSTEM==\"misc\", TAG+=\"uaccess\", OPTIONS+=\"static_node=uinput\"\n" > /etc/udev/rules.d/99-pepomote.rules; udevadm control --reload-rules; udevadm trigger /dev/uinput; setfacl -m "u:${SUDO_UID:-$(id -u)}:rw" /dev/uinput'"#;
+pub const UINPUT_MANUAL_CMD: &str = r#"sudo sh -c 'modprobe uinput; printf "uinput\n" > /etc/modules-load.d/revolutionmote.conf; printf "KERNEL==\"uinput\", SUBSYSTEM==\"misc\", TAG+=\"uaccess\", OPTIONS+=\"static_node=uinput\"\n" > /etc/udev/rules.d/99-revolutionmote.rules; udevadm control --reload-rules; udevadm trigger /dev/uinput; setfacl -m "u:${SUDO_UID:-$(id -u)}:rw" /dev/uinput'"#;
 
 /// Comando manual para abrir el puerto del móvil (y mDNS) en el firewall.
 pub fn firewall_manual_cmd(kind: FwKind, port: u16) -> String {
@@ -59,8 +59,8 @@ err="$(mktemp 2>/dev/null || echo /dev/null)"
 modprobe uinput 2>/dev/null || true
 if [ -e /dev/uinput ]; then
     mkdir -p /etc/udev/rules.d /etc/modules-load.d
-    printf 'KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"\n' > /etc/udev/rules.d/99-pepomote.rules
-    printf 'uinput\n' > /etc/modules-load.d/pepomote.conf
+    printf 'KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"\n' > /etc/udev/rules.d/99-revolutionmote.rules
+    printf 'uinput\n' > /etc/modules-load.d/revolutionmote.conf
     udevadm control --reload-rules 2>/dev/null || true
     udevadm trigger /dev/uinput 2>/dev/null || true
     # ACL directa al usuario que pidio la reparacion (pkexec exporta PKEXEC_UID)
@@ -76,8 +76,8 @@ else
 fi
 # --- firewall: puerto del movil ({port} TCP+UDP) y mDNS ---
 if [ -f /etc/ufw/ufw.conf ] && grep -q '^ENABLED=yes' /etc/ufw/ufw.conf && command -v ufw >/dev/null 2>&1; then
-    if ufw allow {port}/tcp comment PepoMote >/dev/null 2>"$err" && ufw allow {port}/udp comment PepoMote >/dev/null 2>"$err"; then
-        ufw allow 5353/udp comment 'mDNS PepoMote' >/dev/null 2>&1 || true
+    if ufw allow {port}/tcp comment 'RevolutionMote+' >/dev/null 2>"$err" && ufw allow {port}/udp comment 'RevolutionMote+' >/dev/null 2>"$err"; then
+        ufw allow 5353/udp comment 'mDNS RevolutionMote+' >/dev/null 2>&1 || true
         echo "firewall: ufw ok"
     else
         echo "firewall: error $(head -c 200 "$err" 2>/dev/null | tr '\n' ' ')"; rc=$((rc | {RC_FIREWALL}))
@@ -338,8 +338,8 @@ mod tests {
         assert!(!c.contains('\n'));
         for needle in [
             "modprobe uinput",
-            "99-pepomote.rules",
-            "modules-load.d/pepomote.conf",
+            "99-revolutionmote.rules",
+            "modules-load.d/revolutionmote.conf",
             "${SUDO_UID:-$(id -u)}",
             "udevadm trigger /dev/uinput",
             "TAG+=\\\"uaccess\\\"",

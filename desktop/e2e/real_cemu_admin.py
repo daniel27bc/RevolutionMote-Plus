@@ -2,7 +2,7 @@
 está abierto como administrador (y cuando se reabre normal).
 
 La wiki de Cemu recomienda «Ejecutar como administrador»; con Cemu así y
-PepoMote sin elevar, Windows no deja a PepoMote capturar la ventana GamePad
+RevolutionMote+ sin elevar, Windows no deja a RevolutionMote+ capturar la ventana GamePad
 View ni escribirle. Este script arranca un receptor AISLADO (puerto de
 prueba, configuración propia y `PEPOMOTE_CEMU_DIR` propio: la configuración
 de Cemu de verdad no se toca), conecta un móvil simulado en modo Wii U con el
@@ -11,7 +11,7 @@ canal de pantalla y apunta qué le llega a lo largo del tiempo: estados
 teclado del móvil. No abre ni cierra Cemu: eso lo hace quien prueba (abrirlo
 como administrador pide el permiso de Windows).
 
-Uso: python real_cemu_admin.py <PepoMote.exe> <carpeta> [--seconds 20]
+Uso: python real_cemu_admin.py <RevolutionMote.exe> <carpeta> [--seconds 20]
      [--no-wgc] [--text-at 6] [--expect admin|frames|none]
 Imprime la línea de tiempo y un resumen; con --expect sale con 1 si no se
 cumple."""

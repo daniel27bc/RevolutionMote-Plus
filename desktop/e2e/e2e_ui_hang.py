@@ -10,8 +10,8 @@ Aquí un receptor AISLADO (puertos y configuración propios) arranca con
 PEPOMOTE_FAKE_UI_HANG=1: su hilo de ventana se duerme en el fotograma 3, con
 el QR ya pintado. Se comprueba que
 
-- `PepoMote.exe --diag` (mismo PEPOMOTE_PORT) imprime «Receptor abierto:
-  PepoMote <versión> · último fotograma hace N s · último paso: gancho de
+- `RevolutionMote.exe --diag` (mismo PEPOMOTE_PORT) imprime «Receptor abierto:
+  RevolutionMote+ <versión> · último fotograma hace N s · último paso: gancho de
   prueba»: el cerrojo contesta aunque la ventana esté colgada;
 - receptor.log apunta «Ventana: sin repintar desde hace 10 s · último paso:
   gancho de prueba»;
@@ -19,7 +19,7 @@ el QR ya pintado. Se comprueba que
 
 Y, sin el gancho, que el humo sale con 0 y el log no habla de cuelgues.
 
-Uso: python e2e_ui_hang.py <PepoMote.exe> [directorio de trabajo]
+Uso: python e2e_ui_hang.py <RevolutionMote.exe> [directorio de trabajo]
 Sale con 0 si pasa y con 1 si falla."""
 import os
 import socket
@@ -111,7 +111,7 @@ def case_hang(exe: Path, root: Path, check: Checks) -> None:
         diag = out.stdout.decode("utf-8", errors="replace")
         print("---- --diag (receptor abierto) ----", flush=True)
         print("\n".join(l for l in diag.splitlines() if l.startswith("Receptor abierto")), flush=True)
-        check("Receptor abierto: PepoMote " in diag, "--diag encontró al receptor abierto por su cerrojo")
+        check("Receptor abierto: RevolutionMote+ " in diag, "--diag encontró al receptor abierto por su cerrojo")
         check("último paso: gancho de prueba" in diag, "--diag dice en qué paso se quedó la ventana")
         check("último fotograma hace" in diag, "--diag dice cuánto hace del último fotograma")
         text = wait_for(cfg, receiver, "sin repintar desde hace", 25)

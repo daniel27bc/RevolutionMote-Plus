@@ -1,6 +1,6 @@
 //! Autoarranque opcional con el sistema.
 //! Windows: HKCU\...\Run (todo Windows, sin admin), arrancando --minimized.
-//! Linux: XDG autostart (~/.config/autostart/PepoMote.desktop) — el estándar
+//! Linux: XDG autostart (~/.config/autostart/RevolutionMote.desktop) — el estándar
 //! freedesktop que respetan todos los escritorios (GNOME, KDE, XFCE, MATE,
 //! Cinnamon, LXQt...). El propio archivo/clave ES el estado: nada duplicado.
 
@@ -10,7 +10,7 @@ mod imp {
     use std::process::{Command, Stdio};
 
     const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
-    const VALUE: &str = "PepoMote";
+    const VALUE: &str = "RevolutionMote";
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     /// `reg.exe` en silencio. Solo nos interesa si salió bien: cuando el
@@ -55,7 +55,7 @@ mod imp {
 
     fn desktop_path() -> Option<PathBuf> {
         directories::BaseDirs::new()
-            .map(|b| b.config_dir().join("autostart").join("PepoMote.desktop"))
+            .map(|b| b.config_dir().join("autostart").join("RevolutionMote.desktop"))
     }
 
     /// El AppImage expone su propia ruta en $APPIMAGE; fuera de AppImage,
@@ -78,7 +78,7 @@ mod imp {
                 std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
             }
             let content = format!(
-                "[Desktop Entry]\nType=Application\nName=PepoMote\n\
+                "[Desktop Entry]\nType=Application\nName=RevolutionMote+\n\
                  Comment=Tu móvil, mando de tu PC\nExec=\"{exe}\"\n\
                  Terminal=false\nX-GNOME-Autostart-enabled=true\n"
             );
@@ -92,14 +92,14 @@ mod imp {
     }
 }
 
-/// macOS: LaunchAgent (~/Library/LaunchAgents/dev.pepotech.pepomote.plist)
+/// macOS: LaunchAgent (~/Library/LaunchAgents/dev.daniel27bc.revolutionmote.receiver.plist)
 /// que lanza el binario del .app con --minimized al iniciar sesión. Sale en
 /// Ajustes → General → Ítems de inicio (como «Permitir en segundo plano»).
 #[cfg(target_os = "macos")]
 mod imp {
     use std::path::PathBuf;
 
-    const LABEL: &str = "dev.pepotech.pepomote";
+    const LABEL: &str = "dev.daniel27bc.revolutionmote.receiver";
 
     fn plist_path() -> Option<PathBuf> {
         directories::BaseDirs::new().map(|b| b.home_dir().join("Library/LaunchAgents").join(format!("{LABEL}.plist")))
@@ -108,7 +108,7 @@ mod imp {
     /// El binario dentro del .app (si corremos desde un bundle) o el actual.
     fn exe_path() -> Option<String> {
         crate::macos::bundle_path()
-            .map(|b| b.join("Contents/MacOS/PepoMote").display().to_string())
+            .map(|b| b.join("Contents/MacOS/RevolutionMote").display().to_string())
             .or_else(|| std::env::current_exe().ok().map(|p| p.display().to_string()))
     }
 
@@ -155,7 +155,7 @@ pub fn plist_xml(exe: &str) -> String {
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
          <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
          <plist version=\"1.0\">\n<dict>\n\
-         \t<key>Label</key>\n\t<string>dev.pepotech.pepomote</string>\n\
+         \t<key>Label</key>\n\t<string>dev.daniel27bc.revolutionmote.receiver</string>\n\
          \t<key>ProgramArguments</key>\n\t<array>\n\t\t<string>{exe}</string>\n\t\t<string>--minimized</string>\n\t</array>\n\
          \t<key>RunAtLoad</key>\n\t<true/>\n\
          \t<key>KeepAlive</key>\n\t<false/>\n\
@@ -170,12 +170,12 @@ pub use imp::{is_enabled, set_enabled};
 mod tests {
     #[test]
     fn el_plist_lanza_minimizado_y_escapa_xml() {
-        let p = super::plist_xml("/Applications/PepoMote.app/Contents/MacOS/PepoMote");
+        let p = super::plist_xml("/Applications/RevolutionMote+.app/Contents/MacOS/RevolutionMote");
         assert!(p.starts_with("<?xml"));
-        assert!(p.contains("<string>dev.pepotech.pepomote</string>"));
-        assert!(p.contains("<string>/Applications/PepoMote.app/Contents/MacOS/PepoMote</string>\n\t\t<string>--minimized</string>"));
+        assert!(p.contains("<string>dev.daniel27bc.revolutionmote.receiver</string>"));
+        assert!(p.contains("<string>/Applications/RevolutionMote+.app/Contents/MacOS/RevolutionMote</string>\n\t\t<string>--minimized</string>"));
         assert!(p.contains("<key>RunAtLoad</key>\n\t<true/>"));
-        let p = super::plist_xml("/Apps/A&B <x>/PepoMote");
-        assert!(p.contains("<string>/Apps/A&amp;B &lt;x&gt;/PepoMote</string>"));
+        let p = super::plist_xml("/Apps/A&B <x>/RevolutionMote+");
+        assert!(p.contains("<string>/Apps/A&amp;B &lt;x&gt;/RevolutionMote+</string>"));
     }
 }

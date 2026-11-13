@@ -120,7 +120,7 @@ impl UpdateUi {
         let mut open = self.open;
         let mut later = false;
         let width = (ctx.screen_rect().width() - 48.0).clamp(230.0, 400.0);
-        egui::Window::new(text("Actualización de PepoMote","PepoMote update"))
+        egui::Window::new(text("Actualización de RevolutionMote+","RevolutionMote+ update"))
             .id(egui::Id::new("pepomote-updater"))
             .open(&mut open).collapsible(false).resizable(false)
             .default_width(width).anchor(egui::Align2::CENTER_CENTER,egui::Vec2::ZERO)
@@ -156,7 +156,7 @@ impl UpdateUi {
                             let target=install::Runtime::current().and_then(|r|install::select_target(&r));
                             let can_install=target.as_ref().ok().is_some_and(|t|release.assets.contains_key(t.key));
                             if can_install {
-                                ui.label(text("PepoMote se reiniciará. Tus emparejamientos y ajustes se conservarán.","PepoMote will restart. Your pairings and settings will be kept."));
+                                ui.label(text("RevolutionMote+ se reiniciará. Tus emparejamientos y ajustes se conservarán.","RevolutionMote+ will restart. Your pairings and settings will be kept."));
                                 let label=if matches!(snapshot.phase,Phase::Failed(_)|Phase::Cancelled){text("Reintentar instalación","Retry installation")}else{text("Instalar actualización","Install update")};
                                 if ui.add_enabled(!snapshot.phase.busy() && !self.preview(),egui::Button::new(label)).clicked(){start_download();}
                             } else {
@@ -200,9 +200,9 @@ mod tests {
     #[ignore = "manual, isolated UI review; no network or installation"]
     fn preview_update_dialog() {
         let bytes=serde_json::to_vec(&serde_json::json!({"schema":1,"version":"999.0.0","published_at":"2026-09-19T12:00:00Z",
-            "release_url":"https://github.com/pepitolas13/PepoMote/releases/tag/v999.0.0",
+            "release_url":"https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/v999.0.0",
             "notes":{"es":["Instalación guiada con progreso y recuperación automática.","Más estabilidad al usar varios mandos."],"en":["Guided installation with progress and automatic recovery.","More stable connections with multiple controllers."]},
-            "assets":{"windows-x86_64":{"name":"PepoMote.exe","url":"https://github.com/pepitolas13/PepoMote/releases/download/v999.0.0/PepoMote.exe","size":100000,"sha256":"0".repeat(64)}}})).unwrap();
+            "assets":{"windows-x86_64":{"name":"RevolutionMote-Plus-Receptor-Windows-v999.0.0.exe","url":"https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v999.0.0/RevolutionMote-Plus-Receptor-Windows-v999.0.0.exe","size":100000,"sha256":"0".repeat(64)}}})).unwrap();
         let manifest = manifest::Manifest::parse(&bytes).unwrap();
         {
             let mut s = locked();
@@ -216,7 +216,7 @@ mod tests {
         impl eframe::App for Preview {
             fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
                 egui::CentralPanel::default().show(ctx, |ui| {
-                    ui.heading("PepoMote · Actualizaciones");
+                    ui.heading("RevolutionMote+ · Actualizaciones");
                     ui.label("Vista de prueba: instalación desactivada");
                     self.ui.settings(ui);
                     if ui.button("ES / EN").clicked() {
@@ -240,7 +240,7 @@ mod tests {
             ..Default::default()
         };
         eframe::run_native(
-            "PepoMote — revisión de actualizaciones",
+            "RevolutionMote+ — revisión de actualizaciones",
             options,
             Box::new(|cc| {
                 crate::theme::apply(&cc.egui_ctx);

@@ -14,7 +14,7 @@
 //! La segunda copia pide con `PMPSHOW2`, y la primera, si se colgó antes de
 //! pintar con OpenGL (Windows, ver `gpu::handover_allowed`), contesta
 //! `PMPHUNG1`, quita su icono y se termina: la nueva sigue como principal
-//! con Direct3D. Un PepoMote de antes (hasta la 1.13.2) no conoce
+//! con Direct3D. Un RevolutionMote+ de antes (hasta la 1.13.2) no conoce
 //! `PMPSHOW2` (no contesta) y se le pregunta con el `PMPSHOW1` de siempre,
 //! que solo recibe `PMPACK01`.
 
@@ -47,9 +47,9 @@ pub fn port() -> u16 {
 static UI_CTX: OnceLock<egui::Context> = OnceLock::new();
 static SHOW_SIGNAL: Mutex<Option<Sender<()>>> = Mutex::new(None);
 /// Windows: el HWND de NUESTRA ventana, guardado al crearla. Antes se
-/// buscaba con `FindWindowW(null, "PepoMote")`, que devuelve la primera
+/// buscaba con `FindWindowW(null, "RevolutionMote+")`, que devuelve la primera
 /// ventana de CUALQUIER programa con ese título: en Windows 10 el
-/// Explorador abierto en una carpeta llamada «PepoMote» (donde mucha gente
+/// Explorador abierto en una carpeta llamada «RevolutionMote+» (donde mucha gente
 /// guarda el exe) se titula así y se llevaba el empujón, y la ventana
 /// escondida en la bandeja no volvía nunca.
 #[cfg(windows)]
@@ -162,7 +162,7 @@ pub enum Singleton {
     /// La que había se colgó antes de pintar y nos ha dejado el sitio:
     /// somos la principal (y la ventana va con Direct3D).
     TookOver(UdpSocket),
-    /// Hay otro PepoMote vivo y ha contestado: ya se le ha pedido que se
+    /// Hay otro RevolutionMote+ vivo y ha contestado: ya se le ha pedido que se
     /// muestre. Salir.
     AlreadyRunning,
     /// El cerrojo no se pudo coger y nadie contesta al otro lado (el puerto
@@ -193,7 +193,7 @@ pub fn acquire_on(port: u16) -> Singleton {
                     Some(sock) => Singleton::TookOver(sock),
                     None => Singleton::NoLock(e),
                 },
-                // Un PepoMote anterior no conoce PMPSHOW2: el de siempre
+                // Un RevolutionMote+ anterior no conoce PMPSHOW2: el de siempre
                 _ => {
                     if ping(port, ACK_TIMEOUT) {
                         Singleton::AlreadyRunning
@@ -237,7 +237,7 @@ fn ask(port: u16, msg: &[u8], timeout: Duration) -> Option<Vec<u8>> {
     None
 }
 
-/// Manda `PMPSHOW1` al cerrojo y espera el acuse. true = hay un PepoMote
+/// Manda `PMPSHOW1` al cerrojo y espera el acuse. true = hay un RevolutionMote+
 /// vivo al otro lado (y ya sabe que tiene que mostrarse).
 fn ping(port: u16, timeout: Duration) -> bool {
     ask(port, SHOW, timeout).is_some_and(|reply| reply == ACK)
@@ -252,7 +252,7 @@ pub fn query_status(port: u16, timeout: Duration) -> Option<String> {
 /// La respuesta a `PMPDIAG1`: versión y estado de la ventana. La escribe
 /// el hilo del cerrojo, que sigue vivo aunque el de la ventana se cuelgue.
 fn status_reply() -> String {
-    format!("PepoMote {} · {}", env!("CARGO_PKG_VERSION"), crate::launch::window_status())
+    format!("RevolutionMote+ {} · {}", env!("CARGO_PKG_VERSION"), crate::launch::window_status())
 }
 
 /// Hilo del cerrojo: cada "PMPSHOW1" recibe su "PMPACK01" y pide mostrar la
@@ -276,7 +276,7 @@ pub fn watch(sock: UdpSocket) {
                             if &buf[..len] == SHOW2 && crate::gpu::handover_now() {
                                 let _ = sock.send_to(HUNG, from);
                                 crate::log_line!(
-                                    "Otra copia de PepoMote pide la ventana y esta no ha pintado con OpenGL en {} s: le dejo el sitio · {}",
+                                    "Otra copia de RevolutionMote+ pide la ventana y esta no ha pintado con OpenGL en {} s: le dejo el sitio · {}",
                                     crate::gpu::attempt_age().map(|a| a.as_secs()).unwrap_or(0),
                                     crate::launch::window_status()
                                 );
@@ -288,7 +288,7 @@ pub fn watch(sock: UdpSocket) {
                             }
                             let _ = sock.send_to(ACK, from);
                             crate::log_line!(
-                                "Otra copia de PepoMote pide mostrar la ventana · {}",
+                                "Otra copia de RevolutionMote+ pide mostrar la ventana · {}",
                                 crate::launch::window_status()
                             );
                             request_show();
@@ -339,7 +339,7 @@ mod tests {
         };
         watch(lock);
         let reply = query_status(p, ACK_TIMEOUT).expect("la primera contesta");
-        assert!(reply.starts_with(&format!("PepoMote {} · ", env!("CARGO_PKG_VERSION"))), "{reply}");
+        assert!(reply.starts_with(&format!("RevolutionMote+ {} · ", env!("CARGO_PKG_VERSION"))), "{reply}");
         assert!(reply.contains("fotograma"), "{reply}");
         let mute = UdpSocket::bind(("127.0.0.1", 0)).unwrap();
         assert!(query_status(mute.local_addr().unwrap().port(), Duration::from_millis(100)).is_none());

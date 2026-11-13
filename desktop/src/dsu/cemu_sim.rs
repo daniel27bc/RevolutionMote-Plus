@@ -1,6 +1,6 @@
 //! Simulación FIEL de la cadena de movimiento de Cemu, para poder ver —sin
 //! móvil, sin Cemu y sin el usuario— qué orientación recibiría un juego de
-//! Wii U con los bytes que PepoMote pone en el cable DSU.
+//! Wii U con los bytes que RevolutionMote+ pone en el cable DSU.
 //!
 //! Cemu no mapea el movimiento eje por eje como Dolphin (12 bindings en
 //! `dolphin.rs:43-58`): mete accel y gyro en UNA fusión Mahony propia y el
@@ -92,7 +92,7 @@ struct Mahony {
 impl Mahony {
     fn new() -> Self {
         // "assume default forward pose": su GetVectorZ() vale exactamente
-        // (0, 1, 0), o sea el móvil PLANO con el accel de PepoMote.
+        // (0, 1, 0), o sea el móvil PLANO con el accel de RevolutionMote+.
         let h = 0.5f32.sqrt();
         Mahony {
             q: Quat { w: h, x: h, y: 0.0, z: 0.0 },
@@ -355,8 +355,8 @@ struct Leg {
 /// Por dónde entra el movimiento en Cemu.
 #[derive(Clone, Copy, PartialEq)]
 enum Via {
-    /// PepoMote: móvil → `pad_data_packet` (bytes de verdad) → DSU.
-    PepoMote,
+    /// RevolutionMote+: móvil → `pad_data_packet` (bytes de verdad) → DSU.
+    Receiver,
     /// Un mando nativo (DS4/DS5/Switch Pro) por SDL, sin pasar por el DSU.
     MandoNativo,
 }
@@ -388,7 +388,7 @@ fn run_via(legs: &[Leg], via: Via) -> (Vpad, Cemu) {
                 profile: DsuProfile::WiiU,
             };
             match via {
-                Via::PepoMote => {
+                Via::Receiver => {
                     let p = pad_data_packet(0, &sample, false, counter);
                     let f = |o: usize| f32::from_le_bytes(p[o..o + 4].try_into().unwrap());
                     let ts = u64::from_le_bytes(p[68..76].try_into().unwrap());
@@ -414,7 +414,7 @@ fn run_via(legs: &[Leg], via: Via) -> (Vpad, Cemu) {
 /// Quieto el tiempo suficiente para que la fusión se asiente y el estimador de
 /// sesgo de Cemu arranque (necesita 200 muestras).
 fn run(legs: &[Leg]) -> (Vpad, Cemu) {
-    run_via(legs, Via::PepoMote)
+    run_via(legs, Via::Receiver)
 }
 
 fn settle() -> Leg {
@@ -475,8 +475,8 @@ mod tests {
     }
 
     /// LA PRUEBA DE FONDO: el mismo movimiento físico entrando por el cable de
-    /// PepoMote y por un mando nativo de SDL tiene que dar A UN JUEGO DE WII U
-    /// exactamente lo mismo. Si coincide, el marco de ejes de PepoMote es el
+    /// RevolutionMote+ y por un mando nativo de SDL tiene que dar A UN JUEGO DE WII U
+    /// exactamente lo mismo. Si coincide, el marco de ejes de RevolutionMote+ es el
     /// que Cemu espera, y cualquier «el giro no va» es de configuración o del
     /// juego, no del cable.
     #[test]
@@ -491,10 +491,10 @@ mod tests {
         println!();
         for (nombre, mov) in guiones {
             let legs = [settle(), Leg { w: mov, secs: 0.5 }];
-            let mio = run_via(&legs, Via::PepoMote).0;
+            let mio = run_via(&legs, Via::Receiver).0;
             let nativo = run_via(&legs, Via::MandoNativo).0;
             println!(
-                "  {nombre:7} PepoMote [{:+.4} {:+.4} {:+.4}]  mando nativo [{:+.4} {:+.4} {:+.4}]",
+                "  {nombre:7} RevolutionMote+ [{:+.4} {:+.4} {:+.4}]  mando nativo [{:+.4} {:+.4} {:+.4}]",
                 mio.orientation[0], mio.orientation[1], mio.orientation[2],
                 nativo.orientation[0], nativo.orientation[1], nativo.orientation[2]
             );

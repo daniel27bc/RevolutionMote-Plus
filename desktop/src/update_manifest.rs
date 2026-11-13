@@ -58,19 +58,26 @@ fn unique_assets<'de, D: serde::Deserializer<'de>>(
 }
 
 pub const TARGETS: &[(&str, &str)] = &[
-    ("windows-x86_64", "PepoMote.exe"),
-    ("linux-x86_64", "PepoMote-linux-x86_64"),
-    ("linux-x86_64-appimage", "PepoMote-x86_64.AppImage"),
-    ("macos-aarch64", "PepoMote-macOS.zip"),
+    ("windows-x86_64", "RevolutionMote.exe"),
+    ("linux-x86_64", "RevolutionMote-Plus-linux-x86_64"),
+    ("linux-x86_64-appimage", "RevolutionMote-Plus-x86_64.AppImage"),
+    ("macos-aarch64", "RevolutionMote-Plus-macOS.zip"),
     ("mobile-linux-aarch64", "PepoMote-Mobile-aarch64"),
     (
         "mobile-linux-aarch64-appimage",
         "PepoMote-Mobile-aarch64.AppImage",
     ),
     ("mobile-linux-aarch64-musl", "PepoMote-Mobile-aarch64-musl"),
-    ("android-universal", "PepoMote.apk"),
-    ("ios", "PepoMote.ipa"),
+    ("android-universal", "RevolutionMote-Plus.apk"),
+    ("ios", "RevolutionMote-Plus.ipa"),
 ];
+
+pub fn release_asset_name(target: &str, version: &Version) -> Option<String> {
+    if target == "windows-x86_64" {
+        return Some(format!("RevolutionMote-Plus-Receptor-Windows-v{version}.exe"));
+    }
+    TARGETS.iter().find(|(key, _)| *key == target).map(|(_, name)| (*name).to_owned())
+}
 
 impl Manifest {
     pub fn parse(bytes: &[u8]) -> Result<Self, String> {
@@ -100,11 +107,7 @@ impl Manifest {
             }
         }
         for (target, asset) in &m.assets {
-            let expected = TARGETS
-                .iter()
-                .find(|(key, _)| *key == target)
-                .ok_or("Unknown release target")?
-                .1;
+            let expected = release_asset_name(target, &version).ok_or("Unknown release target")?;
             if asset.name != expected
                 || asset.size == 0
                 || asset.size > MAX_PACKAGE
@@ -170,10 +173,10 @@ mod tests {
         serde_json::json!({
             "schema": 1, "version": "1.11.0", "published_at": "2026-09-19T12:00:00Z",
             "notes": {"es": ["Mejora del mando."], "en": ["Controller improvements."]},
-            "release_url": "https://github.com/pepitolas13/PepoMote/releases/tag/v1.11.0",
-            "assets": {"windows-x86_64": {"name":"PepoMote.exe", "size":3,
+            "release_url": "https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/v1.11.0",
+            "assets": {"windows-x86_64": {"name":"RevolutionMote-Plus-Receptor-Windows-v1.11.0.exe", "size":3,
                 "sha256":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-                "url":"https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.exe"}}
+                "url":"https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus-Receptor-Windows-v1.11.0.exe"}}
         })
     }
     fn parse(v: &serde_json::Value) -> Result<Manifest, String> {
@@ -186,9 +189,9 @@ mod tests {
     #[test]
     fn refuses_untrusted_or_mismatched_downloads() {
         for bad in [
-            "https://evil.example/PepoMote.exe",
-            "https://github.com/pepitolas13/PepoMote/releases/download/v1.10.0/PepoMote.exe",
-            "https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.exe?x=1",
+            "https://evil.example/RevolutionMote-Plus-Receptor-Windows-v1.11.0.exe",
+            "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.10.0/RevolutionMote-Plus-Receptor-Windows-v1.11.0.exe",
+            "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus-Receptor-Windows-v1.11.0.exe?x=1",
         ] {
             let mut v = fixture();
             v["assets"]["windows-x86_64"]["url"] = bad.into();
