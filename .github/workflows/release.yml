@@ -1,7 +1,9 @@
 name: release
 
 # Al subir una etiqueta vX.Y.Z, o al subir a la rama `release` (la etiqueta
-# sale entonces de versionName), se compila el APK y se publica la release. Si el repo tiene los secretos de firma (KEYSTORE_B64, KEYSTORE_PASSWORD,
+# sale entonces de versionName), se compila el APK y se publica la release con
+# todo: emisor de Android (APK) e iOS (IPA sin firmar) y receptor de Windows,
+# macOS y Linux. Si el repo tiene los secretos de firma (KEYSTORE_B64, KEYSTORE_PASSWORD,
 # KEY_ALIAS, KEY_PASSWORD) sale el APK release firmado con tu clave; si no, el
 # de depuración.
 on:
@@ -11,22 +13,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  # El receptor del PC con teclado y ratón (Windows), para adjuntarlo
-  receptor-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Compilar el receptor
-        working-directory: desktop
-        run: cargo build --release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: receptor-windows
-          path: desktop/target/release/RevolutionMote.exe
+  # Los receptores de escritorio (Windows, macOS y Linux) y el emisor de iOS
+  # salen de sus propios flujos, con sus tests: aquí solo se adjuntan
+  desktop:
+    uses: ./.github/workflows/desktop.yml
+    secrets: inherit
+
+  ios:
+    uses: ./.github/workflows/ios.yml
+    secrets: inherit
 
   release:
-    needs: receptor-windows
+    needs: [desktop, ios]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -65,8 +63,27 @@ jobs:
           fi
       - uses: actions/download-artifact@v4
         with:
-          name: receptor-windows
+          name: RevolutionMote-Plus-windows
           path: receptor
+      - uses: actions/download-artifact@v4
+        with:
+          name: RevolutionMote-Plus-macos
+          path: extra
+      - uses: actions/download-artifact@v4
+        with:
+          name: RevolutionMote-Plus-linux
+          path: extra
+      - uses: actions/download-artifact@v4
+        with:
+          name: RevolutionMote-Plus-ios
+          path: extra
+      - name: Nombres de los demás archivos de la release
+        run: |
+          mv extra/RevolutionMote-Plus-macOS.dmg "RevolutionMote-Plus-Receptor-macOS-${TAG}.dmg"
+          mv extra/RevolutionMote-Plus-x86_64.AppImage "RevolutionMote-Plus-Receptor-Linux-${TAG}.AppImage"
+          mv extra/RevolutionMote-Plus-linux-x86_64.tar.gz "RevolutionMote-Plus-Receptor-Linux-${TAG}.tar.gz"
+          mv extra/RevolutionMote-Plus.ipa "RevolutionMote-Plus-iOS-${TAG}.ipa"
+          ls -la
       - name: update.json (aviso de versión nueva en la app)
         run: |
           cp "RevolutionMote-Plus-${TAG}.apk" RevolutionMote-Plus.apk
@@ -108,9 +125,13 @@ jobs:
           [ -f "$NOTES" ] || NOTES=/dev/null
           # Un solo APK por release: RevolutionMote-Plus.apk (el nombre fijo que
           # busca el aviso de actualización de la app)
-          gh release create "$TAG" RevolutionMote-Plus.apk "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe" update.json --target "$GITHUB_SHA" \
+          FILES=(RevolutionMote-Plus.apk "RevolutionMote-Plus-iOS-${TAG}.ipa"
+            "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe" "RevolutionMote-Plus-Receptor-macOS-${TAG}.dmg"
+            "RevolutionMote-Plus-Receptor-Linux-${TAG}.AppImage" "RevolutionMote-Plus-Receptor-Linux-${TAG}.tar.gz"
+            update.json)
+          gh release create "$TAG" "${FILES[@]}" --target "$GITHUB_SHA" \
             --title "RevolutionMote+ ${TAG}" --notes-file "$NOTES" \
-            || gh release upload "$TAG" RevolutionMote-Plus.apk "RevolutionMote-Plus-Receptor-Windows-${TAG}.exe" update.json --clobber
+            || gh release upload "$TAG" "${FILES[@]}" --clobber
           # Restos de cuando se subían dos APK iguales
           gh release delete-asset "$TAG" "RevolutionMote-Plus-${TAG}.apk" -y 2>/dev/null || true
           gh release delete-asset v1.2.0 RevolutionMote-Plus-v1.2.0.apk -y 2>/dev/null || true

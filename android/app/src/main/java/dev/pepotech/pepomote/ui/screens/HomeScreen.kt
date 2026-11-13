@@ -197,7 +197,7 @@ fun HomeScreen(
                         }
                     }
                     // Sin conexión y con la MAC del PC guardada: encenderlo desde aquí
-                    if (onWake != null && status.tone == HomeTone.Off) {
+                    if (onWake != null && status.tone == HomeTone.Off && tab == HomeTab.Home) {
                         Spacer(Modifier.width(8.dp))
                         Text(
                             stringResource(R.string.wol_wake_short),
@@ -391,7 +391,7 @@ private fun DeviceRow(d: HomeDevice, onConnect: () -> Unit, onDisconnect: () -> 
             Text(
                 when {
                     d.connected -> stringResource(R.string.conn_connected)
-                    d.current -> stringResource(R.string.conn_in_use, d.detail)
+                    d.current -> stringResource(R.string.conn_in_use)
                     else -> d.detail
                 },
                 style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim),
