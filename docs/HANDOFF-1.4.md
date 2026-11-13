@@ -17,6 +17,20 @@ vinculado ni servidor en marcha, la app se abre por Conexión
 (`HomeLayout.startsOnConnection`). La pastilla del mando Bluetooth ya dice
 «Mando Bluetooth».
 
+Lo último (commit `778e436`, CI en verde): la pestaña Conexión enseña los
+equipos vinculados (`HomeDevice`, `DeviceRow` en `HomeScreen.kt`; los datos
+salen de `PairStore` en `MainActivity.kt`). Cada equipo ofrece «Conectar
+ahora», «Desconectar», «Usar» (cambia de equipo) y «Olvidar». También está
+ahí «Encender PC» cuando hay una MAC guardada.
+
+Pendiente en esa pestaña:
+
+- «Olvidar» borra la vinculación sin pedir confirmación.
+- «Encender PC» sale dos veces sin conexión: como chip junto a la píldora de
+  estado y como tarjeta. Quitar el chip en la pestaña Conexión.
+- La IP del equipo en uso se corta en pantallas estrechas.
+- Cambiar de equipo y olvidar uno no se han probado en un móvil.
+
 Cosas del mando Bluetooth que conviene saber:
 
 - En Windows aparece como mando genérico (DirectInput), no como mando de Xbox.
@@ -26,7 +40,9 @@ Cosas del mando Bluetooth que conviene saber:
 
 ## Por probar en un móvil (nada está verificado en hardware)
 
-- Inicio nuevo y favoritos.
+- Inicio nuevo, favoritos, barra de navegación y arranque por Conexión.
+- Pestaña Conexión: conectar, desconectar, cambiar de equipo y olvidar.
+- Mando universal por Bluetooth.
 - Pestañas de Teclado y ratón, por la app y por Bluetooth. Las teclas
   multimedia y los operadores del numérico por la app necesitan el receptor
   de Windows nuevo.

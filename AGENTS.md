@@ -71,7 +71,8 @@ Avisos:
 Hecho y compilado en CI, sin probar en un dispositivo:
 
 - Inicio con barra de navegación: pestaña Inicio («Continuar», favoritos
-  fijables, Mandos, Otras herramientas), pestaña Conexión y acceso a Ajustes.
+  fijables, Mandos, Otras herramientas), pestaña Conexión (equipos
+  vinculados, encender el PC, conectar por QR, servidor) y acceso a Ajustes.
 - Teclado y ratón con pestañas: Touchpad, Atajos, Multimedia, Numérico,
   Presentar.
 - Mando universal: perfiles por QR, gestos (volante y agitar), macros, capa
