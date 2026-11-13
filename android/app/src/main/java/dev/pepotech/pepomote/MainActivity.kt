@@ -665,6 +665,10 @@ private fun Root(activity: MainActivity) {
                     btSub = R.string.btpad_bt_sub
                 )
             }
+            // Equipos vinculados (se releen al cambiar u olvidar uno)
+            var pairTick by remember { mutableStateOf(0) }
+            val pairings = remember(pairTick, l) { PairStore.all(context) }
+            val currentToken = remember(pairTick, l) { PairStore.current(context)?.token }
             var homeFavorites by remember { mutableStateOf(AppPrefs.homeFavorites(context)) }
             var homeLast by remember { mutableStateOf(AppPrefs.homeLast(context)) }
             val androidReceiver = (l as? UiLink.Connected)?.platform == ReceiverCapabilities.ANDROID ||
@@ -734,6 +738,35 @@ private fun Root(activity: MainActivity) {
                 initialTab = if (HomeLayout.startsOnConnection(PairStore.load(context) != null, server.active)) {
                     dev.pepotech.pepomote.ui.screens.HomeTab.Connection
                 } else dev.pepotech.pepomote.ui.screens.HomeTab.Home,
+                devices = pairings.map { p ->
+                    val isCurrent = p.token == currentToken
+                    dev.pepotech.pepomote.ui.screens.HomeDevice(
+                        id = p.token, name = p.pcName, detail = p.host,
+                        current = isCurrent, connected = isCurrent && l is UiLink.Connected
+                    )
+                },
+                onDeviceConnect = { token ->
+                    // Cambiar de equipo: se corta el enlace que hubiera y se abre con el elegido
+                    if (token != currentToken) {
+                        LinkForegroundService.stop(context)
+                        PairStore.select(context, token)
+                    }
+                    activity.linkRole = LinkState.ROLE_WIIMOTE
+                    LinkForegroundService.start(context)
+                    pairTick++
+                },
+                onDeviceDisconnect = {
+                    LinkState.clearIntent()
+                    LinkForegroundService.stop(context)
+                },
+                onDeviceForget = { token ->
+                    if (token == currentToken) {
+                        LinkState.clearIntent()
+                        LinkForegroundService.stop(context)
+                    }
+                    PairStore.forget(context, token)
+                    pairTick++
+                },
                 favorites = homeFavorites,
                 last = homeLast,
                 onOpened = { e ->

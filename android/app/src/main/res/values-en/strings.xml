@@ -866,4 +866,13 @@
     <string name="nav_home">Home</string>
     <string name="nav_connection">Connection</string>
     <string name="conn_hint">Link this phone to a PC or another Android by scanning its QR, or use this Android as the server to play here. You only need to do it once</string>
+    <string name="conn_devices">Linked devices</string>
+    <string name="conn_add">Add or host</string>
+    <string name="conn_connected">Connected</string>
+    <string name="conn_in_use">In use · %1$s</string>
+    <string name="conn_connect">Connect now</string>
+    <string name="conn_disconnect">Disconnect</string>
+    <string name="conn_use">Use</string>
+    <string name="conn_forget">Forget</string>
+    <string name="conn_wake_sub">Wakes it over the network (Wake-on-LAN)</string>
 </resources>

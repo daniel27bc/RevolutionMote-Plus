@@ -98,7 +98,12 @@ fun HomeScreen(
     /** Encender el PC por la red (null = sin MAC configurada: no se ofrece). */
     onWake: (() -> Unit)? = null,
     /** Con qué pestaña se abre (Conexión si aún no hay nada vinculado). */
-    initialTab: HomeTab = HomeTab.Home
+    initialTab: HomeTab = HomeTab.Home,
+    /** Equipos ya vinculados, para la pestaña Conexión. */
+    devices: List<HomeDevice> = emptyList(),
+    onDeviceConnect: (String) -> Unit = {},
+    onDeviceDisconnect: () -> Unit = {},
+    onDeviceForget: (String) -> Unit = {}
 ) {
     // Qué hace cada tarjeta de modo (las de siempre; aquí solo se reparten)
     val open: (HomeEntry) -> Unit = { e ->
@@ -276,7 +281,29 @@ fun HomeScreen(
             } else {
                 // Conexión: vincular con un equipo o alojar aquí. Se hace una
                 // vez y se olvida, así que no ocupa el inicio
-                item(key = "h-conn", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(R.string.nav_connection)) }
+                if (devices.isNotEmpty()) {
+                    item(key = "h-devices", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(R.string.conn_devices)) }
+                    items(devices, key = { "dev-${it.id}" }, span = { GridItemSpan(maxLineSpan) }) { d ->
+                        DeviceRow(
+                            d,
+                            onConnect = { onDeviceConnect(d.id) },
+                            onDisconnect = onDeviceDisconnect,
+                            onForget = { onDeviceForget(d.id) }
+                        )
+                    }
+                }
+                if (onWake != null) item(key = "wake", span = { GridItemSpan(maxLineSpan) }) {
+                    ChannelCard(
+                        title = stringResource(R.string.wol_wake_short),
+                        subtitle = stringResource(R.string.conn_wake_sub),
+                        glyph = ChannelGlyph.Gear,
+                        icon = R.drawable.ms_bolt,
+                        accent = PepoColors.Blue,
+                        wide = true,
+                        onClick = onWake
+                    )
+                }
+                item(key = "h-conn", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(R.string.conn_add)) }
                 item(key = "connect") {
                     ChannelCard(
                         title = stringResource(R.string.channel_connect),
@@ -297,6 +324,66 @@ fun HomeScreen(
             }
         }
         HomeNavBar(tab, onTab = { tab = it }, onSettings = onNewPairing)
+    }
+}
+
+/** Un equipo vinculado en la pestaña Conexión. [id]: el token del emparejamiento. */
+data class HomeDevice(
+    val id: String,
+    val name: String,
+    val detail: String,
+    /** Es el equipo en uso (al que se conecta la app). */
+    val current: Boolean,
+    /** Y ahora mismo hay enlace con él. */
+    val connected: Boolean
+)
+
+/** Un equipo vinculado: quién es, si está en uso, y conectar, desconectar u olvidarlo. */
+@Composable
+private fun DeviceRow(d: HomeDevice, onConnect: () -> Unit, onDisconnect: () -> Unit, onForget: () -> Unit) {
+    val shape = MaterialTheme.shapes.medium
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(PepoColors.Card, shape)
+            .border(1.5.dp, if (d.current) PepoColors.Blue else PepoColors.CardBorder, shape)
+            .padding(start = 18.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(10.dp)
+                .background(if (d.connected) PepoColors.Ok else PepoColors.TextDim, CircleShape)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(d.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                when {
+                    d.connected -> stringResource(R.string.conn_connected)
+                    d.current -> stringResource(R.string.conn_in_use, d.detail)
+                    else -> d.detail
+                },
+                style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        androidx.compose.material3.TextButton(onClick = if (d.connected) onDisconnect else onConnect) {
+            Text(
+                stringResource(
+                    when {
+                        d.connected -> R.string.conn_disconnect
+                        d.current -> R.string.conn_connect
+                        else -> R.string.conn_use
+                    }
+                ),
+                color = PepoColors.Blue
+            )
+        }
+        androidx.compose.material3.TextButton(onClick = onForget) {
+            Text(stringResource(R.string.conn_forget), color = PepoColors.Error)
+        }
     }
 }
 

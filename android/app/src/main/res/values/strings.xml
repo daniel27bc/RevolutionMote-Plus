@@ -867,4 +867,13 @@
     <string name="nav_home">Inicio</string>
     <string name="nav_connection">Conexión</string>
     <string name="conn_hint">Vincula este móvil con un PC u otro Android leyendo su QR, o usa este Android como servidor para jugar aquí. Solo hace falta la primera vez</string>
+    <string name="conn_devices">Equipos vinculados</string>
+    <string name="conn_add">Añadir o alojar</string>
+    <string name="conn_connected">Conectado</string>
+    <string name="conn_in_use">En uso · %1$s</string>
+    <string name="conn_connect">Conectar ahora</string>
+    <string name="conn_disconnect">Desconectar</string>
+    <string name="conn_use">Usar</string>
+    <string name="conn_forget">Olvidar</string>
+    <string name="conn_wake_sub">Lo despierta por la red (Wake-on-LAN)</string>
 </resources>

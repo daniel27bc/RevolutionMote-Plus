@@ -288,7 +288,12 @@ class ScreenshotTest {
             status = dev.pepotech.pepomote.ui.screens.HomeStatus(dev.pepotech.pepomote.ui.screens.HomeTone.Off, "Sin conexión"),
             langLabel = "ES", langSwitchHint = "", onToggleLang = {},
             onConnect = {}, onController = {}, onDolphin = {}, onWiiU = {}, onSwitch = {}, onNunchuk = {}, onNewPairing = {},
-            initialTab = dev.pepotech.pepomote.ui.screens.HomeTab.Connection
+            initialTab = dev.pepotech.pepomote.ui.screens.HomeTab.Connection,
+            onWake = {},
+            devices = listOf(
+                dev.pepotech.pepomote.ui.screens.HomeDevice("a", "TorreDaniel", "192.168.1.40", current = true, connected = false),
+                dev.pepotech.pepomote.ui.screens.HomeDevice("b", "Portátil", "192.168.1.52", current = false, connected = false)
+            )
         )
     }
 }
