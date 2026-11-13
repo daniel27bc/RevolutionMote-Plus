@@ -1,24 +1,15 @@
-"""e2e (solo Windows): el permiso de administrador del driver del mando
-virtual se pide con la ventana de PepoMote a la vista y delante.
+"""Comprueba cuándo se ofrece ViGEmBus con un receptor de Windows aislado.
 
-Informe (1.13.2): «de forma generalizada no les pide administrador de
-primeras». El permiso existía, pero se pedía a los pocos ms de arrancar,
-sin ventana, y Windows lo dejaba minimizado y parpadeando en la barra de
-tareas (con `--minimized`, al iniciar sesión, ni eso). Aquí, con receptores
-AISLADOS y `PEPOMOTE_FAKE_DRIVER_MISSING` (el sondeo dice «falta el driver» y
-el instalador contesta «cancelado» sin lanzar nada: nunca sale un permiso de
-verdad), se comprueba:
-
-- ventana: el permiso se pide DESPUÉS del primer fotograma, con la ventana
-  del receptor delante y como dueña (su HWND en el log); sin el foco, no.
-- minimizado: con `--minimized` no se pide mientras no hay ventana; al abrirla
-  (otra copia del exe), sí, con esa ventana.
-- ya_intentado: con el intento apuntado en los ajustes no se pide y el log
-  dice por qué.
+El instalador simulado cancela sin elevar permisos. El modo de touchpad
+no ofrece el driver, el mando Xbox explícito espera a la ventana y el
+resultado se recuerda en ajustes.
 
 Uso: python e2e_driver_prompt.py <PepoMote.exe> [directorio] [--cases a,b]
-Sale con 0 si pasa y con 1 si falla."""
+"""
 import ctypes
+import json
+import socket
+import threading
 import os
 import re
 import subprocess
@@ -39,17 +30,15 @@ user32.SetForegroundWindow.argtypes = [wintypes.HWND]
 user32.BringWindowToTop.argtypes = [wintypes.HWND]
 user32.PeekMessageW.argtypes = [ctypes.c_void_p, wintypes.HWND, wintypes.UINT, wintypes.UINT, wintypes.UINT]
 kernel32.GetCurrentThreadId.restype = wintypes.DWORD
-SW_SHOWNOACTIVATE = 4
 
 ASKED = "se pide el permiso de administrador para el driver"
 PAINTED = "primer fotograma pintado"
-WANTED = "se instalará el embebido"
 SETUP_VERSION = "1.22.0"
 
 
 def env_for(port: int, cfg: Path, **extra: str) -> dict:
     env = receiver_env(port, cfg, PEPOMOTE_SMOKE="60000", PEPOMOTE_FAKE_DRIVER_MISSING="1", **extra)
-    # lo que se prueba es justo la instalación al arrancar
+    # se prueba el aviso al elegir el mando Xbox
     env.pop("PEPOMOTE_NO_DRIVER_SETUP", None)
     return env
 
@@ -106,39 +95,64 @@ def asked_properly(tag: str, cfg: Path, receiver, hwnd, check: Checks) -> None:
           f"[{tag}] el intento queda apuntado (no se vuelve a pedir solo)")
 
 
+
+def mode_connection(cfg: Path, port: int):
+    def connect():
+        try:
+            token = (cfg / "token.txt").read_text(encoding="utf-8").strip()
+            client = socket.create_connection(("127.0.0.1", port), timeout=1)
+        except OSError:
+            return None
+        client.sendall((json.dumps({"m": "hello", "pv": 1, "name": "Prueba ViGEm", "token": token}) + "\n").encode())
+        def heartbeat():
+            while True:
+                try:
+                    client.sendall(b'{"m":"ping","t":1}\n')
+                except OSError:
+                    return
+                time.sleep(1)
+        threading.Thread(target=heartbeat, daemon=True).start()
+        return client
+
+    if not wait_until(lambda: (cfg / "token.txt").exists(), 10):
+        raise RuntimeError("El receptor no generó su token")
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        client = connect()
+        if client is not None:
+            return client
+        time.sleep(0.15)
+    raise RuntimeError("El receptor no abrió su puerto")
+
+
+def select_gamepad(client, prompt: bool) -> None:
+    client.sendall((json.dumps({"m": "mode", "mode": "gamepad", "driver_prompt": prompt}) + "\n").encode())
+
+
 def case_ventana(exe: Path, root: Path, check: Checks) -> None:
     cfg = root / "ventana" / "config"
     seed_settings(cfg)
     port = free_base_port()
-    print(f"[ventana] receptor aislado en el puerto {port}", flush=True)
-    # Sin activarla (como si se hubiera hecho clic en otra cosa mientras
-    # arrancaba): la primera ShowWindow de un proceso usa la de STARTUPINFO
-    si = subprocess.STARTUPINFO()
-    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    si.wShowWindow = SW_SHOWNOACTIVATE
-    receiver = subprocess.Popen([str(exe)], env=env_for(port, cfg), startupinfo=si)
+    receiver = start_receiver(exe, env_for(port, cfg))
     try:
-        text = wait_log(cfg, PAINTED, 30, receiver)
-        check(PAINTED in text, "[ventana] la ventana pintó")
-        check(WANTED in text, "[ventana] el hub dejó la instalación pedida, sin lanzarla")
-        wait_until(lambda: receiver_window(receiver.pid) is not None, 10)
+        wait_log(cfg, PAINTED, 30, receiver)
         hwnd = receiver_window(receiver.pid)
-        check(hwnd is not None, "[ventana] ventana del receptor encontrada")
+        check(hwnd is not None, "[ventana] el receptor ha abierto su ventana")
         if hwnd is None:
             return
-        time.sleep(1.0)
-        if not foreground(hwnd):
-            # Nacida sin el foco (se usaba otra ventana): entonces espera
-            check(ASKED not in read_log(cfg), "[ventana] sin el foco no se pide el permiso")
-            if not bring_to_front(hwnd):
-                check.inconclusive("[ventana] Windows no deja al script poner la ventana delante mientras se usa otra")
-                return
-        else:
-            print("[ventana] la ventana nació con el foco", flush=True)
-        asked_properly("ventana", cfg, receiver, hwnd, check)
+        if not bring_to_front(hwnd):
+            check.inconclusive("[ventana] no se pudo poner el receptor delante")
+            return
+        time.sleep(0.5)
+        check(ASKED not in read_log(cfg), "[ventana] abrir el receptor no pide el driver")
+        with mode_connection(cfg, port) as client:
+            select_gamepad(client, False)
+            time.sleep(0.5)
+            check(ASKED not in read_log(cfg), "[ventana] la conexión del touchpad no pide el driver")
+            select_gamepad(client, True)
+            asked_properly("ventana", cfg, receiver, hwnd, check)
     finally:
         stop(receiver)
-        print("---- receptor.log (ventana) ----", flush=True)
         print(read_log(cfg), flush=True)
 
 
@@ -147,34 +161,21 @@ def case_minimizado(exe: Path, root: Path, check: Checks) -> None:
     seed_settings(cfg)
     port = free_base_port()
     env = env_for(port, cfg)
-    print(f"[minimizado] receptor aislado en el puerto {port}", flush=True)
     receiver = subprocess.Popen([str(exe), "--minimized"], env=env)
     try:
-        text = wait_log(cfg, WANTED, 20, receiver)
-        check(WANTED in text, "[minimizado] el hub dejó la instalación pedida")
-        time.sleep(3.0)
-        text = read_log(cfg)
-        check(ASKED not in text, "[minimizado] sin ventana no se pide el permiso (al iniciar sesión Windows lo bloquea)")
-        check(receiver_window(receiver.pid) is None, "[minimizado] la ventana no existe")
-        code = second_copy(exe, env)
-        check(code == 0, f"[minimizado] otra copia pidió la ventana y salió (código {code})")
-        text = wait_log(cfg, PAINTED, 30, receiver)
-        check(PAINTED in text, "[minimizado] la ventana se creó y pintó")
-        wait_until(lambda: receiver_window(receiver.pid) is not None, 10)
-        hwnd = receiver_window(receiver.pid)
-        check(hwnd is not None, "[minimizado] ventana del receptor encontrada")
-        if hwnd is None:
-            return
-        time.sleep(1.0)
-        if not foreground(hwnd):
-            check(ASKED not in read_log(cfg), "[minimizado] sin el foco no se pide el permiso")
-            if not bring_to_front(hwnd):
-                check.inconclusive("[minimizado] Windows no deja al script poner la ventana delante mientras se usa otra")
+        with mode_connection(cfg, port) as client:
+            select_gamepad(client, True)
+            time.sleep(0.5)
+            check(ASKED not in read_log(cfg), "[minimizado] elegir Xbox espera a la ventana")
+            check(second_copy(exe, env) == 0, "[minimizado] se abrió la ventana")
+            wait_log(cfg, PAINTED, 30, receiver)
+            hwnd = receiver_window(receiver.pid)
+            if hwnd is None or not bring_to_front(hwnd):
+                check.inconclusive("[minimizado] no se pudo poner el receptor delante")
                 return
-        asked_properly("minimizado", cfg, receiver, hwnd, check)
+            asked_properly("minimizado", cfg, receiver, hwnd, check)
     finally:
         stop(receiver)
-        print("---- receptor.log (minimizado) ----", flush=True)
         print(read_log(cfg), flush=True)
 
 
@@ -184,17 +185,17 @@ def case_ya_intentado(exe: Path, root: Path, check: Checks) -> None:
     port = free_base_port()
     receiver = start_receiver(exe, env_for(port, cfg))
     try:
-        text = wait_log(cfg, "no se instala solo", 30, receiver)
-        check("no se instala solo: ya se intentó con este instalador" in text, "[ya_intentado] el log dice por qué no se instala")
         wait_log(cfg, PAINTED, 30, receiver)
         hwnd = receiver_window(receiver.pid)
-        if hwnd is not None:
-            bring_to_front(hwnd)
-        time.sleep(2.0)
-        check(ASKED not in read_log(cfg), "[ya_intentado] no se pide el permiso")
+        if hwnd is None or not bring_to_front(hwnd):
+            check.inconclusive("[ya_intentado] no se pudo poner el receptor delante")
+            return
+        with mode_connection(cfg, port) as client:
+            select_gamepad(client, True)
+            time.sleep(1.0)
+            check(ASKED not in read_log(cfg), "[ya_intentado] no se repite el aviso")
     finally:
         stop(receiver)
-        print("---- receptor.log (ya_intentado) ----", flush=True)
         print(read_log(cfg), flush=True)
 
 

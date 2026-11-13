@@ -130,31 +130,51 @@ pub(crate) fn fake_driver_missing() -> bool {
     std::env::var_os("PEPOMOTE_FAKE_DRIVER_MISSING").is_some()
 }
 
-/// Windows: instalación del driver pedida al arrancar, a la espera de que la
-/// ventana esté a la vista (ver `decide_startup_setup` y `window_ready`).
+/// Windows: el primer uso explícito del mando Xbox puede ofrecer el driver.
 #[cfg(windows)]
-static SETUP_WANTED: AtomicBool = AtomicBool::new(false);
+static GAMEPAD_REQUESTED: AtomicBool = AtomicBool::new(false);
 
-/// ¿Toca lanzar ya la instalación pedida al arrancar? Con la ventana pintada
-/// y con el foco: solo así Windows saca su permiso de administrador delante.
-/// Sin ventana, o desde un programa en segundo plano, lo deja minimizado y
-/// parpadeando en la barra de tareas (y al iniciar sesión lo bloquea).
+/// La ventana ofrece el driver cuando el jugador lo necesita y está delante.
 #[cfg(any(windows, test))]
-pub fn setup_due(wanted: bool, painted: bool, focused: bool) -> bool {
-    wanted && painted && focused
+fn setup_due(requested: bool, gamepad: bool, painted: bool, focused: bool) -> bool {
+    requested && gamepad && painted && focused
 }
 
-/// La ventana, en cada fotograma: lanza la instalación pedida al arrancar en
-/// cuanto se la ve pintada y con el foco. Con `--minimized`, al abrirla.
+pub fn note_requested_mode(mode: Mode, explicit: bool) {
+    #[cfg(windows)]
+    if mode != Mode::Gamepad || explicit {
+        GAMEPAD_REQUESTED.store(mode == Mode::Gamepad, Ordering::SeqCst);
+    }
+    #[cfg(not(windows))]
+    let _ = (mode, explicit);
+}
+
+/// Lanza una sola solicitud cuando se ha elegido el mando Xbox y falta el
+/// driver. Si el usuario vuelve al puntero, la solicitud pendiente caduca.
 pub fn window_ready(painted: bool, focused: bool) {
     #[cfg(windows)]
-    if setup_due(SETUP_WANTED.load(Ordering::SeqCst), painted, focused) && SETUP_WANTED.swap(false, Ordering::SeqCst) {
-        if let Some(h) = hub() {
-            crate::log_line!("Mando virtual: ventana a la vista y con el foco; se instala el driver");
-            // `run_setup` coge el estado compartido: fuera del hilo de la
-            // ventana, que nunca lo espera sin tope
+    if let Some(h) = hub() {
+        let requested = GAMEPAD_REQUESTED.load(Ordering::SeqCst);
+        if !requested || !painted || !focused {
+            return;
+        }
+        let status = status();
+        let state = h.shared.lock_tolerant();
+        if !setup_due(requested, state.mode == Mode::Gamepad, painted, focused) {
+            return;
+        }
+        let skip = std::env::var_os("PEPOMOTE_NO_DRIVER_SETUP").is_some();
+        if state.rumble_setup == RumbleSetup::Installing || matches!(status, Status::Checking) {
+            return;
+        }
+        if !GAMEPAD_REQUESTED.swap(false, Ordering::SeqCst) {
+            return;
+        }
+        if vigem_setup::should_install(status, state.config.vigem_setup_version.as_deref(), skip) {
+            drop(state);
+            crate::log_line!("Mando virtual: elegido el modo Xbox; se instalará el embebido (ViGEmBus {})", vigem_setup::SETUP_VERSION);
             let shared = h.shared.clone();
-            let _ = crate::threads::spawn_once("vigem-setup-start", move || run_setup(shared));
+            let _ = crate::threads::spawn_once("vigem-setup-gamepad", move || run_setup(shared, true));
         }
     }
     #[cfg(not(windows))]
@@ -537,9 +557,6 @@ struct Pads {
     /// cadencia; se apaga al no faltar nada o al fallar una creación.
     creating: bool,
     last_create_done: Option<Instant>,
-    /// Windows: con el primer resultado del sondeo se decide, una vez, si
-    /// instalar el driver embebido.
-    startup_decided: bool,
 }
 
 /// Lo que pide el hilo de control con [`sync`]; el hub lo recoge en su tic.
@@ -596,7 +613,6 @@ pub fn start(shared: SharedState) {
             job: None,
             creating: false,
             last_create_done: None,
-            startup_decided: false,
         }),
         wants: Mutex::new(Wants::default()),
         view: Mutex::new(View { status: Status::Checking, in_flight: None, pads: [None, None, None, None] }),
@@ -797,60 +813,37 @@ impl Hub {
     /// resultado. Sin esperar: si no ha contestado, vuelve.
     fn poll_job(&self) {
         let mut reconfigure = false;
-        let mut startup: Option<Status> = None;
         let mut retired: Vec<platform::Pad> = Vec::new();
         {
             let mut p = self.pads.lock_tolerant();
-            let mut first_warning = false;
             let done = match p.job.as_mut() {
                 None => return,
-                Some(Job::Probe(pending)) => {
-                    let was = pending.warned;
-                    let r = pending.poll();
-                    first_warning = pending.warned && !was;
-                    r.map(Done::Probe)
-                }
+                Some(Job::Probe(pending)) => pending.poll().map(Done::Probe),
                 Some(Job::Create { slot, pending }) => {
                     let slot = *slot;
                     pending.poll().map(|r| Done::Create(slot, r))
                 }
             };
-            let Some(done) = done else {
-                if first_warning && !p.startup_decided {
-                    crate::log_line!(
-                        "Mando virtual: el sondeo del driver no contesta; no se instala solo (queda el botón de la ventana)"
-                    );
-                }
-                return;
-            };
+            let Some(done) = done else { return };
             p.job = None;
             match done {
                 Done::Probe(result) => {
-                    let st = match result {
+                    match result {
                         Ok(Ok(b)) => {
                             p.backend = Some(Arc::new(b));
                             p.backend_err = None;
-                            Status::Ready
                         }
-                        Ok(Err(st)) => {
-                            p.backend_err = Some(st);
-                            st
-                        }
+                        Ok(Err(st)) => p.backend_err = Some(st),
                         Err(()) => {
                             crate::log_line!("Mando virtual: el hilo del sondeo del driver murió sin contestar");
                             p.backend_err = Some(Status::Failed);
-                            Status::Failed
                         }
-                    };
+                    }
                     // `None` aquí = el instalador pidió volver a sondear
                     // mientras este iba en vuelo: se respeta y el tic
                     // siguiente sondea otra vez
                     if p.probed_at.is_some() {
                         p.probed_at = Some(Instant::now());
-                    }
-                    if !p.startup_decided {
-                        p.startup_decided = true;
-                        startup = Some(st);
                     }
                 }
                 Done::Create(slot, result) => {
@@ -899,9 +892,6 @@ impl Hub {
             self.publish();
             crate::dolphin::maybe_auto_configure(&self.shared);
             crate::cemu::maybe_auto_configure(&self.shared);
-        }
-        if let Some(st) = startup {
-            self.decide_startup_setup(st);
         }
     }
 
@@ -980,42 +970,6 @@ impl Hub {
         *self.view.lock_tolerant() = view;
     }
 
-    /// Windows: con el primer resultado del sondeo, si falta el driver se
-    /// instala el embebido (una vez por versión del instalador; instalado,
-    /// cancelado o fallido, no se vuelve a preguntar solo). `PEPOMOTE_NO_DRIVER_SETUP`
-    /// lo apaga (receptores de prueba). Si el sondeo no contesta no se
-    /// decide nada: queda el botón de la ventana. No se lanza aquí, decenas
-    /// de ms tras arrancar y sin ventana (Windows dejaba su permiso
-    /// minimizado en la barra de tareas): queda pedido y lo lanza la ventana
-    /// cuando está a la vista (`window_ready`).
-    fn decide_startup_setup(&self, st: Status) {
-        #[cfg(windows)]
-        {
-            let tried = self.shared.lock_tolerant().config.vigem_setup_version.clone();
-            let skip = std::env::var_os("PEPOMOTE_NO_DRIVER_SETUP").is_some();
-            if vigem_setup::should_install(st, tried.as_deref(), skip) {
-                crate::log_line!(
-                    "Mando virtual: falta el driver; se instalará el embebido (ViGEmBus {}) con la ventana a la vista",
-                    vigem_setup::SETUP_VERSION
-                );
-                SETUP_WANTED.store(true, Ordering::SeqCst);
-            } else if st == Status::NeedsDriver {
-                crate::log_line!(
-                    "Mando virtual: falta el driver y no se instala solo: {}",
-                    if skip {
-                        "PEPOMOTE_NO_DRIVER_SETUP".to_owned()
-                    } else {
-                        format!(
-                            "ya se intentó con este instalador (ViGEmBus {}); queda el botón de la ventana",
-                            vigem_setup::SETUP_VERSION
-                        )
-                    }
-                );
-            }
-        }
-        #[cfg(not(windows))]
-        let _ = st;
-    }
 }
 
 /// ¿Existe ya el mando virtual del jugador del slot? Sin él no se escribe
@@ -1288,13 +1242,12 @@ pub fn remembers_attempt(state: RumbleSetup) -> bool {
 /// compila en todos los sistemas.
 pub const INSTALL_ALREADY_RUNNING: u32 = 1618;
 
-/// Botón «Instalar el mando virtual» de la ventana (la instalación pedida al
-/// arrancar, si quedaba alguna, es esta misma).
+/// Botón «Instalar el mando virtual» de la ventana.
 pub fn install_driver_now() {
     #[cfg(windows)]
     if let Some(h) = hub() {
-        SETUP_WANTED.store(false, Ordering::SeqCst);
-        run_setup(h.shared.clone());
+        GAMEPAD_REQUESTED.store(false, Ordering::SeqCst);
+        run_setup(h.shared.clone(), false);
     }
 }
 
@@ -1314,10 +1267,10 @@ pub fn install_driver_from_args() -> bool {
 /// ventana lo cuenta) y, al terminar bien, el hub vuelve a sondear el driver
 /// en su siguiente tic, sin reiniciar nada.
 #[cfg(windows)]
-fn run_setup(shared: SharedState) {
+fn run_setup(shared: SharedState, require_gamepad: bool) {
     {
         let mut s = shared.lock_tolerant();
-        if s.rumble_setup == RumbleSetup::Installing {
+        if s.rumble_setup == RumbleSetup::Installing || (require_gamepad && s.mode != Mode::Gamepad) {
             return;
         }
         s.rumble_setup = RumbleSetup::Installing;
@@ -1800,9 +1753,10 @@ mod tests {
     /// ventana, y Windows lo dejaba minimizado en la barra de tareas.
     #[test]
     fn el_permiso_del_driver_espera_a_la_ventana_delante() {
-        assert!(setup_due(true, true, true));
-        assert!(!setup_due(true, false, true), "sin pintar aún");
-        assert!(!setup_due(true, true, false), "sin el foco: Windows lo dejaría en segundo plano");
-        assert!(!setup_due(false, true, true), "nada pedido");
+        assert!(setup_due(true, true, true, true));
+        assert!(!setup_due(true, true, false, true), "sin pintar aún");
+        assert!(!setup_due(true, true, true, false), "sin el foco");
+        assert!(!setup_due(false, true, true, true), "el mando Xbox no se eligió");
+        assert!(!setup_due(true, false, true, true), "el usuario volvió al puntero");
     }
 }

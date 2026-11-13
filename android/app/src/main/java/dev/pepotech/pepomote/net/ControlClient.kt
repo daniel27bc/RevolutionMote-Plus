@@ -253,10 +253,11 @@ class ControlClient(
         }
     }, "pepomote-control-ping").apply { isDaemon = true; start() }
 
-    fun sendMode(mode: String, cemuScreenOnly: Boolean? = null) {
+    fun sendMode(mode: String, cemuScreenOnly: Boolean? = null, driverPrompt: Boolean = false) {
         // The receiver may configure Cemu immediately upon mode change, before its echo arrives.
         if (mode == "cemu" && cemuScreenOnly != null) sendScreenOnly(cemuScreenOnly)
-        sendJson(JSONObject().put("m", "mode").put("mode", mode))
+        sendJson(JSONObject().put("m", "mode").put("mode", mode)
+            .apply { if (driverPrompt && mode == "gamepad") put("driver_prompt", true) })
     }
 
     /** Restore preferences only after the receiver confirmed their console mode. */

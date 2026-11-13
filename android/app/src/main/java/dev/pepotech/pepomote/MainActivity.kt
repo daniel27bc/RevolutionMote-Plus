@@ -264,7 +264,7 @@ class MainActivity : ComponentActivity() {
         pairVersion++
         pairReason = null
         LinkForegroundService.start(this, linkRole, usb = usb)
-        if (linkRole == LinkState.ROLE_WIIMOTE) LinkState.pendingMode?.let { LinkState.requestMode(it) }
+        if (linkRole == LinkState.ROLE_WIIMOTE) LinkState.pendingMode?.let { LinkState.requestMode(it, driverPrompt = LinkState.pendingDriverPrompt) }
         currentScreen = if (linkRole == LinkState.ROLE_NUNCHUK) Screen.Nunchuk else Screen.Controller
     }
 
@@ -469,7 +469,7 @@ class MainActivity : ComponentActivity() {
         // arranque del servicio compitiendo con el diálogo del sistema y el
         // primer emparejamiento fallaba en algunos OEMs.
         LinkForegroundService.start(this, linkRole, usb = pairUsb)
-        if (linkRole == LinkState.ROLE_WIIMOTE) LinkState.pendingMode?.let { LinkState.requestMode(it) }
+        if (linkRole == LinkState.ROLE_WIIMOTE) LinkState.pendingMode?.let { LinkState.requestMode(it, driverPrompt = LinkState.pendingDriverPrompt) }
         currentScreen = if (linkRole == LinkState.ROLE_NUNCHUK) Screen.Nunchuk else Screen.Controller
     }
 

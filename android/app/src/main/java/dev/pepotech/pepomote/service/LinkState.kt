@@ -162,6 +162,12 @@ object LinkState {
     @Volatile
     var sendMode: ((String) -> Unit)? = null
 
+    @Volatile
+    internal var sendModeWithDriverPrompt: (() -> Unit)? = null
+
+    @Volatile
+    internal var pendingDriverPrompt = false
+
     /** Modo a aplicar en cuanto se complete la próxima conexión. */
     @Volatile
     var pendingMode: String? = null
@@ -263,7 +269,7 @@ object LinkState {
      * deshace); cualquier otro modo la quita. Si el enlace aún no está, el
      * modo se aplica en cuanto llegue el `ok`.
      */
-    fun requestMode(mode: String) {
+    fun requestMode(mode: String, driverPrompt: Boolean = mode == MODE_GAMEPAD) {
         val connected = _flow.value as? UiLink.Connected
         val selected = connected?.let { Route.selectMode(mode, it) } ?: mode
         ButtonState.reset()
@@ -275,12 +281,19 @@ object LinkState {
             else -> PadIntent.None
         }
         val send = sendMode
-        if (send != null && _flow.value is UiLink.Connected) send(selected) else pendingMode = selected
+        if (send != null && _flow.value is UiLink.Connected) {
+            val ask = sendModeWithDriverPrompt
+            if (selected == MODE_GAMEPAD && driverPrompt && ask != null) ask() else send(selected)
+        } else {
+            pendingDriverPrompt = selected == MODE_GAMEPAD && driverPrompt
+            pendingMode = selected
+        }
     }
 
     /** Salir / desconectar: no queda nada pendiente. */
     fun clearIntent() {
         _intent.value = PadIntent.None
+        pendingDriverPrompt = false
     }
 
     /** Eco o difusión de `mode`: consume la intención Wii U y avisa si no era cemu (salvo si lo decidió el PC). */

@@ -174,6 +174,7 @@ pub fn set_mode_from_pc(shared: &SharedState, mode: Mode, notice: &str) {
             return;
         }
         s.mode = mode;
+        crate::rumble::note_requested_mode(mode, false);
     }
     crate::log_line!("Modo automático: {notice}");
     broadcast(&json!({"m":"mode","mode":mode.as_str(),"by":"pc"}), None);
@@ -412,6 +413,7 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
                         let mut s = shared.lock_tolerant();
                         let changed = s.mode != new_mode;
                         s.mode = new_mode;
+                        crate::rumble::note_requested_mode(new_mode, msg["driver_prompt"].as_bool() == Some(true));
                         changed
                     };
                     if debug() {

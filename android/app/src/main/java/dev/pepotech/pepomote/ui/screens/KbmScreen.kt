@@ -149,7 +149,7 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit, initialPanel: KbmPanel = K
             Kbm.backend = Kbm.Backend.APP
             val c = LinkState.flow.value as? UiLink.Connected
             if (c != null && c.mode == LinkState.MODE_POINTER) {
-                LinkState.requestMode(if (c.supportsGamepad) LinkState.MODE_GAMEPAD else LinkState.MODE_DOLPHIN)
+                LinkState.requestMode(if (c.supportsGamepad) LinkState.MODE_GAMEPAD else LinkState.MODE_DOLPHIN, driverPrompt = false)
             }
         } else if (transport == KbmTransport.APP) {
             Kbm.backend = Kbm.Backend.NONE

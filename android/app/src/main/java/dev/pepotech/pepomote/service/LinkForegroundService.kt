@@ -348,6 +348,12 @@ class LinkForegroundService : Service() {
                         control?.sendMode(selected, cemuScreenOnly = AppPrefs.gamePadFullScreen(this@LinkForegroundService))
                     }
                     // Guardar la elección de Wii U; Switch siempre usa Pro Controller.
+                    LinkState.sendModeWithDriverPrompt = {
+                        if (gen == generation) {
+                            lastMode = LinkState.MODE_GAMEPAD
+                            control?.sendMode(LinkState.MODE_GAMEPAD, driverPrompt = true)
+                        }
+                    }
                     LinkState.sendPad = { p ->
                         ButtonState.reset()
                         (LinkState.flow.value as? UiLink.Connected)?.mode?.let {
@@ -400,11 +406,14 @@ class LinkForegroundService : Service() {
                     )
                     val requestedMode = LinkState.pendingMode
                     requestedMode?.let { m ->
+                        val driverPrompt = LinkState.pendingDriverPrompt
+                        LinkState.pendingDriverPrompt = false
                         LinkState.pendingMode = null
                         val selected = Route.selectMode(m, LinkState.flow.value as UiLink.Connected)
                         if (selected != m) LinkState.clearIntent()
                         lastMode = selected
-                        control?.sendMode(selected, cemuScreenOnly = AppPrefs.gamePadFullScreen(this@LinkForegroundService))
+                        control?.sendMode(selected, cemuScreenOnly = AppPrefs.gamePadFullScreen(this@LinkForegroundService),
+                            driverPrompt = driverPrompt)
                     }
                     // Reponer solo la elección del modo confirmado, después de su eco si estaba pendiente.
                     if (!nunchuk && requestedMode == null && (ok.mode == LinkState.MODE_CEMU && ok.supportsCemu || ok.mode == LinkState.MODE_SWITCH && ok.supportsSwitch || ok.mode == LinkState.MODE_RETROARCH && ok.supportsRetroArch)) {
@@ -559,7 +568,7 @@ class LinkForegroundService : Service() {
         reconnectAttempt++
         LinkState.publish(UiLink.Reconnecting(pairing.pcName, reconnectAttempt))
         // Lo que el usuario había pedido se vuelve a pedir en cuanto llegue el ok
-        lastMode?.takeIf { it != LinkState.MODE_POINTER }?.let { LinkState.requestMode(it) }
+        lastMode?.takeIf { it != LinkState.MODE_POINTER }?.let { LinkState.requestMode(it, driverPrompt = false) }
         updateNotification(getString(R.string.status_reconnecting, pairing.pcName))
         scheduleReconnect(pairing)
     }
@@ -718,6 +727,7 @@ class LinkForegroundService : Service() {
         LinkState.sendLayout = null
         lastSentLayout = null
         LinkState.sendMode = null
+        LinkState.sendModeWithDriverPrompt = null
         LinkState.sendPad = null
         LinkState.sendText = null
         LinkState.requestClipboard = null

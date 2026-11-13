@@ -349,9 +349,7 @@ impl eframe::App for PepoMoteApp {
 
         self.refresh_ip();
 
-        // Windows: el driver del mando virtual que faltaba al arrancar se
-        // instala ahora, con la ventana pintada y delante (su permiso de
-        // administrador sale entonces en primer plano)
+        // El modo Xbox puede ofrecer el driver, con la ventana ya delante.
         let focused = ctx.input(|i| i.viewport().focused.unwrap_or(false));
         crate::rumble::window_ready(self.frames >= 2, focused);
 
@@ -433,9 +431,7 @@ impl eframe::App for PepoMoteApp {
                             );
                             ui.add_space(18.0);
 
-                            // El permiso del driver en cualquier modo: en el
-                            // de puntero (el de arranque) no hay tarjeta que
-                            // lo cuente, y es lo que Windows está esperando
+                            // Una instalación explícita ya en curso puede seguir al cambiar de modo.
                             if snap.rumble_setup == crate::rumble::RumbleSetup::Installing {
                                 ui.label(RichText::new(tr!("rumble.installing")).size(12.0).color(theme::warn()));
                                 ui.add_space(10.0);
@@ -825,12 +821,9 @@ impl PepoMoteApp {
         for l in pads {
             ui.label(RichText::new(l).size(11.0).color(theme::text_dim()));
         }
-        self.ui_driver_setup(ui, snap);
     }
 
-    /// Windows: el driver del mando virtual viene dentro del exe y se
-    /// instala solo al arrancar. Si falta, aquí se cuenta en qué punto está
-    /// (instalando, cancelado, fallido) y queda el botón para instalarlo.
+    /// Instalación manual o reintento del controlador del mando virtual.
     fn ui_driver_setup(&self, ui: &mut egui::Ui, snap: &Snapshot) {
         use crate::rumble::{RumbleSetup, Status};
         // También con el driver colgado: el instalador repara la instalación
