@@ -164,6 +164,26 @@ import dev.pepotech.pepomote.R
  */
 @Composable
 fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
+    GamePadContent(link, onDisconnect)
+}
+
+internal class DirectDsuPadUi(
+    val title: String,
+    val motion: dev.pepotech.pepomote.sensor.MotionEngine,
+    val controls: @Composable () -> Unit
+)
+
+private val LocalDirectDsuPad = androidx.compose.runtime.compositionLocalOf<DirectDsuPadUi?> { null }
+
+@Composable
+internal fun DirectDsuPad(ui: DirectDsuPadUi, onExit: () -> Unit) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalDirectDsuPad provides ui) {
+        GamePadContent(UiLink.Disconnected, onExit)
+    }
+}
+
+@Composable
+private fun GamePadContent(link: UiLink, onDisconnect: () -> Unit) {
     val view = LocalView.current
     val context = LocalContext.current
     // Diseño personalizado: perfil activo (o el original), y el borrador
@@ -193,21 +213,27 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     val connected = link as? UiLink.Connected
     val intent by LinkState.intent.collectAsState()
     // Modo ratón (mando universal): el receptor en modo puntero, esta pantalla sigue
-    val padMouse by LinkState.padMouse.collectAsState()
+    val direct = LocalDirectDsuPad.current
+    val requestedMouse by LinkState.padMouse.collectAsState()
+    val padMouse = direct == null && requestedMouse
     // Con el receptor de RevolutionMote+ el modo ratón no cambia el modo del PC
     val mouseMode = padMouse && (connected?.supportsKbm == true || connected?.mode == LinkState.MODE_POINTER)
     // Modo ratón por el modo puntero del PC (receptor de PepoTech)
     val pointerMouse = mouseMode && connected?.mode == LinkState.MODE_POINTER
     // Por Bluetooth (sin receptor): siempre el mando universal, y siempre listo
     val btPad = LocalBtPad.current != null
-    val wantedMode = if (padMouse || btPad) LinkState.MODE_GAMEPAD else Route.displayMode(link, intent)
+    val wantedMode = when {
+        direct != null -> LinkState.MODE_SWITCH
+        padMouse || btPad -> LinkState.MODE_GAMEPAD
+        else -> Route.displayMode(link, intent)
+    }
     val switchPad = wantedMode == LinkState.MODE_SWITCH
     // RetroArch: el mismo mando apaisado con etiquetas de RetroPad (L2/R2,
     // Select/Start, Menú y avance rápido); paquetes como los de Switch
     val retroPad = wantedMode == LinkState.MODE_RETROARCH
     // Mando universal: el mismo mando, con las letras de Xbox en su sitio
     val xboxPad = wantedMode == LinkState.MODE_GAMEPAD
-    val operative = (Route.isGamePad(link) && connected?.mode == wantedMode) || mouseMode || btPad
+    val operative = (Route.isGamePad(link) && connected?.mode == wantedMode) || mouseMode || btPad || direct != null
     val pro = switchPad || retroPad || xboxPad || connected?.pad == LinkState.PAD_PRO
     // RetroArch: la plantilla de la consola del juego cargado (o la elegida a
     // mano); fuera de RetroArch, el RetroPad de siempre (nada cambia)
@@ -217,7 +243,7 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
         retroPad -> RetroLayouts.byId(LinkState.effectiveRetroLayout(connected, retroChoice)) ?: RetroLayouts.RETROPAD
         else -> RetroLayouts.RETROPAD
     }
-    val engine = LinkState.motion
+    val engine = if (direct != null) direct.motion else LinkState.motion
     val rotation = rememberDisplayRotation()
     val screen by ScreenLink.client.collectAsState()
     // Primera vez: el lado del apaisado lo ha elegido el sensor; se pregunta
@@ -1265,7 +1291,7 @@ internal fun GamePadCollapsibleHeader(
     CollapsibleHeader(
         link = link,
         // Por Bluetooth no hay enlace con el receptor: la pastilla dice lo que es
-        label = LocalBtPad.current?.title ?: GamePadHeaderText.handle(
+        label = LocalDirectDsuPad.current?.title ?: LocalBtPad.current?.title ?: GamePadHeaderText.handle(
             connected = link is UiLink.Connected,
             connecting = link is UiLink.Connecting,
             // el modo que se quiere: Wii U ya se lee aunque falte el eco
@@ -1307,13 +1333,13 @@ private fun GamePadHeaderCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        val btUi = LocalBtPad.current
+        val localTitle = LocalDirectDsuPad.current?.title ?: LocalBtPad.current?.title
         if (link is UiLink.Reconnecting) {
             ReconnectingLabel(link, MaterialTheme.typography.bodyMedium)
         } else {
             Text(
                 when {
-                    btUi != null -> btUi.title
+                    localTitle != null -> localTitle
                     else -> when (link) {
                     is UiLink.Connected -> link.pcName
                     is UiLink.Connecting -> stringResource(R.string.status_connecting)
@@ -1333,6 +1359,7 @@ private fun GamePadHeaderCard(
     }
     // Por Bluetooth: el estado y a qué equipo conectarse
     LocalBtPad.current?.controls?.invoke()
+    LocalDirectDsuPad.current?.controls?.invoke()
     if (link is UiLink.Connected) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

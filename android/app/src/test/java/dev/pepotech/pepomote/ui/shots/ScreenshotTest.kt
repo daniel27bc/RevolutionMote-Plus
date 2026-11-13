@@ -162,6 +162,14 @@ class ScreenshotTest {
         dev.pepotech.pepomote.ui.screens.ClipboardDialog(ready = true, connected = true, onDismiss = {})
     }
 
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun dsuDirecto() = shot("25_dsu_directo") {
+        dev.pepotech.pepomote.ui.screens.DirectDsuSetup(
+            addresses = listOf("192.168.1.24"), switchMotion = false, failed = false,
+            onProfile = {}, onStart = {}, onExit = {}
+        )
+    }
+
     // Igual que la captura 01 (misma pantalla y tamaño): solo cambia la cabecera
     @Test fun mandoBluetooth() {
         AppPrefs.setGyroWarnShown(compose.activity)

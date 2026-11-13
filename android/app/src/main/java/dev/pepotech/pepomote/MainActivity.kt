@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.pepotech.pepomote.ui.components.OrientationLockButton
 import dev.pepotech.pepomote.ui.screens.KbmScreen
+import dev.pepotech.pepomote.ui.screens.DirectDsuScreen
 import dev.pepotech.pepomote.ui.screens.PointerQuickControls
 import dev.pepotech.pepomote.control.PointerTrackpad
 import androidx.compose.foundation.layout.Row
@@ -117,13 +118,14 @@ import dev.pepotech.pepomote.ui.components.UpdateHost
  * layouts Wii o Nunchuk) la decide [Route] a partir del enlace y de la
  * intención pendiente del usuario.
  */
-internal enum class Screen { Onboarding, Home, Pair, Controller, Nunchuk, Settings, Server, Kbm, Diag }
+internal enum class Screen { Onboarding, Home, Pair, Controller, Nunchuk, Settings, Server, Kbm, Diag, DirectDsu }
 
 class MainActivity : ComponentActivity() {
 
     internal var foreground by mutableStateOf(false)
 
     internal var currentScreen by mutableStateOf(Screen.Home)
+    internal var directDsuPlaying by mutableStateOf(false)
 
     /** true = se entró al mando por la tarjeta Dolphin (pantalla solo-Dolphin). */
     internal var controllerDolphinOnly by mutableStateOf(false)
@@ -394,6 +396,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    internal fun openDirectDsu() {
+        LinkState.clearIntent()
+        LinkForegroundService.stop(this)
+        directDsuPlaying = false
+        currentScreen = Screen.DirectDsu
+    }
+
     override fun onResume() {
         super.onResume()
         foreground = true
@@ -491,7 +500,7 @@ class MainActivity : ComponentActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         // Mando físico (USB / Bluetooth / telescópico) con un mando abierto:
         // sus botones van al PC como los del táctil
-        if (currentScreen == Screen.Controller && PhysicalPad.onKey(this, event)) return true
+        if ((currentScreen == Screen.Controller || currentScreen == Screen.DirectDsu && directDsuPlaying) && PhysicalPad.onKey(this, event)) return true
         // Teclado y ratón > Presentar: los botones de volumen pasan diapositivas
         if (currentScreen == Screen.Kbm && Kbm.slideKeys) {
             val slide = when (event.keyCode) {
@@ -534,7 +543,7 @@ class MainActivity : ComponentActivity() {
 
     /** Sticks, cruceta de ejes y gatillos analógicos del mando físico. */
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (currentScreen == Screen.Controller && PhysicalPad.onMotion(this, event)) return true
+        if ((currentScreen == Screen.Controller || currentScreen == Screen.DirectDsu && directDsuPlaying) && PhysicalPad.onMotion(this, event)) return true
         return super.dispatchGenericMotionEvent(event)
     }
 }
@@ -599,11 +608,12 @@ private fun Root(activity: MainActivity) {
     val gamePadProvisional by GamePadSide.provisional.collectAsState()
     val padMouse by LinkState.padMouse.collectAsState()
     val btPad by dev.pepotech.pepomote.control.BtPad.active.collectAsState()
-    val wantLandscape = activity.currentScreen == Screen.Controller &&
+    val directDsuPlaying = activity.currentScreen == Screen.DirectDsu && activity.directDsuPlaying
+    val wantLandscape = directDsuPlaying || activity.currentScreen == Screen.Controller &&
         (btPad || Route.forcesLandscape(link, padIntent) || (padMouse && LinkState.mouseOverride(link)))
     val landscapeSide = when {
         !wantLandscape -> LandscapeSide.Sensor
-        Route.wiiLandscapeNunchuk(link) -> LandscapeSide.effective(nunchukSaved, nunchukProvisional)
+        !directDsuPlaying && Route.wiiLandscapeNunchuk(link) -> LandscapeSide.effective(nunchukSaved, nunchukProvisional)
         else -> LandscapeSide.effective(gamePadSaved, gamePadProvisional)
     }
     val freeOrientation = activity.currentScreen == Screen.Controller && !wantLandscape
@@ -615,7 +625,7 @@ private fun Root(activity: MainActivity) {
     // haya un mando abierto (en los apaisados fijos, solo entre los dos
     // apaisados: un mando apaisado no se pone en vertical)
     val orientationLock by OrientationLock.state.collectAsState()
-    val inController = activity.currentScreen == Screen.Controller
+    val inController = activity.currentScreen == Screen.Controller || directDsuPlaying
     LaunchedEffect(wantLandscape, landscapeSide, acceptedOrientation, orientationLock, inController) {
         val locked = orientationLock.takeIf {
             inController && it != AppPrefs.ORIENTATION_FREE &&
@@ -717,6 +727,7 @@ private fun Root(activity: MainActivity) {
                 onNunchuk = { activity.openNunchuk() },
                 onNewPairing = { activity.currentScreen = Screen.Settings },
                 onServer = { activity.openServer() },
+                onDirectDsu = { activity.openDirectDsu() },
                 androidReceiver = androidReceiver,
                 serverRunning = server.active,
                 update = update,
@@ -837,6 +848,11 @@ private fun Root(activity: MainActivity) {
             )
         }
 
+        Screen.DirectDsu -> DirectDsuScreen(
+            foreground = activity.foreground,
+            onPlaying = { activity.directDsuPlaying = it },
+            onExit = { activity.currentScreen = Screen.Home }
+        )
         Screen.Controller -> ControllerRoute(activity, link)
         Screen.Server -> ServerScreen(onBack = { activity.currentScreen = Screen.Home })
     }

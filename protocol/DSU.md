@@ -147,3 +147,15 @@ La diana del móvil incrementa `recenter_count` (PMP); el servidor DSU traduce c
 ## Modo
 
 El receptor alimenta el DSU en `dolphin` (Wii), `cemu` (Wii U) y `switch` (Switch); en modo puntero el pad se reporta desconectado al caducar el TTL de 1 s. Así los emuladores abiertos no reciben movimiento mientras usas el cursor.
+
+## DSU directo desde Android
+
+En **Conexión → DSU directo**, elige el perfil de movimiento y una dirección
+local del móvil. Añade esa dirección y el puerto UDP 26760 al emulador y
+selecciona el primer mando. El perfil Dolphin/Cemu envía el giro en grados por
+segundo. El perfil Switch usa el escalado del receptor de Eden. Los botones se
+mapean en el emulador y el formato es el del mando estándar DSU.
+
+El móvil emite mientras está abierta la pantalla del mando. Solo acepta
+clientes de la subred de la dirección seleccionada. Con USB compartido, usa
+la dirección que corresponde a esa interfaz si aparece en la lista.

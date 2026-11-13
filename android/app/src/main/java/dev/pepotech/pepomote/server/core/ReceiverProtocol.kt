@@ -104,7 +104,9 @@ internal object DsuCodec {
         ByteBuffer.allocate(16).order(ByteOrder.LITTLE_ENDIAN).putInt(PORT_INFO).put(info(slot, connected, battery)).put(0).array())
 
     /** Wire layout and signs deliberately match desktop/src/dsu/{mapping,server}.rs. */
-    fun padData(slot: Int, input: ReceiverInput, mode: ReceiverMode, connected: Boolean, recenter: Boolean, counter: Int): ByteArray {
+    fun padData(slot: Int, input: ReceiverInput, mode: ReceiverMode, connected: Boolean, recenter: Boolean, counter: Int,
+        switchMotion: Boolean = mode == ReceiverMode.Eden,
+    ): ByteArray {
         val sw = mode == ReceiverMode.Eden
         val bits = if (connected) input.buttons else 0
         fun on(bit: Int) = if (bits and (1 shl bit) != 0) 255 else 0
@@ -124,7 +126,7 @@ internal object DsuCodec {
         p.put(ByteArray(12)) // Neither Android receiver mode exposes a touch surface.
         p.putLong(input.tSensorUs)
         val radiansToDegrees = 180f / Math.PI.toFloat()
-        val profileScale = if (sw) 312f / 360f else 1f
+        val profileScale = if (switchMotion) 312f / 360f else 1f
         p.putFloat(if (connected) -input.accelX / 9.80665f else 0f)
         p.putFloat(if (connected) -input.accelZ / 9.80665f else 0f)
         p.putFloat(if (connected) input.accelY / 9.80665f else 0f)
