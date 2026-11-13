@@ -11,7 +11,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 E2E=/tmp/pepomote-e2e
-RX="${PEPOMOTE_BIN:-$ROOT/desktop/target/release/PepoMote}"
+RX="${PEPOMOTE_BIN:-$ROOT/desktop/target/release/RevolutionMote}"
 PORT=26771
 
 [ -x "$RX" ] || { echo "no encuentro el receptor en $RX (cargo build --release en desktop/, o PEPOMOTE_BIN=…)"; exit 1; }
