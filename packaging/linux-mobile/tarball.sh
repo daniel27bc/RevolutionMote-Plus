@@ -25,7 +25,7 @@ mkdir -p "$STAGE" "$OUT"
 install -m 0755 "$BIN" "$STAGE/PepoMote-Mobile"
 install -m 0755 "$BIN" "$OUT/PepoMote-Mobile-$VARIANT"
 install -m 0644 "$PKG/dev.pepotech.PepoMote.desktop" "$STAGE/dev.pepotech.PepoMote.desktop"
-install -m 0644 "$ROOT/packaging/linux/pepomote.png" "$STAGE/dev.pepotech.PepoMote.png"
+install -m 0644 "$ROOT/packaging/linux/revolutionmote.png" "$STAGE/dev.pepotech.PepoMote.png"
 install -m 0644 "$PKG/90-pepomote-iio.rules" "$STAGE/90-pepomote-iio.rules"
 install -m 0755 "$PKG/install.sh" "$STAGE/install.sh"
 

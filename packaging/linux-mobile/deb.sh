@@ -22,7 +22,7 @@ mkdir -p "$STAGE/DEBIAN" "$STAGE/usr/bin" "$STAGE/usr/share/applications" \
 
 install -m 0755 "$BIN" "$STAGE/usr/bin/PepoMote-Mobile"
 install -m 0644 "$PKG/dev.pepotech.PepoMote.desktop" "$STAGE/usr/share/applications/dev.pepotech.PepoMote.desktop"
-install -m 0644 "$ROOT/packaging/linux/pepomote.png" "$STAGE/usr/share/icons/hicolor/256x256/apps/dev.pepotech.PepoMote.png"
+install -m 0644 "$ROOT/packaging/linux/revolutionmote.png" "$STAGE/usr/share/icons/hicolor/256x256/apps/dev.pepotech.PepoMote.png"
 install -m 0644 "$PKG/90-pepomote-iio.rules" "$STAGE/usr/lib/udev/rules.d/90-pepomote-iio.rules"
 install -m 0644 "$ROOT/docs/MOBILE-LINUX.md" "$STAGE/usr/share/doc/pepomote-mobile/README.md"
 
