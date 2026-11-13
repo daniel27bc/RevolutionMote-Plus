@@ -128,7 +128,7 @@ internal fun DirectDsuSetup(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         TextButton(onClick = onExit) { Text(stringResource(R.string.exit), color = PepoColors.Error) }
-        Text(stringResource(R.string.dsu_direct_title), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.dsu_direct_title), style = MaterialTheme.typography.headlineSmall, color = PepoColors.Text)
         Text(stringResource(R.string.dsu_direct_emulator), color = PepoColors.TextDim)
         ModeChip(stringResource(R.string.dsu_direct_standard), selected = !switchMotion) { onProfile(false) }
         ModeChip(stringResource(R.string.dsu_direct_switch), selected = switchMotion) { onProfile(true) }

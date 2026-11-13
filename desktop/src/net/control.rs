@@ -206,6 +206,11 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
         Ok(v) => v,
         Err(_) => return,
     };
+    #[cfg(windows)]
+    if hello["m"] == "microphone" {
+        super::microphone::handle(reader, raw_writer, &hello, sessions, pairing, peer_ip);
+        return;
+    }
     if hello["m"] == "screen" {
         super::screen::handle(reader, raw_writer, &hello, shared, sessions, hub);
         return;
@@ -368,6 +373,7 @@ fn handle(stream: TcpStream, shared: &SharedState, sessions: &Sessions, pairing:
                         // (mensaje `kbm`)
                         "kbm":true,
                         "clipboard":cfg!(windows) && role == Role::Wiimote,
+                        "microphone":cfg!(windows) && role == Role::Wiimote,
                         // Vibración de los juegos: si este PC puede mandarla
                         // (ready / driver / denied / unsupported), para la
                         // línea de Ajustes del móvil

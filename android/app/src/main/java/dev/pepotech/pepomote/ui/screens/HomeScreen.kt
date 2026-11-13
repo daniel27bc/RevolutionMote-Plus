@@ -105,7 +105,8 @@ fun HomeScreen(
     onDeviceDisconnect: () -> Unit = {},
     onDeviceForget: (String) -> Unit = {},
     onDirectDsu: (() -> Unit)? = null,
-    onUsb: (() -> Unit)? = null
+    onUsb: (() -> Unit)? = null,
+    onMicrophone: (() -> Unit)? = null
 ) {
     // Qué hace cada tarjeta de modo (las de siempre; aquí solo se reparten)
     val open: (HomeEntry) -> Unit = { e ->
@@ -323,6 +324,15 @@ fun HomeScreen(
                         glyph = ChannelGlyph.GamePad,
                         accent = PepoColors.Blue,
                         onClick = onUsb
+                    )
+                }
+                if (onMicrophone != null) item(key = "microphone") {
+                    ChannelCard(
+                        title = stringResource(R.string.microphone_title),
+                        subtitle = stringResource(R.string.microphone_sub),
+                        glyph = ChannelGlyph.Server,
+                        accent = PepoColors.Blue,
+                        onClick = onMicrophone
                     )
                 }
                 if (onDirectDsu != null) item(key = "dsu-direct") {

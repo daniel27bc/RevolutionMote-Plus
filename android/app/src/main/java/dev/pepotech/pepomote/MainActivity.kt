@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import dev.pepotech.pepomote.ui.components.OrientationLockButton
 import dev.pepotech.pepomote.ui.screens.KbmScreen
 import dev.pepotech.pepomote.ui.screens.DirectDsuScreen
+import dev.pepotech.pepomote.ui.screens.MicrophoneScreen
 import dev.pepotech.pepomote.ui.screens.PointerQuickControls
 import dev.pepotech.pepomote.control.PointerTrackpad
 import androidx.compose.foundation.layout.Row
@@ -118,7 +119,7 @@ import dev.pepotech.pepomote.ui.components.UpdateHost
  * layouts Wii o Nunchuk) la decide [Route] a partir del enlace y de la
  * intención pendiente del usuario.
  */
-internal enum class Screen { Onboarding, Home, Pair, Controller, Nunchuk, Settings, Server, Kbm, Diag, DirectDsu }
+internal enum class Screen { Onboarding, Home, Pair, Controller, Nunchuk, Settings, Server, Kbm, Diag, DirectDsu, Microphone }
 
 class MainActivity : ComponentActivity() {
 
@@ -730,6 +731,7 @@ private fun Root(activity: MainActivity) {
                 onNewPairing = { activity.currentScreen = Screen.Settings },
                 onServer = { activity.openServer() },
                 onDirectDsu = { activity.openDirectDsu() },
+                onMicrophone = { activity.currentScreen = Screen.Microphone },
                 onUsb = {
                     activity.linkRole = LinkState.ROLE_WIIMOTE
                     LinkState.clearIntent()
@@ -861,6 +863,7 @@ private fun Root(activity: MainActivity) {
             )
         }
 
+        Screen.Microphone -> MicrophoneScreen(activity.foreground) { activity.currentScreen = Screen.Home }
         Screen.DirectDsu -> DirectDsuScreen(
             foreground = activity.foreground,
             onPlaying = { activity.directDsuPlaying = it },

@@ -356,6 +356,11 @@ class LinkForegroundService : Service() {
                             control?.sendPad(pad)
                         }
                     }
+                    LinkState.microphoneEndpoint.value = if (ok.supportsMicrophone) {
+                        dev.pepotech.pepomote.net.MicrophoneEndpoint(
+                            pairing.host, pairing.port, confirmedPairing.token, ok.sessionId, source
+                        )
+                    } else null
                     LinkState.sendText = { t -> if (ok.textInput) control?.sendText(t) }
                     LinkState.requestClipboard = if (ok.supportsClipboard) ({ id, text ->
                         if (gen == generation) control?.requestClipboard(id, text)
@@ -716,6 +721,7 @@ class LinkForegroundService : Service() {
         LinkState.sendPad = null
         LinkState.sendText = null
         LinkState.requestClipboard = null
+        LinkState.microphoneEndpoint.value = null
         LinkState.sendKbm = null
         LinkState.sendNunchuk = null
         LinkState.sendScreenOnly = null

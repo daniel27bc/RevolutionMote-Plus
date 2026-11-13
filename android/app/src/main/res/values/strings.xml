@@ -901,4 +901,21 @@
     <string name="usb_instructions">Conecta un cable de datos al PC y activa «Compartir conexión por USB» en Android. Abre el receptor y elige tu equipo.</string>
     <string name="usb_missing">No hay un receptor en la red del cable. Comprueba que Android esté compartiendo la conexión por USB.</string>
     <string name="usb_receiver_missing">El receptor no responde por USB. Comprueba que esté abierto y que el PC acepte conexiones en la red del cable.</string>
+    <string name="microphone_title">Micrófono del móvil</string>
+    <string name="microphone_sub">Usa el móvil como micrófono de Windows</string>
+    <string name="microphone_need_link">Conecta primero con el receptor del PC.</string>
+    <string name="microphone_need_windows">Necesitas un receptor de Windows compatible con micrófono.</string>
+    <string name="microphone_select_input">En el programa de Windows, elige CABLE Output como micrófono. Mantén esta pantalla abierta mientras hablas.</string>
+    <string name="microphone_connect">Conectar micrófono</string>
+    <string name="microphone_stop">Detener micrófono</string>
+    <string name="microphone_connecting">Conectando…</string>
+    <string name="microphone_live">Transmitiendo audio al PC.</string>
+    <string name="microphone_stopped">Micrófono detenido.</string>
+    <string name="microphone_permission">Permite el acceso al micrófono para transmitir audio.</string>
+    <string name="microphone_busy">Otro móvil está usando el micrófono del receptor.</string>
+    <string name="microphone_error">No se pudo transmitir el audio. Comprueba el receptor y vuelve a intentarlo.</string>
+    <string name="microphone_driver_title">Configurar el micrófono en Windows</string>
+    <string name="microphone_driver_help">Instala VB-CABLE en el PC desde su sitio oficial. Después, vuelve a conectar el micrófono y selecciona CABLE Output en tu programa.</string>
+    <string name="microphone_driver_missing">VB-CABLE no está disponible en el PC.</string>
+    <string name="microphone_driver_web">Abrir el sitio de VB-CABLE</string>
 </resources>

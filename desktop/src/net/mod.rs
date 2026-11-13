@@ -1,6 +1,8 @@
 /// Codec compartido con el emisor Linux móvil (crate `pmp`).
 pub use pmp as codec;
 pub mod control;
+#[cfg(windows)]
+mod microphone;
 pub mod discovery;
 pub mod screen;
 pub mod telemetry;

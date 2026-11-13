@@ -8,6 +8,7 @@ import dev.pepotech.pepomote.control.ButtonState
 import dev.pepotech.pepomote.sensor.MotionEngine
 import dev.pepotech.pepomote.net.ReceiverCapabilities
 import dev.pepotech.pepomote.control.ClipboardTransfer
+import dev.pepotech.pepomote.net.MicrophoneEndpoint
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -178,6 +179,8 @@ object LinkState {
 
     @Volatile
     var requestClipboard: ((String, String?) -> Unit)? = null
+
+    internal val microphoneEndpoint = MutableStateFlow<MicrophoneEndpoint?>(null)
 
     internal val clipboardReplies = MutableSharedFlow<ClipboardTransfer.Reply>(extraBufferCapacity = 1)
 

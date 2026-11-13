@@ -178,6 +178,14 @@ class ScreenshotTest {
         )
     }
 
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun microfonoDelMovil() = shot("27_microfono") {
+        dev.pepotech.pepomote.ui.screens.MicrophonePanel(
+            available = true, connected = true, running = false, status = null,
+            onConnect = {}, onStop = {}, onExit = {}
+        )
+    }
+
     // Igual que la captura 01 (misma pantalla y tamaño): solo cambia la cabecera
     @Test fun mandoBluetooth() {
         AppPrefs.setGyroWarnShown(compose.activity)

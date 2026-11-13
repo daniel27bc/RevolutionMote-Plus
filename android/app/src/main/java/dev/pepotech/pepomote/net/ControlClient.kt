@@ -74,7 +74,8 @@ class ControlClient(
          * cual y Ajustes lo traduce. null = receptor sin vibración.
          */
         val rumble: String? = null,
-        val supportsClipboard: Boolean = false
+        val supportsClipboard: Boolean = false,
+        val supportsMicrophone: Boolean = false
     )
 
     interface Callbacks {
@@ -197,7 +198,8 @@ class ControlClient(
                                 supportsRetroArch = supportsMode(msg, "retroarch"),
                                 supportsGamepad = supportsMode(msg, "gamepad"),
                                 rumble = msg.optString("rumble", "").takeIf { it.isNotBlank() },
-                                supportsClipboard = confirmedClipboard
+                                supportsClipboard = confirmedClipboard,
+                                supportsMicrophone = confirmedPlatform == ReceiverCapabilities.DESKTOP && msg.optBoolean("microphone", false)
                             )
                         )
                     }

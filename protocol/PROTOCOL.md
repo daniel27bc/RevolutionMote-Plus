@@ -67,6 +67,8 @@ En Switch, bit 28 es Capturar; no hay micrófono, pantalla remota ni táctil. El
 
 **Portapapeles de texto (Windows):** `ok.clipboard: true` anuncia que el receptor entiende la función. En sus ajustes, «Compartir el portapapeles» habilita las operaciones para los móviles vinculados. El móvil solicita `{"m":"clipboard","id":"…","op":"get"}` o `{"m":"clipboard","id":"…","op":"set","text":"…"}`. La respuesta vuelve solo a esa sesión con `m:"clipboard"`, el mismo `id`, `ok` y, si es una lectura correcta, `text`. Los errores son `disabled`, `empty`, `invalid_text` o `unavailable`. Solo se transfiere texto UTF-8 de hasta 64 KiB por pulsación.
 
+**Micrófono en Windows:** `ok.microphone: true` anuncia la función. Al conectar, el móvil abre otro TCP al mismo puerto, con `{"m":"microphone","pv":1,"session_id":42,"token":"…"}` y un salto de línea. El receptor comprueba token, origen y sesión de mando activa. Responde `{"m":"microphone","status":"ready"}` o un estado `driver_missing`, `busy`, `unauthorized` o `unavailable`. Tras `ready`, el móvil envía PCM mono de 48 kHz, 16 bits con signo little-endian, 960 muestras por bloque. El receptor reproduce el audio solo por **CABLE Input** de VB-CABLE. La aplicación de Windows elige **CABLE Output** como micrófono. Cerrar la pantalla, salir de primer plano o perder la sesión cierra el envío.
+
 ## 4. Telemetría (UDP, binario)
 
 ### 4.1 `INPUT` móvil→receptor — 72 bytes (80 con el bloque extendido Wii U / Switch)

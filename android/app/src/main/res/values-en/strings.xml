@@ -900,4 +900,21 @@
     <string name="usb_instructions">Connect a data cable to the PC and enable USB tethering in Android. Open the receiver and choose your computer.</string>
     <string name="usb_missing">No receiver is available on the cable network. Check that USB tethering is enabled in Android.</string>
     <string name="usb_receiver_missing">The receiver is not responding over USB. Check that it is running and that the PC accepts connections on the USB network.</string>
+    <string name="microphone_title">Phone microphone</string>
+    <string name="microphone_sub">Use your phone as a Windows microphone</string>
+    <string name="microphone_need_link">Connect to the PC receiver first.</string>
+    <string name="microphone_need_windows">You need a Windows receiver with microphone support.</string>
+    <string name="microphone_select_input">Choose CABLE Output as the microphone in your Windows app. Keep this screen open while speaking.</string>
+    <string name="microphone_connect">Connect microphone</string>
+    <string name="microphone_stop">Stop microphone</string>
+    <string name="microphone_connecting">Connecting…</string>
+    <string name="microphone_live">Streaming audio to the PC.</string>
+    <string name="microphone_stopped">Microphone stopped.</string>
+    <string name="microphone_permission">Allow microphone access to stream audio.</string>
+    <string name="microphone_busy">Another phone is using the receiver microphone.</string>
+    <string name="microphone_error">Audio could not be streamed. Check the receiver and try again.</string>
+    <string name="microphone_driver_title">Set up the microphone on Windows</string>
+    <string name="microphone_driver_help">Install VB-CABLE on the PC from its official website. Then reconnect the microphone and select CABLE Output in your app.</string>
+    <string name="microphone_driver_missing">VB-CABLE is unavailable on the PC.</string>
+    <string name="microphone_driver_web">Open the VB-CABLE website</string>
 </resources>
