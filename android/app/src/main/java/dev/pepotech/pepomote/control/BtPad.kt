@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
  */
 object BtPadReport {
     const val HAT_NONE = 8
-    val NEUTRAL: ByteArray = build(0, 0, 0, 0, 0)
 
     private val BUTTONS = listOf(
         ButtonState.A to 0, ButtonState.B to 1, ButtonState.X to 3, ButtonState.Y to 4,
@@ -23,6 +22,9 @@ object BtPadReport {
         ButtonState.MINUS to 10, ButtonState.PLUS to 11, ButtonState.HOME to 12,
         ButtonState.STICK_L to 13, ButtonState.STICK_R to 14
     )
+
+    // Después de BUTTONS: build() lo usa al inicializar el objeto
+    val NEUTRAL: ByteArray = build(0, 0, 0, 0, 0)
 
     /** Cruceta → hat: 0 arriba, en el sentido del reloj hasta 7; [HAT_NONE] suelta. */
     fun hat(mask: Int): Int {
