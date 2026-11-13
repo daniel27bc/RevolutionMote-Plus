@@ -10,10 +10,12 @@ antes que `BUTTONS`); está corregido en el commit siguiente. La CI de ese commi
 captura `22_mando_bluetooth.png` de `ci-out/feat/v1.4` muestra el mando
 universal con la cabecera «Mando Bluetooth».
 
-Fallo estético pendiente: con la cabecera plegada, la pastilla de arriba dice
-«Sin conexión» aunque el Bluetooth esté conectado. Sale de
-`GamePadCollapsibleHeader` en `GamePadScreen.kt`, que solo mira el enlace con
-el receptor; debería usar `LocalBtPad` como ya hace la tarjeta.
+Después se añadió la barra de navegación del inicio (commit `6d7e81a`, CI en
+verde): pestañas Inicio (Favoritos, Mandos, Otras herramientas) y Conexión
+(vincular por QR o alojar como servidor), más el acceso a Ajustes. Sin nada
+vinculado ni servidor en marcha, la app se abre por Conexión
+(`HomeLayout.startsOnConnection`). La pastilla del mando Bluetooth ya dice
+«Mando Bluetooth».
 
 Cosas del mando Bluetooth que conviene saber:
 

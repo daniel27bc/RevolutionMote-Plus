@@ -70,8 +70,8 @@ Avisos:
 
 Hecho y compilado en CI, sin probar en un dispositivo:
 
-- Inicio por bloques: «Continuar», favoritos fijables, Consolas / PC y
-  escritorio / Más, estado de conexión con latencia.
+- Inicio con barra de navegación: pestaña Inicio («Continuar», favoritos
+  fijables, Mandos, Otras herramientas), pestaña Conexión y acceso a Ajustes.
 - Teclado y ratón con pestañas: Touchpad, Atajos, Multimedia, Numérico,
   Presentar.
 - Mando universal: perfiles por QR, gestos (volante y agitar), macros, capa
