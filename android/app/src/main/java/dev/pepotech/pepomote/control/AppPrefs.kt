@@ -313,6 +313,14 @@ object AppPrefs {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("wolMac", mac).apply()
     }
 
+    /** Mando universal: por dónde va de serie ("app", "bt"; vacío = preguntar si no hay conexión). */
+    fun padTransport(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("padTransport", "") ?: ""
+
+    fun setPadTransport(context: Context, value: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("padTransport", value).apply()
+    }
+
     /** Tarjetas fijadas arriba en el inicio (ids de [HomeEntry], en orden). */
     fun homeFavorites(context: Context): List<String> =
         HomeLayout.parse(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("homeFavorites", ""))

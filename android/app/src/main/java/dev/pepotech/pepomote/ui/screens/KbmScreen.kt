@@ -326,24 +326,27 @@ private fun KbmStatus(
 
 /** Elegir por dónde va: la app o Bluetooth, y si se recuerda. */
 @Composable
-private fun TransportDialog(
+internal fun TransportDialog(
     current: String,
     rememberChoice: Boolean,
     btSupported: Boolean,
     onPick: (String, Boolean) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    @androidx.annotation.StringRes appSub: Int = R.string.kbm_app_sub,
+    @androidx.annotation.StringRes btSub: Int = R.string.kbm_bt_sub,
+    @androidx.annotation.StringRes btUnsupported: Int = R.string.kbm_bt_unsupported
 ) {
     var def by remember { mutableStateOf(rememberChoice) }
     EditorDialog(onDismiss) {
         Text(stringResource(R.string.kbm_choose_title), style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(10.dp))
         TransportOption(
-            R.drawable.ms_wifi, stringResource(R.string.kbm_app), stringResource(R.string.kbm_app_sub),
+            R.drawable.ms_wifi, stringResource(R.string.kbm_app), stringResource(appSub),
             current == KbmTransport.APP
         ) { onPick(KbmTransport.APP, def) }
         TransportOption(
             R.drawable.ms_bluetooth, stringResource(R.string.kbm_bt),
-            stringResource(if (btSupported) R.string.kbm_bt_sub else R.string.kbm_bt_unsupported),
+            stringResource(if (btSupported) btSub else btUnsupported),
             current == KbmTransport.BT,
             enabled = btSupported
         ) { onPick(KbmTransport.BT, def) }

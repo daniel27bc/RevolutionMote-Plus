@@ -157,6 +157,20 @@ class ScreenshotTest {
         AppPrefs.setKbmTransport(compose.activity, "")
     }
 
+    @Test @Config(qualifiers = "es-rES-w900dp-h420dp-land-xhdpi")
+    fun mandoBluetooth() = shot("22_mando_bluetooth") {
+        // La cabecera que pone BtPadScreen, sin tocar el Bluetooth del test
+        androidx.compose.runtime.CompositionLocalProvider(
+            dev.pepotech.pepomote.ui.screens.LocalBtPad provides dev.pepotech.pepomote.ui.screens.BtPadUi("Mando Bluetooth") {
+                androidx.compose.material3.Text("Conectado con TorreDaniel")
+            }
+        ) {
+            dev.pepotech.pepomote.ui.screens.GamePadScreen(
+                link = dev.pepotech.pepomote.service.UiLink.Disconnected, onDisconnect = {}
+            )
+        }
+    }
+
     @Test @Config(qualifiers = "es-rES-w420dp-h900dp-port-xhdpi")
     fun elegirConexion() = shot("13_elegir_conexion") { dev.pepotech.pepomote.ui.screens.KbmScreen(onBack = {}, onPair = {}) }
 

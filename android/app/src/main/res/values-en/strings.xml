@@ -860,4 +860,8 @@
     <string name="wol_sent">Signal sent. The PC takes a few seconds to start</string>
     <string name="wol_failed">Could not send it. Is the phone on Wi-Fi?</string>
     <string name="wol_wake_short">Turn on PC</string>
+    <string name="btpad_title">Bluetooth controller</string>
+    <string name="btpad_unsupported">This phone cannot act as a Bluetooth controller</string>
+    <string name="btpad_app_sub">With the RevolutionMote+ receiver on the PC, over Wi-Fi. An Xbox controller for any game, with rumble</string>
+    <string name="btpad_bt_sub">The phone pairs as a real Bluetooth controller: PC, TV, tablet, handheld… nothing to install</string>
 </resources>

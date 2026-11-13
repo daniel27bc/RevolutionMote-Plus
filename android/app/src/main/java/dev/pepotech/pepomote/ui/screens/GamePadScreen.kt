@@ -198,14 +198,16 @@ fun GamePadScreen(link: UiLink, onDisconnect: () -> Unit) {
     val mouseMode = padMouse && (connected?.supportsKbm == true || connected?.mode == LinkState.MODE_POINTER)
     // Modo ratón por el modo puntero del PC (receptor de PepoTech)
     val pointerMouse = mouseMode && connected?.mode == LinkState.MODE_POINTER
-    val wantedMode = if (padMouse) LinkState.MODE_GAMEPAD else Route.displayMode(link, intent)
+    // Por Bluetooth (sin receptor): siempre el mando universal, y siempre listo
+    val btPad = LocalBtPad.current != null
+    val wantedMode = if (padMouse || btPad) LinkState.MODE_GAMEPAD else Route.displayMode(link, intent)
     val switchPad = wantedMode == LinkState.MODE_SWITCH
     // RetroArch: el mismo mando apaisado con etiquetas de RetroPad (L2/R2,
     // Select/Start, Menú y avance rápido); paquetes como los de Switch
     val retroPad = wantedMode == LinkState.MODE_RETROARCH
     // Mando universal: el mismo mando, con las letras de Xbox en su sitio
     val xboxPad = wantedMode == LinkState.MODE_GAMEPAD
-    val operative = (Route.isGamePad(link) && connected?.mode == wantedMode) || mouseMode
+    val operative = (Route.isGamePad(link) && connected?.mode == wantedMode) || mouseMode || btPad
     val pro = switchPad || retroPad || xboxPad || connected?.pad == LinkState.PAD_PRO
     // RetroArch: la plantilla de la consola del juego cargado (o la elegida a
     // mano); fuera de RetroArch, el RetroPad de siempre (nada cambia)
@@ -1304,14 +1306,18 @@ private fun GamePadHeaderCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(20.dp)
     ) {
+        val btUi = LocalBtPad.current
         if (link is UiLink.Reconnecting) {
             ReconnectingLabel(link, MaterialTheme.typography.bodyMedium)
         } else {
             Text(
-                when (link) {
+                when {
+                    btUi != null -> btUi.title
+                    else -> when (link) {
                     is UiLink.Connected -> link.pcName
                     is UiLink.Connecting -> stringResource(R.string.status_connecting)
                     else -> stringResource(R.string.status_disconnected)
+                    }
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 // un nombre de PC largo no echa a «Salir» fuera de la tarjeta
@@ -1324,6 +1330,8 @@ private fun GamePadHeaderCard(
             Text(stringResource(R.string.exit), color = PepoColors.Error, style = MaterialTheme.typography.bodyMedium)
         }
     }
+    // Por Bluetooth: el estado y a qué equipo conectarse
+    LocalBtPad.current?.controls?.invoke()
     if (link is UiLink.Connected) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

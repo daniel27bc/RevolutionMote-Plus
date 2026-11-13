@@ -861,4 +861,8 @@
     <string name="wol_sent">Señal enviada. El PC tarda unos segundos en arrancar</string>
     <string name="wol_failed">No se pudo enviar. ¿Está el móvil en la wifi?</string>
     <string name="wol_wake_short">Encender PC</string>
+    <string name="btpad_title">Mando Bluetooth</string>
+    <string name="btpad_unsupported">Este móvil no puede hacer de mando Bluetooth</string>
+    <string name="btpad_app_sub">Con el receptor de RevolutionMote+ en el PC, por wifi. Un mando de Xbox para cualquier juego, con vibración</string>
+    <string name="btpad_bt_sub">El móvil se empareja como un mando Bluetooth de verdad: PC, tele, tablet, consola portátil… sin instalar nada</string>
 </resources>

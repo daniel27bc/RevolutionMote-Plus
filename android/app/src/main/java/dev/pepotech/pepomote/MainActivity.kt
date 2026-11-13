@@ -60,6 +60,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import dev.pepotech.pepomote.control.AppPrefs
+import dev.pepotech.pepomote.control.BtHid
 import dev.pepotech.pepomote.control.HomeLayout
 import dev.pepotech.pepomote.control.Kbm
 import kotlin.math.roundToInt
@@ -216,6 +217,13 @@ class MainActivity : ComponentActivity() {
                 openPair()
             }
         }
+    }
+
+    /** Mando universal por Bluetooth, sin receptor. */
+    internal fun openBtPad() {
+        controllerDolphinOnly = false
+        dev.pepotech.pepomote.control.BtPad.enter()
+        currentScreen = Screen.Controller
     }
 
     /** Tarjeta «Mando»: al mando sin tocar el modo del receptor. */
@@ -590,8 +598,9 @@ private fun Root(activity: MainActivity) {
     val gamePadSaved by GamePadSide.saved.collectAsState()
     val gamePadProvisional by GamePadSide.provisional.collectAsState()
     val padMouse by LinkState.padMouse.collectAsState()
+    val btPad by dev.pepotech.pepomote.control.BtPad.active.collectAsState()
     val wantLandscape = activity.currentScreen == Screen.Controller &&
-        (Route.forcesLandscape(link, padIntent) || (padMouse && LinkState.mouseOverride(link)))
+        (btPad || Route.forcesLandscape(link, padIntent) || (padMouse && LinkState.mouseOverride(link)))
     val landscapeSide = when {
         !wantLandscape -> LandscapeSide.Sensor
         Route.wiiLandscapeNunchuk(link) -> LandscapeSide.effective(nunchukSaved, nunchukProvisional)
@@ -639,6 +648,23 @@ private fun Root(activity: MainActivity) {
         Screen.Home -> {
             val l = link
             val pcName = PairStore.load(context)?.pcName
+            var askPadTransport by remember { mutableStateOf(false) }
+            if (askPadTransport) {
+                dev.pepotech.pepomote.ui.screens.TransportDialog(
+                    current = "",
+                    rememberChoice = false,
+                    btSupported = true,
+                    onPick = { t, def ->
+                        askPadTransport = false
+                        if (def) AppPrefs.setPadTransport(context, t)
+                        if (t == "bt") activity.openBtPad()
+                        else activity.openController(LinkState.MODE_GAMEPAD, dolphinOnly = false)
+                    },
+                    onDismiss = { askPadTransport = false },
+                    appSub = R.string.btpad_app_sub,
+                    btSub = R.string.btpad_bt_sub
+                )
+            }
             var homeFavorites by remember { mutableStateOf(AppPrefs.homeFavorites(context)) }
             var homeLast by remember { mutableStateOf(AppPrefs.homeLast(context)) }
             val androidReceiver = (l as? UiLink.Connected)?.platform == ReceiverCapabilities.ANDROID ||
@@ -672,7 +698,17 @@ private fun Root(activity: MainActivity) {
                 onWiiU = { activity.openController(LinkState.MODE_CEMU, dolphinOnly = false) },
                 onSwitch = { activity.openController(LinkState.MODE_SWITCH, dolphinOnly = false) },
                 onRetroArch = { activity.openController(LinkState.MODE_RETROARCH, dolphinOnly = false) },
-                onGamepad = { activity.openController(LinkState.MODE_GAMEPAD, dolphinOnly = false) },
+                onGamepad = {
+                    // Con el receptor ya conectado, por él. Si no, por donde se
+                    // eligió de serie; y sin elección, se pregunta
+                    val saved = AppPrefs.padTransport(context)
+                    when {
+                        LinkState.flow.value.alive || saved == "app" || !BtHid.supported(context) ->
+                            activity.openController(LinkState.MODE_GAMEPAD, dolphinOnly = false)
+                        saved == "bt" -> activity.openBtPad()
+                        else -> askPadTransport = true
+                    }
+                },
                 onKbm = { activity.currentScreen = Screen.Kbm },
                 onNunchuk = { activity.openNunchuk() },
                 onNewPairing = { activity.currentScreen = Screen.Settings },
@@ -798,6 +834,16 @@ private fun ControllerRoute(activity: MainActivity, link: UiLink) {
         LinkState.clearIntent()
         LinkForegroundService.stop(context)
         activity.currentScreen = Screen.Home
+    }
+
+    // Mando universal por Bluetooth: no hay enlace que decida la pantalla
+    val btPad by dev.pepotech.pepomote.control.BtPad.active.collectAsState()
+    if (btPad) {
+        dev.pepotech.pepomote.ui.screens.BtPadScreen(onExit = {
+            dev.pepotech.pepomote.control.BtPad.stop()
+            activity.currentScreen = Screen.Home
+        })
+        return
     }
 
     val padMouse by LinkState.padMouse.collectAsState()

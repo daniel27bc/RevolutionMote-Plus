@@ -53,6 +53,7 @@ object BtHid {
     private const val ID_KEYBOARD = 1
     private const val ID_MOUSE = 2
     private const val ID_CONSUMER = 3
+    private const val ID_GAMEPAD = 4
 
     private val DESCRIPTOR = byteArrayOf(
         // Teclado (informe 1)
@@ -84,6 +85,19 @@ object BtHid {
         0x09, 0xEA.toByte(), // bajar volumen
         0x81.toByte(), 0x02,
         0x95.toByte(), 0x02, 0x81.toByte(), 0x01, // relleno hasta el byte
+        0xC0.toByte(),
+        // Mando de juego: 16 botones, cruceta (hat) y dos sticks
+        0x05, 0x01, 0x09, 0x05, 0xA1.toByte(), 0x01,
+        0x85.toByte(), ID_GAMEPAD.toByte(),
+        0x05, 0x09, 0x19, 0x01, 0x29, 0x10,
+        0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95.toByte(), 0x10, 0x81.toByte(), 0x02,
+        0x05, 0x01, 0x09, 0x39,
+        0x15, 0x00, 0x25, 0x07, 0x35, 0x00, 0x46, 0x3B, 0x01, 0x65, 0x14,
+        0x75, 0x04, 0x95.toByte(), 0x01, 0x81.toByte(), 0x42,
+        0x65, 0x00, 0x75, 0x04, 0x95.toByte(), 0x01, 0x81.toByte(), 0x01, // relleno
+        0x09, 0x30, 0x09, 0x31, 0x09, 0x32, 0x09, 0x35, // X, Y, Z, Rz
+        0x15, 0x00, 0x26, 0xFF.toByte(), 0x00, 0x35, 0x00, 0x46, 0xFF.toByte(), 0x00,
+        0x75, 0x08, 0x95.toByte(), 0x04, 0x81.toByte(), 0x02,
         0xC0.toByte()
     )
 
@@ -244,6 +258,17 @@ object BtHid {
 
     // --- Teclado ---
 
+    // --- Mando ---
+
+    private var lastPad: ByteArray? = null
+
+    /** El estado del mando ([BtPadReport.build]); solo sale si cambió. */
+    fun gamepad(report: ByteArray) {
+        if (lastPad?.contentEquals(report) == true) return
+        lastPad = report
+        outbox += ID_GAMEPAD to report
+    }
+
     /** Teclas multimedia mantenidas (bits de HidKeys.consumerBit). */
     private var consumer = 0
 
@@ -289,6 +314,10 @@ object BtHid {
             consumer = 0
             outbox += ID_CONSUMER to byteArrayOf(0)
         }
+        if (lastPad != null) {
+            lastPad = null
+            outbox += ID_GAMEPAD to BtPadReport.NEUTRAL
+        }
     }
 
     private fun keyboardReport(mods: Int, codes: List<Int>): ByteArray {
@@ -306,6 +335,7 @@ object BtHid {
     /** Quedan informes por mandar (el reloj de [Kbm] no puede dormirse). */
     val pending: Boolean get() = outbox.isNotEmpty()
 
+    @Synchronized
     fun pump() {
         if (Build.VERSION.SDK_INT < 28) return
         val h = hid ?: run { outbox.clear(); return }
