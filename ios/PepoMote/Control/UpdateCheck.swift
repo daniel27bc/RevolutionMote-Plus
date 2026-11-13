@@ -30,14 +30,14 @@ struct AppVersion: Equatable, Comparable, CustomStringConvertible {
 
 /// Release metadata only; packages are installed by SideStore/AltStore Classic.
 enum UpdateCheck {
-    static let repo = "pepitolas13/PepoMote"
+    static let repo = "daniel27bc/RevolutionMote-Plus"
     static let latestURL = URL(string: "https://github.com/\(repo)/releases/latest/download/update.json")!
     static let sourceURL = URL(string: "https://github.com/\(repo)/releases/latest/download/altstore.json")!
     static let guideURL = URL(string: "https://github.com/\(repo)/blob/main/docs/IOS.md")!
     static let maxManifestBytes = 256 * 1024
     static let maxPackageBytes = 1024 * 1024 * 1024
-    /// Fijo y sin versión: GitHub solo ve «un PepoMote», nada más.
-    static let userAgent = "PepoMote-update-check"
+    /// Fijo y sin versión: GitHub solo ve «un RevolutionMote+», nada más.
+    static let userAgent = "RevolutionMote-Plus-update-check"
     static let checkEvery: TimeInterval = 3600
     /// La primera consulta espera a que el inicio esté en pantalla.
     static let firstDelay: TimeInterval = 3

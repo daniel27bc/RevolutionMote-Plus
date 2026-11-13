@@ -34,7 +34,7 @@ final class UpdateCheckTests: XCTestCase {
     }
 
     func testLaUrlDeLaReleaseYLaVersionActual() {
-        XCTAssertEqual(UpdateCheck.releaseURL(v(1, 6, 0)).absoluteString, "https://github.com/pepitolas13/PepoMote/releases/tag/v1.6.0")
+        XCTAssertEqual(UpdateCheck.releaseURL(v(1, 6, 0)).absoluteString, "https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/v1.6.0")
         // la app anfitriona de los tests lleva su versión en el Info.plist
         XCTAssertNotNil(UpdateCheck.current)
     }

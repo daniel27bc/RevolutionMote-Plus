@@ -158,8 +158,8 @@ final class UpdateManagerTests: XCTestCase {
         let json: [String: Any] = [
             "schema": 1, "version": version, "published_at": "2026-09-19T12:00:00Z",
             "notes": ["es": ["Mejora la conexión."], "en": ["Improves connection."]],
-            "release_url": "https://github.com/pepitolas13/PepoMote/releases/tag/v\(version)",
-            "assets": ["ios": ["name": "PepoMote.ipa", "url": "https://github.com/pepitolas13/PepoMote/releases/download/v\(version)/PepoMote.ipa",
+            "release_url": "https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/v\(version)",
+            "assets": ["ios": ["name": "RevolutionMote-Plus.ipa", "url": "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v\(version)/RevolutionMote-Plus.ipa",
                                "size": 12345, "sha256": String(repeating: "a", count: 64)]]
         ]
         return try UpdateRelease.decode(JSONSerialization.data(withJSONObject: json))

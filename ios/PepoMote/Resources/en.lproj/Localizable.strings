@@ -100,7 +100,7 @@
 "link_other_pc_sub" = "Scan a new QR";
 "sens_note" = "The pointer sensitivity is set in RevolutionMote+'s window on the PC.";
 "ios_note" = "On iPhone and iPad the controller works while the app is on screen (in the background iOS cuts the connection) and the physical volume buttons cannot be used as A/B.";
-"about" = "RevolutionMote+ %1$@ · GPL-3.0 · made by PepoTech";
+"about" = "RevolutionMote+ %1$@ · GPL-3.0 · daniel27bc · original project by PepoTech";
 "update_title" = "Notify about new versions";
 "update_sub" = "Checks GitHub for updates hourly while you use the app, without sending your data";
 "update_available" = "RevolutionMote+ %1$@ available";

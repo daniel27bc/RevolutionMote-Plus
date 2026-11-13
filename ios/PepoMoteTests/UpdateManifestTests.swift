@@ -21,11 +21,11 @@ final class UpdateManifestTests: XCTestCase {
     }
 
     func testRejectsUntrustedOrMismatchedAssetAndReleaseURLs() throws {
-        for url in ["http://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.ipa",
-                    "https://github.com/another/PepoMote/releases/download/v1.11.0/PepoMote.ipa",
-                    "https://github.com/pepitolas13/PepoMote/releases/download/v1.10.0/PepoMote.ipa",
-                    "https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.ipa?x=1",
-                    "https://github.com@evil.test/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.ipa"] {
+        for url in ["http://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus.ipa",
+                    "https://github.com/another/PepoMote/releases/download/v1.11.0/RevolutionMote-Plus.ipa",
+                    "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.10.0/RevolutionMote-Plus.ipa",
+                    "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus.ipa?x=1",
+                    "https://github.com@evil.test/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus.ipa"] {
             XCTAssertThrowsError(try UpdateRelease.decode(fixture(asset: ["url": url])))
         }
         XCTAssertThrowsError(try UpdateRelease.decode(fixture(["release_url": "https://evil.test/releases/tag/v1.11.0"])))
@@ -108,19 +108,19 @@ final class UpdateManifestTests: XCTestCase {
 
     func testRedirectPolicyRejectsOtherRepositoriesAndInsecureHosts() {
         XCTAssertTrue(UpdateCheck.allowsMetadataURL(UpdateCheck.latestURL))
-        XCTAssertTrue(UpdateCheck.allowsMetadataURL(URL(string: "https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/update.json")!))
+        XCTAssertTrue(UpdateCheck.allowsMetadataURL(URL(string: "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/update.json")!))
         XCTAssertTrue(UpdateCheck.allowsMetadataURL(URL(string: "https://release-assets.githubusercontent.com/github-production-release-asset/123?sig=abc")!))
         for url in ["https://github.com/other/PepoMote/releases/download/v1.11.0/update.json",
                     "http://release-assets.githubusercontent.com/asset", "https://evil.test/update.json",
-                    "https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.ipa"] {
+                    "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus.ipa"] {
             XCTAssertFalse(UpdateCheck.allowsMetadataURL(URL(string: url)!))
         }
     }
 
     private func fixture(_ changes: [String: Any] = [:], asset changesToAsset: [String: Any] = [:]) throws -> Data {
-        var asset: [String: Any] = ["name": "PepoMote.ipa", "url": "https://github.com/pepitolas13/PepoMote/releases/download/v1.11.0/PepoMote.ipa", "size": 12345, "sha256": String(repeating: "a", count: 64)]
+        var asset: [String: Any] = ["name": "RevolutionMote-Plus.ipa", "url": "https://github.com/daniel27bc/RevolutionMote-Plus/releases/download/v1.11.0/RevolutionMote-Plus.ipa", "size": 12345, "sha256": String(repeating: "a", count: 64)]
         asset.merge(changesToAsset) { _, new in new }
-        var manifest: [String: Any] = ["schema": 1, "version": "1.11.0", "published_at": "2026-09-19T12:00:00Z", "notes": ["es": ["Mejora la conexión."], "en": ["Improves connection."]], "release_url": "https://github.com/pepitolas13/PepoMote/releases/tag/v1.11.0", "assets": ["ios": asset]]
+        var manifest: [String: Any] = ["schema": 1, "version": "1.11.0", "published_at": "2026-09-19T12:00:00Z", "notes": ["es": ["Mejora la conexión."], "en": ["Improves connection."]], "release_url": "https://github.com/daniel27bc/RevolutionMote-Plus/releases/tag/v1.11.0", "assets": ["ios": asset]]
         manifest.merge(changes) { _, new in new }
         return try JSONSerialization.data(withJSONObject: manifest)
     }
