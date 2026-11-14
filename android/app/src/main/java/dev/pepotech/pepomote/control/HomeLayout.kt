@@ -19,7 +19,9 @@ enum class HomeEntry(val id: String, val group: HomeGroup, val pcOnly: Boolean =
     Switch("switch", HomeGroup.Controllers),
     RetroArch("retroarch", HomeGroup.Controllers),
     Nunchuk("nunchuk", HomeGroup.Controllers, pcOnly = true),
-    Kbm("kbm", HomeGroup.Tools);
+    Kbm("kbm", HomeGroup.Tools),
+    // El micrófono del móvil en el PC: solo el receptor de Windows (VB-CABLE)
+    Microphone("microphone", HomeGroup.Tools, pcOnly = true);
 
     companion object {
         fun byId(id: String?): HomeEntry? = entries.firstOrNull { it.id == id }

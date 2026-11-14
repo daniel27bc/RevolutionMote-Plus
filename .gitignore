@@ -32,3 +32,5 @@ dist/
 # Receptor de pruebas e2e (CARGO_TARGET_DIR aparte)
 desktop/target-e2e/
 desktop/e2e/__pycache__/
+# VB-CABLE: lo descarga la CI de Windows antes de compilar (packaging/windows/README.md)
+packaging/windows/VBCABLE_Driver_Pack.zip

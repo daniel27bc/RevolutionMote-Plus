@@ -321,6 +321,14 @@ object AppPrefs {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("padTransport", value).apply()
     }
 
+    /** Conexión por cable: preguntar, usarla siempre o nunca ([CablePrompt]). */
+    fun cableMode(context: Context): String =
+        CablePrompt.normalize(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("cableMode", null))
+
+    fun setCableMode(context: Context, value: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("cableMode", CablePrompt.normalize(value)).apply()
+    }
+
     /** Tarjetas fijadas arriba en el inicio (ids de [HomeEntry], en orden). */
     fun homeFavorites(context: Context): List<String> =
         HomeLayout.parse(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("homeFavorites", ""))

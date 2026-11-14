@@ -7,6 +7,11 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.displayCutoutPadding
@@ -44,11 +49,11 @@ internal fun MicrophoneScreen(foreground: Boolean, onExit: () -> Unit) {
     val context = LocalContext.current
     val endpoint by LinkState.microphoneEndpoint.collectAsState()
     val link by LinkState.flow.collectAsState()
-    val prefs = remember(context) { context.getSharedPreferences("microphone", android.content.Context.MODE_PRIVATE) }
     var pendingPermission by remember { mutableStateOf<MicrophoneEndpoint?>(null) }
     var requested by remember { mutableStateOf<MicrophoneEndpoint?>(null) }
     var status by remember { mutableStateOf<Int?>(null) }
-    var offerDriver by remember { mutableStateOf(false) }
+    // Falta VB-CABLE: el diálogo para instalarlo desde aquí (null = cerrado)
+    var driver by remember { mutableStateOf<DriverStep?>(null) }
 
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val target = pendingPermission
@@ -69,7 +74,8 @@ internal fun MicrophoneScreen(foreground: Boolean, onExit: () -> Unit) {
         var active = true
         val client = if (foreground && target != null && target == endpoint) {
             val main = android.os.Handler(android.os.Looper.getMainLooper())
-            MicrophoneClient(target) { result ->
+            MicrophoneClient(target) { reply ->
+                val result = reply.status
                 main.post {
                     if (!active || requested != target || LinkState.microphoneEndpoint.value != target) return@post
                     if (result == "ready") {
@@ -81,10 +87,40 @@ internal fun MicrophoneScreen(foreground: Boolean, onExit: () -> Unit) {
                             "busy" -> R.string.microphone_busy
                             else -> R.string.microphone_error
                         }
-                        if (result == "driver_missing" && !prefs.getBoolean("driver_prompted", false)) {
-                            prefs.edit().putBoolean("driver_prompted", true).apply()
-                            offerDriver = true
+                        if (result == "driver_missing") driver = DriverStep.Offer
+                    }
+                }
+            }
+        } else null
+        onDispose {
+            active = false
+            client?.close()
+        }
+    }
+
+    // Instalar VB-CABLE en el PC: el receptor saca la ventana de permiso de
+    // Windows y avisa al terminar. Con él ya puesto, el micrófono arranca solo.
+    DisposableEffect(driver == DriverStep.Running, endpoint) {
+        val target = endpoint
+        var active = true
+        val client = if (driver == DriverStep.Running && target != null) {
+            val main = android.os.Handler(android.os.Looper.getMainLooper())
+            MicrophoneClient(target, install = true) { reply ->
+                main.post {
+                    if (!active || driver != DriverStep.Running) return@post
+                    driver = when (reply.status) {
+                        "installing" -> DriverStep.Running
+                        "installed", "ready" -> {
+                            requested = target
+                            status = R.string.microphone_connecting
+                            null
                         }
+                        "restart" -> DriverStep.Done(R.string.microphone_restart)
+                        "declined" -> DriverStep.Declined
+                        "busy" -> DriverStep.Done(R.string.microphone_busy)
+                        // Un receptor viejo no sabe instalar: a mano
+                        "manual", "driver_missing" -> DriverStep.Manual(reply.path)
+                        else -> DriverStep.Manual(null)
                     }
                 }
             }
@@ -122,16 +158,74 @@ internal fun MicrophoneScreen(foreground: Boolean, onExit: () -> Unit) {
         }
     )
 
-    if (offerDriver) EditorDialog(onDismiss = { offerDriver = false }) {
-        Text(stringResource(R.string.microphone_driver_title), style = MaterialTheme.typography.titleLarge, color = PepoColors.Text)
-        Text(stringResource(R.string.microphone_driver_help), color = PepoColors.TextDim)
-        TextButton(onClick = {
-            offerDriver = false
-            runCatching {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://vb-audio.com/Cable/")))
+    driver?.let { step ->
+        DriverDialog(
+            step = step,
+            canInstall = endpoint != null && connected,
+            onInstall = { driver = DriverStep.Running },
+            onWeb = {
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://vb-audio.com/Cable/")))
+                }
+            },
+            onDismiss = { if (step != DriverStep.Running) driver = null }
+        )
+    }
+}
+
+/** En qué punto está la instalación de VB-CABLE desde el móvil. */
+internal sealed interface DriverStep {
+    /** Falta: se ofrece instalarlo en el PC. */
+    data object Offer : DriverStep
+    /** El PC está con la ventana de permiso o instalando. */
+    data object Running : DriverStep
+    /** Se dijo que no al permiso de Windows: se puede volver a intentar. */
+    data object Declined : DriverStep
+    /** Terminó con este aviso (reiniciar el PC, otro móvil ocupado…). */
+    data class Done(val message: Int) : DriverStep
+    /** No se pudo solo: a mano, desde [folder] (ya abierta en el PC) o desde la web. */
+    data class Manual(val folder: String?) : DriverStep
+}
+
+@Composable
+internal fun DriverDialog(
+    step: DriverStep,
+    canInstall: Boolean,
+    onInstall: () -> Unit,
+    onWeb: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    EditorDialog(onDismiss = onDismiss) {
+        Text(
+            stringResource(if (step is DriverStep.Manual) R.string.microphone_manual_title else R.string.microphone_driver_title),
+            style = MaterialTheme.typography.titleLarge, color = PepoColors.Text
+        )
+        when (step) {
+            DriverStep.Offer, DriverStep.Declined -> {
+                if (step == DriverStep.Declined) Text(stringResource(R.string.microphone_declined), color = PepoColors.Warn)
+                Text(stringResource(R.string.microphone_driver_help), color = PepoColors.TextDim)
+                TextButton(onClick = onInstall, enabled = canInstall) {
+                    Text(stringResource(R.string.microphone_install), color = PepoColors.Blue)
+                }
             }
-        }) { Text(stringResource(R.string.microphone_driver_web), color = PepoColors.Blue) }
-        TextButton(onClick = { offerDriver = false }, modifier = Modifier.align(Alignment.End)) {
+            DriverStep.Running -> Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(20.dp), color = PepoColors.Blue, strokeWidth = 2.dp)
+                Spacer(Modifier.width(12.dp))
+                Text(stringResource(R.string.microphone_installing), color = PepoColors.Text)
+            }
+            is DriverStep.Done -> Text(stringResource(step.message), color = PepoColors.Text)
+            is DriverStep.Manual -> {
+                if (step.folder != null) {
+                    Text(stringResource(R.string.microphone_manual_folder), color = PepoColors.TextDim)
+                    Text(step.folder, color = PepoColors.Text, style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    Text(stringResource(R.string.microphone_manual_web), color = PepoColors.TextDim)
+                }
+                Text(stringResource(R.string.microphone_manual_steps), color = PepoColors.TextDim)
+                TextButton(onClick = onWeb) { Text(stringResource(R.string.microphone_driver_web), color = PepoColors.Blue) }
+            }
+        }
+        if (step != DriverStep.Running) TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
             Text(stringResource(R.string.ed_done), color = PepoColors.Blue)
         }
     }

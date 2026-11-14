@@ -88,7 +88,8 @@ class LinkForegroundService : Service() {
          * plano con su notificación.
          */
         fun start(
-            context: Context, role: String = LinkState.ROLE_WIIMOTE, background: Boolean = false, usb: Boolean = false
+            context: Context, role: String = LinkState.ROLE_WIIMOTE, background: Boolean = false,
+            usb: Boolean = LinkState.preferUsb
         ) {
             dev.pepotech.pepomote.server.ServerForegroundService.stop(context)
             // "Conectando" YA, antes de que el servicio llegue a arrancar: si
@@ -196,6 +197,7 @@ class LinkForegroundService : Service() {
             return START_NOT_STICKY
         }
         usb = intent?.getBooleanExtra(EXTRA_USB, false) == true
+        LinkState.overUsb = usb
         role = intent?.getStringExtra(EXTRA_ROLE) ?: LinkState.ROLE_WIIMOTE
         LinkState.role = role
 
@@ -271,8 +273,11 @@ class LinkForegroundService : Service() {
         val source = if (usb) dev.pepotech.pepomote.net.UsbNetwork.sourceFor(pairing.host) else null
         if (usb && source == null) {
             if (phase == Phase.Initial) {
-                LinkState.publish(UiLink.Failed("usb", getString(R.string.usb_missing)))
-                stopSelf()
+                // El cable no lleva al receptor (no está compartiendo la
+                // conexión o el PC no contesta por ahí): por la red de siempre
+                usb = false
+                LinkState.overUsb = false
+                connect(PairStore.load(this) ?: pairing)
             } else dropped(pairing)
             return
         }
@@ -750,6 +755,7 @@ class LinkForegroundService : Service() {
 
     override fun onDestroy() {
         if (current === this) current = null
+        LinkState.overUsb = false
         if (LinkState.flow.value is UiLink.Connected) {
             UiSounds.disconnect()
         }

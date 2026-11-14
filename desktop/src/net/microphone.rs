@@ -15,27 +15,49 @@ use std::time::Duration;
 const SAMPLE_RATE: u32 = 48_000;
 const FRAME_BYTES: usize = 960 * 2;
 static AUDIO: Mutex<()> = Mutex::new(());
-static WORKER: OnceLock<Option<mpsc::SyncSender<AudioJob>>> = OnceLock::new();
+static WORKER: OnceLock<Option<mpsc::SyncSender<Job>>> = OnceLock::new();
 
 struct AudioJob {
     frames: mpsc::Receiver<Vec<i16>>,
     reply: mpsc::SyncSender<&'static str>,
 }
 
-fn worker() -> Option<&'static mpsc::SyncSender<AudioJob>> {
+/// Lo que hace el hilo del audio: reproducir el micrófono o mirar si ya
+/// está «CABLE Input» (tras instalar VB-CABLE).
+enum Job {
+    Play(AudioJob),
+    Probe(mpsc::SyncSender<bool>),
+}
+
+fn worker() -> Option<&'static mpsc::SyncSender<Job>> {
     WORKER.get_or_init(|| {
-        let (sender, jobs) = mpsc::sync_channel::<AudioJob>(1);
+        let (sender, jobs) = mpsc::sync_channel::<Job>(1);
         std::thread::Builder::new().name("pmp-microphone".into()).spawn(move || {
             // CPAL conserva un enumerador COM global. Su primer hilo tiene
-            // que seguir vivo incluso entre dos conexiones del micrófono.
+            // que seguir vivo incluso entre dos conexiones del micrófono, y
+            // toda consulta de dispositivos pasa por aquí.
             while let Ok(job) = jobs.recv() {
-                let reply = job.reply.clone();
-                if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| play(job))).is_err() {
-                    let _ = reply.try_send("unavailable");
+                match job {
+                    Job::Play(job) => {
+                        let reply = job.reply.clone();
+                        if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| play(job))).is_err() {
+                            let _ = reply.try_send("unavailable");
+                        }
+                    }
+                    Job::Probe(reply) => {
+                        let found = std::panic::catch_unwind(probe).unwrap_or(false);
+                        let _ = reply.try_send(found);
+                    }
                 }
             }
         }).ok().map(|_| sender)
     }).as_ref()
+}
+
+fn probe() -> bool {
+    rodio::cpal::default_host().output_devices().is_ok_and(|mut devices| {
+        devices.any(|device| device.name().is_ok_and(|name| is_cable_input(&name)))
+    })
 }
 
 fn play(job: AudioJob) {
@@ -70,6 +92,12 @@ pub(super) fn handle(
         let _ = reply(&mut writer, "unauthorized");
         return;
     }
+    // Instalar VB-CABLE desde el móvil: `installing` y, al terminar, el
+    // resultado. Nada de audio en esta conexión: el móvil vuelve a conectar.
+    if hello["install"].as_bool() == Some(true) {
+        install(&mut writer);
+        return;
+    }
     let Ok(_audio) = AUDIO.try_lock() else {
         let _ = reply(&mut writer, "busy");
         return;
@@ -80,7 +108,7 @@ pub(super) fn handle(
     };
     let (frames, receiver) = mpsc::sync_channel(2);
     let (result, status) = mpsc::sync_channel(1);
-    if worker.try_send(AudioJob { frames: receiver, reply: result }).is_err() {
+    if worker.try_send(Job::Play(AudioJob { frames: receiver, reply: result })).is_err() {
         let _ = reply(&mut writer, "busy");
         return;
     }
@@ -97,6 +125,44 @@ pub(super) fn handle(
             break;
         }
     }
+}
+
+fn install(writer: &mut TcpStream) {
+    if !reply(writer, "installing") {
+        return;
+    }
+    // Solo una instalación a la vez (dos móviles pidiéndola a la vez)
+    static INSTALLING: Mutex<()> = Mutex::new(());
+    let Ok(_guard) = INSTALLING.try_lock() else {
+        let _ = reply(writer, "busy");
+        return;
+    };
+    let result = super::vbcable::install(cable_present);
+    let message = match result {
+        super::vbcable::Install::Installed => json!({"m":"microphone","status":"installed"}),
+        super::vbcable::Install::NeedsRestart => json!({"m":"microphone","status":"restart"}),
+        super::vbcable::Install::Declined => json!({"m":"microphone","status":"declined"}),
+        super::vbcable::Install::Manual(dir) => json!({
+            "m":"microphone","status":"manual",
+            "bundled":super::vbcable::bundled(),
+            "path":dir.map(|d| d.display().to_string()),
+        }),
+    };
+    let _ = writeln!(writer, "{message}");
+}
+
+/// Si Windows ya enseña «CABLE Input» (el instalador ha terminado de verdad).
+/// Por el hilo del audio. Si otro móvil está mandando audio, el cable ya está.
+fn cable_present() -> bool {
+    if AUDIO.try_lock().is_err() {
+        return true;
+    }
+    let Some(worker) = worker() else { return false };
+    let (reply, answer) = mpsc::sync_channel(1);
+    if worker.try_send(Job::Probe(reply)).is_err() {
+        return false;
+    }
+    answer.recv_timeout(Duration::from_secs(5)).unwrap_or(false)
 }
 
 fn reply(writer: &mut TcpStream, status: &str) -> bool {

@@ -158,6 +158,19 @@ object LinkState {
     var role: String = ROLE_WIIMOTE
         internal set
 
+    /** El enlace de ahora va por el cable USB (lo fija el servicio). */
+    @Volatile
+    var overUsb: Boolean = false
+        internal set
+
+    /**
+     * Se aceptó usar el cable: los enlaces que se abran a partir de ahora
+     * van por él (si el cable no llega al receptor, por la red de siempre).
+     * Se olvida al cerrar la app o al quitar el cable.
+     */
+    @Volatile
+    var preferUsb: Boolean = false
+
     /** Cambia el modo pointer/dolphin/cemu; lo conecta el servicio al ControlClient. */
     @Volatile
     var sendMode: ((String) -> Unit)? = null

@@ -129,6 +129,18 @@ class MainActivity : ComponentActivity() {
     internal var directDsuPlaying by mutableStateOf(false)
     internal var pairUsb by mutableStateOf(false)
 
+    /** Se dijo «No» al cable (sin recordar) desde que se abrió la app: no se vuelve a preguntar. */
+    internal var cableDeclined = false
+
+    /**
+     * Usar el cable desde ahora: los enlaces nuevos van por él y, si ya había
+     * uno por la red, se rehace por el cable con el mismo papel.
+     */
+    internal fun useCable() {
+        LinkState.preferUsb = true
+        if (LinkState.flow.value.alive && !LinkState.overUsb) LinkForegroundService.start(this, LinkState.role, usb = true)
+    }
+
     /** true = se entró al mando por la tarjeta Dolphin (pantalla solo-Dolphin). */
     internal var controllerDolphinOnly by mutableStateOf(false)
 
@@ -221,6 +233,22 @@ class MainActivity : ComponentActivity() {
                 LinkState.requestMode(requested)
                 openPair()
             }
+        }
+    }
+
+    /**
+     * Herramienta «Micrófono»: necesita el enlace con el receptor de Windows
+     * (el audio viaja por su conexión); si no estaba, se abre.
+     */
+    internal fun openMicrophone() {
+        linkRole = LinkState.ROLE_WIIMOTE
+        when {
+            PairStore.load(this) == null -> openPair()
+            !LinkState.flow.value.alive || linkIsNunchuk() -> {
+                LinkForegroundService.start(this)
+                currentScreen = Screen.Microphone
+            }
+            else -> currentScreen = Screen.Microphone
         }
     }
 
@@ -661,6 +689,41 @@ private fun Root(activity: MainActivity) {
         Screen.Home -> {
             val l = link
             val pcName = PairStore.load(context)?.pcName
+            // Conexión por cable: al abrir un mando con la conexión USB
+            // compartida activa se sugiere usarla (ajuste «Conexión por cable»)
+            var cableNext by remember { mutableStateOf<(() -> Unit)?>(null) }
+            val viaCable: (() -> Unit) -> Unit = { go ->
+                val alive = LinkState.flow.value.alive
+                when (dev.pepotech.pepomote.control.CablePrompt.decide(
+                    pref = AppPrefs.cableMode(context),
+                    cableUp = dev.pepotech.pepomote.net.UsbNetwork.active().isNotEmpty(),
+                    overUsb = if (alive) LinkState.overUsb else LinkState.preferUsb,
+                    androidReceiver = PairStore.load(context)?.platform == ReceiverCapabilities.ANDROID,
+                    paired = PairStore.load(context) != null,
+                    declinedThisSession = activity.cableDeclined
+                )) {
+                    dev.pepotech.pepomote.control.CablePrompt.Action.Skip -> go()
+                    dev.pepotech.pepomote.control.CablePrompt.Action.UseCable -> { activity.useCable(); go() }
+                    dev.pepotech.pepomote.control.CablePrompt.Action.Ask -> cableNext = go
+                }
+            }
+            cableNext?.let { go ->
+                dev.pepotech.pepomote.ui.screens.CableDialog(
+                    onAnswer = { useCable, keep ->
+                        cableNext = null
+                        if (keep) {
+                            AppPrefs.setCableMode(
+                                context,
+                                if (useCable) dev.pepotech.pepomote.control.CablePrompt.ALWAYS else dev.pepotech.pepomote.control.CablePrompt.NEVER
+                            )
+                        }
+                        if (useCable) activity.useCable() else activity.cableDeclined = true
+                        go()
+                    },
+                    // Cerrar sin contestar: no se abre nada
+                    onDismiss = { cableNext = null }
+                )
+            }
             var askPadTransport by remember { mutableStateOf(false) }
             if (askPadTransport) {
                 dev.pepotech.pepomote.ui.screens.TransportDialog(
@@ -671,7 +734,7 @@ private fun Root(activity: MainActivity) {
                         askPadTransport = false
                         if (def) AppPrefs.setPadTransport(context, t)
                         if (t == "bt") activity.openBtPad()
-                        else activity.openController(LinkState.MODE_GAMEPAD, dolphinOnly = false)
+                        else viaCable { activity.openController(LinkState.MODE_GAMEPAD, dolphinOnly = false) }
                     },
                     onDismiss = { askPadTransport = false },
                     appSub = R.string.btpad_app_sub,
@@ -710,34 +773,28 @@ private fun Root(activity: MainActivity) {
                     LinkState.pendingMode = null
                     activity.openPair()
                 },
-                onController = { activity.openPad() },
-                onDolphin = { activity.openController(LinkState.MODE_DOLPHIN, dolphinOnly = true) },
-                onWiiU = { activity.openController(LinkState.MODE_CEMU, dolphinOnly = false) },
-                onSwitch = { activity.openController(LinkState.MODE_SWITCH, dolphinOnly = false) },
-                onRetroArch = { activity.openController(LinkState.MODE_RETROARCH, dolphinOnly = false) },
+                onController = { viaCable { activity.openPad() } },
+                onDolphin = { viaCable { activity.openController(LinkState.MODE_DOLPHIN, dolphinOnly = true) } },
+                onWiiU = { viaCable { activity.openController(LinkState.MODE_CEMU, dolphinOnly = false) } },
+                onSwitch = { viaCable { activity.openController(LinkState.MODE_SWITCH, dolphinOnly = false) } },
+                onRetroArch = { viaCable { activity.openController(LinkState.MODE_RETROARCH, dolphinOnly = false) } },
                 onGamepad = {
                     // Con el receptor ya conectado, por él. Si no, por donde se
                     // eligió de serie; y sin elección, se pregunta
                     val saved = AppPrefs.padTransport(context)
                     when {
                         LinkState.flow.value.alive || saved == "app" || !BtHid.supported(context) ->
-                            activity.openController(LinkState.MODE_GAMEPAD, dolphinOnly = false)
+                            viaCable { activity.openController(LinkState.MODE_GAMEPAD, dolphinOnly = false) }
                         saved == "bt" -> activity.openBtPad()
                         else -> askPadTransport = true
                     }
                 },
                 onKbm = { activity.currentScreen = Screen.Kbm },
-                onNunchuk = { activity.openNunchuk() },
+                onNunchuk = { viaCable { activity.openNunchuk() } },
                 onNewPairing = { activity.currentScreen = Screen.Settings },
                 onServer = { activity.openServer() },
                 onDirectDsu = { activity.openDirectDsu() },
-                onMicrophone = { activity.currentScreen = Screen.Microphone },
-                onUsb = {
-                    activity.linkRole = LinkState.ROLE_WIIMOTE
-                    LinkState.clearIntent()
-                    LinkState.pendingMode = null
-                    activity.openPair(usb = true)
-                },
+                onMicrophone = { viaCable { activity.openMicrophone() } },
                 androidReceiver = androidReceiver,
                 serverRunning = server.active,
                 update = update,
@@ -763,7 +820,8 @@ private fun Root(activity: MainActivity) {
                     val isCurrent = p.token == currentToken
                     dev.pepotech.pepomote.ui.screens.HomeDevice(
                         id = p.token, name = p.pcName, detail = p.host,
-                        current = isCurrent, connected = isCurrent && l is UiLink.Connected
+                        current = isCurrent, connected = isCurrent && l is UiLink.Connected,
+                        cable = isCurrent && l is UiLink.Connected && LinkState.overUsb
                     )
                 },
                 onDeviceConnect = { token ->

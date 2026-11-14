@@ -3,6 +3,8 @@ pub use pmp as codec;
 pub mod control;
 #[cfg(windows)]
 mod microphone;
+#[cfg(windows)]
+mod vbcable;
 pub mod discovery;
 pub mod screen;
 pub mod telemetry;

@@ -1481,6 +1481,34 @@ fun SettingsScreen(onNewPairing: () -> Unit, onBack: () -> Unit, onDiag: () -> U
                 }
             }
             }
+            // Conexión por cable: qué hacer al detectar la conexión USB compartida
+            SettingItem(listOf(R.string.usb_title, R.string.cable_setting_sub, R.string.cable_ask, R.string.cable_always, R.string.cable_never)) {
+            var cable by remember { mutableStateOf(AppPrefs.cableMode(context)) }
+            Card(
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(containerColor = PepoColors.Card),
+                border = BorderStroke(1.5.dp, PepoColors.CardBorder),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                    Text(stringResource(R.string.usb_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.cable_setting_sub), style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(10.dp))
+                    ChipFlow {
+                        for ((label, mode) in listOf(
+                            R.string.cable_ask to dev.pepotech.pepomote.control.CablePrompt.ASK,
+                            R.string.cable_always to dev.pepotech.pepomote.control.CablePrompt.ALWAYS,
+                            R.string.cable_never to dev.pepotech.pepomote.control.CablePrompt.NEVER
+                        )) {
+                            ModeChip(stringResource(label), selected = cable == mode) {
+                                cable = mode
+                                AppPrefs.setCableMode(context, mode)
+                            }
+                        }
+                    }
+                }
+            }
+            }
             SettingItem(listOf(R.string.diag_title, R.string.diag_entry_sub)) { DiagEntryCard(onDiag) }
         }
         if (query.isNotBlank() && counter.count == 0) {

@@ -19,10 +19,24 @@ internal data class MicrophoneEndpoint(
     val source: InetAddress?,
 )
 
+/**
+ * Lo que contesta el receptor. [status]: `ready`, `driver_missing`, `busy`…
+ * y, al pedir instalar VB-CABLE: `installing`, `installed`, `restart`,
+ * `declined` o `manual` (con [path], la carpeta del instalador ya abierta en
+ * el PC, y [bundled], si el receptor lo trae dentro).
+ */
+internal data class MicrophoneReply(val status: String, val path: String? = null, val bundled: Boolean = false)
+
+/**
+ * El micrófono hacia el receptor de Windows. Con [install], en vez de mandar
+ * audio pide instalar VB-CABLE en el PC y avisa de cada paso.
+ */
 internal class MicrophoneClient(
     endpoint: MicrophoneEndpoint,
-    onStatus: (String) -> Unit,
+    private val install: Boolean = false,
+    onReply: (MicrophoneReply) -> Unit,
 ) : AutoCloseable {
+    private val onStatus: (String) -> Unit = { onReply(MicrophoneReply(it)) }
     private val running = AtomicBoolean(true)
     private val socket = Socket()
     private val thread = Thread({
@@ -34,8 +48,20 @@ internal class MicrophoneClient(
             val output = socket.getOutputStream()
             val hello = JSONObject().put("m", "microphone").put("pv", 1)
                 .put("session_id", endpoint.sessionId.toUInt().toLong()).put("token", endpoint.token)
+            if (install) hello.put("install", true)
             output.write("$hello\n".toByteArray(Charsets.UTF_8))
             val reader = socket.getInputStream().bufferedReader(Charsets.UTF_8)
+            if (install) {
+                // La ventana de permiso de Windows espera a la persona: sin tope corto
+                socket.soTimeout = INSTALL_TIMEOUT_MS
+                while (running.get()) {
+                    val reply = parse(line(reader) ?: break)
+                    onReply(reply)
+                    if (reply.status != "installing") return@Thread
+                }
+                if (running.get()) onStatus("unavailable")
+                return@Thread
+            }
             val status = response(reader)
             if (status != "ready") {
                 if (running.get()) onStatus(status)
@@ -50,15 +76,19 @@ internal class MicrophoneClient(
     }, "pepomote-microphone").apply { isDaemon = true; start() }
 
     // La confirmación llega en una línea corta; la captura empieza tras el OK.
-    private fun response(reader: BufferedReader): String {
+    private fun response(reader: BufferedReader): String =
+        line(reader)?.let { JSONObject(it).optString("status", "unavailable") } ?: "unavailable"
+
+    /** Una línea corta del receptor (null si se corta antes). */
+    private fun line(reader: BufferedReader): String? {
         val line = StringBuilder()
-        while (line.length < 256) {
+        while (line.length < 1024) {
             val char = reader.read()
-            if (char == -1) break
-            if (char == 10) return JSONObject(line.toString()).optString("status", "unavailable")
+            if (char == -1) return null
+            if (char == 10) return line.toString()
             line.append(char.toChar())
         }
-        return "unavailable"
+        return null
     }
 
     @SuppressLint("MissingPermission") // El permiso se pide al pulsar «Conectar micrófono».
@@ -108,5 +138,16 @@ internal class MicrophoneClient(
     companion object {
         private const val RATE = 48_000
         private const val SAMPLES = 960
+        private const val INSTALL_TIMEOUT_MS = 5 * 60_000
+
+        /** Una respuesta del receptor; un receptor viejo no conoce `install` y contesta como siempre. */
+        internal fun parse(line: String): MicrophoneReply = runCatching {
+            val json = JSONObject(line)
+            MicrophoneReply(
+                status = json.optString("status", "unavailable"),
+                path = json.optString("path").takeIf { json.has("path") && !json.isNull("path") && it.isNotBlank() },
+                bundled = json.optBoolean("bundled", false)
+            )
+        }.getOrDefault(MicrophoneReply("unavailable"))
     }
 }

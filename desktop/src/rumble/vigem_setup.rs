@@ -73,6 +73,34 @@ fn unpack() -> Result<PathBuf, String> {
 /// plano y lo deja minimizado en la barra de tareas (sin ventana solo queda
 /// `--install-driver`, desde una consola).
 pub fn install() -> Result<Outcome, String> {
+    crate::log_line!("Mando virtual: se pide el permiso de administrador para el driver");
+    if super::fake_driver_missing() {
+        crate::log_line!("PEPOMOTE_FAKE_DRIVER_MISSING: el instalador no se lanza; cuenta como cancelado");
+        return Ok(Outcome::Declined);
+    }
+    let path = unpack()?;
+    Ok(match run_elevated(&path, SETUP_ARGS)? {
+        Elevated::Declined => Outcome::Declined,
+        Elevated::Exited(code) => outcome_of(code),
+    })
+}
+
+/// Cómo acabó un programa lanzado con permiso de administrador.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Elevated {
+    /// Terminó con este código de salida.
+    Exited(u32),
+    /// El usuario dijo que no en la ventana de permiso.
+    Declined,
+}
+
+/// Lanza `path` elevado (`runas`: la ventana de permiso de Windows; si el
+/// proceso ya es administrador, no pregunta) y espera a que termine.
+/// Bloquea: llamar desde un hilo propio. El permiso va con la ventana de
+/// RevolutionMote+ como dueña: sin ella Windows lo trata como de segundo plano
+/// y lo deja minimizado en la barra de tareas. Lo comparten los dos drivers
+/// que viajan dentro del exe (ViGEmBus y VB-CABLE).
+pub(crate) fn run_elevated(path: &std::path::Path, args: &str) -> Result<Elevated, String> {
     use std::os::windows::ffi::OsStrExt;
     use windows::core::PCWSTR;
     use windows::Win32::Foundation::{CloseHandle, ERROR_CANCELLED};
@@ -82,21 +110,18 @@ pub fn install() -> Result<Outcome, String> {
 
     let owner = crate::singleton::own_window();
     crate::log_line!(
-        "Mando virtual: se pide el permiso de administrador para el driver ({})",
+        "Permiso de administrador para {} ({})",
+        path.display(),
         match owner {
             Some(h) => format!("con la ventana 0x{:X} como dueña", h.0 as usize),
             None => "sin ventana".to_owned(),
         }
     );
-    if super::fake_driver_missing() {
-        crate::log_line!("PEPOMOTE_FAKE_DRIVER_MISSING: el instalador no se lanza; cuenta como cancelado");
-        return Ok(Outcome::Declined);
-    }
-    let path = unpack()?;
     let wide = |s: &std::ffi::OsStr| -> Vec<u16> { s.encode_wide().chain(std::iter::once(0)).collect() };
     let verb = wide("runas".as_ref());
     let file = wide(path.as_os_str());
-    let params = wide(SETUP_ARGS.as_ref());
+    let params = wide(args.as_ref());
+    let dir = path.parent().map(|d| wide(d.as_os_str()));
     let mut info = SHELLEXECUTEINFOW {
         cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
         fMask: SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC,
@@ -104,12 +129,14 @@ pub fn install() -> Result<Outcome, String> {
         lpVerb: PCWSTR(verb.as_ptr()),
         lpFile: PCWSTR(file.as_ptr()),
         lpParameters: PCWSTR(params.as_ptr()),
+        // El instalador de VB-CABLE busca sus .inf y .sys junto a él
+        lpDirectory: dir.as_ref().map_or(PCWSTR::null(), |d| PCWSTR(d.as_ptr())),
         nShow: SW_HIDE.0,
         ..Default::default()
     };
     if let Err(e) = unsafe { ShellExecuteExW(&mut info) } {
         if e.code() == ERROR_CANCELLED.to_hresult() {
-            return Ok(Outcome::Declined);
+            return Ok(Elevated::Declined);
         }
         return Err(format!("ShellExecuteEx: {e}"));
     }
@@ -122,7 +149,7 @@ pub fn install() -> Result<Outcome, String> {
     let read = unsafe { GetExitCodeProcess(process, &mut code) };
     let _ = unsafe { CloseHandle(process) };
     read.map_err(|e| format!("GetExitCodeProcess: {e}"))?;
-    Ok(outcome_of(code))
+    Ok(Elevated::Exited(code))
 }
 
 /// `--install-driver`: instala (o confirma) y sale con 0 si al final hay

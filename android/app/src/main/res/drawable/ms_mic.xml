@@ -1,0 +1,16 @@
+<!-- Micrófono: la cápsula, el soporte en arco, el pie y la base -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960"
+>
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M360,200A120,120 0,0 1,600 200L600,440A120,120 0,0 1,360 440Z"/>
+  <path
+      android:strokeColor="@android:color/white"
+      android:strokeWidth="64"
+      android:strokeLineCap="round"
+      android:pathData="M240,440A240,240 0,0 0,720 440M480,680L480,840M360,840L600,840"/>
+</vector>

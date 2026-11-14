@@ -24,3 +24,27 @@ de permiso de administrador que Windows exige para cualquier driver.
 la de Nefarius sobre estos bytes exactos. Cualquier cambio dejaría el driver
 sin cargar. Lo que sí es nuestro es el cliente (crate `vigem-client`, Rust
 puro, por IOCTL) y todo lo que hay encima.
+
+# Cable de audio del micrófono (Windows)
+
+El micrófono del móvil llega a los programas de Windows por **VB-CABLE**, el
+cable de audio virtual de VB-Audio (<https://vb-cable.com>). VB-CABLE es
+donationware: si te sirve, apoya a su autor desde su web.
+
+- Paquete oficial: `VBCABLE_Driver_Pack46.zip`, de
+  <https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack46.zip>.
+- No está en el repositorio: el flujo `desktop` lo descarga en
+  `packaging/windows/VBCABLE_Driver_Pack.zip` antes de compilar y el exe lo
+  lleva dentro (`desktop/src/net/vbcable.rs`). El log de ese paso enseña su
+  SHA-256 y los archivos que trae.
+- Licencia: VB-Audio permite incluir el paquete sin modificar en programas
+  gratuitos siempre que se diga que es de VB-Audio y que es donationware
+  (<https://vb-audio.com/Services/licensing.htm>). La app lo dice en el
+  diálogo de instalación y aquí. En empresas o centros donde los usuarios no
+  puedan ver de dónde viene, VB-Audio pide comprar licencias.
+- Instalación desde el móvil: el receptor desempaqueta el paquete en su
+  carpeta de configuración (`VB-CABLE`) y lanza `VBCABLE_Setup_x64.exe -i -h`
+  con la ventana de permiso de administrador. Si no se puede, abre esa
+  carpeta en el PC y el móvil explica cómo instalarlo a mano.
+- Sin el paquete (compilado en local sin descargarlo), el receptor funciona
+  igual y el móvil manda a la web de VB-CABLE.

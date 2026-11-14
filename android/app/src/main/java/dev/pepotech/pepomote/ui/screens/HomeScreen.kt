@@ -105,8 +105,7 @@ fun HomeScreen(
     onDeviceDisconnect: () -> Unit = {},
     onDeviceForget: (String) -> Unit = {},
     onDirectDsu: (() -> Unit)? = null,
-    onUsb: (() -> Unit)? = null,
-    onMicrophone: (() -> Unit)? = null
+    onMicrophone: () -> Unit = {}
 ) {
     // Qué hace cada tarjeta de modo (las de siempre; aquí solo se reparten)
     val open: (HomeEntry) -> Unit = { e ->
@@ -119,6 +118,7 @@ fun HomeScreen(
             HomeEntry.Nunchuk -> onNunchuk()
             HomeEntry.Gamepad -> onGamepad()
             HomeEntry.Kbm -> onKbm()
+            HomeEntry.Microphone -> onMicrophone()
             HomeEntry.Pointer -> onController()
         }
     }
@@ -317,24 +317,6 @@ fun HomeScreen(
                     )
                 }
                 item(key = "server") { serverCard() }
-                if (onUsb != null) item(key = "usb") {
-                    ChannelCard(
-                        title = stringResource(R.string.usb_title),
-                        subtitle = stringResource(R.string.usb_sub),
-                        glyph = ChannelGlyph.GamePad,
-                        accent = PepoColors.Blue,
-                        onClick = onUsb
-                    )
-                }
-                if (onMicrophone != null) item(key = "microphone") {
-                    ChannelCard(
-                        title = stringResource(R.string.microphone_title),
-                        subtitle = stringResource(R.string.microphone_sub),
-                        glyph = ChannelGlyph.Server,
-                        accent = PepoColors.Blue,
-                        onClick = onMicrophone
-                    )
-                }
                 if (onDirectDsu != null) item(key = "dsu-direct") {
                     ChannelCard(
                         title = stringResource(R.string.dsu_direct_title),
@@ -365,54 +347,78 @@ data class HomeDevice(
     /** Es el equipo en uso (al que se conecta la app). */
     val current: Boolean,
     /** Y ahora mismo hay enlace con él. */
-    val connected: Boolean
+    val connected: Boolean,
+    /** El enlace va por el cable USB. */
+    val cable: Boolean = false
 )
 
-/** Un equipo vinculado: quién es, si está en uso, y conectar, desconectar u olvidarlo. */
+/**
+ * Un equipo vinculado: quién es, si está en uso, y conectar, desconectar u
+ * olvidarlo. Los botones van en su propia línea: al lado del nombre dejaban
+ * sin sitio la IP en pantallas estrechas. Olvidar pide confirmación.
+ */
 @Composable
 private fun DeviceRow(d: HomeDevice, onConnect: () -> Unit, onDisconnect: () -> Unit, onForget: () -> Unit) {
     val shape = MaterialTheme.shapes.medium
-    Row(
+    var confirmForget by remember { mutableStateOf(false) }
+    Column(
         Modifier
             .fillMaxWidth()
             .background(PepoColors.Card, shape)
             .border(1.5.dp, if (d.current) PepoColors.Blue else PepoColors.CardBorder, shape)
-            .padding(start = 18.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(start = 18.dp, end = 6.dp, top = 12.dp, bottom = 2.dp)
     ) {
-        Box(
-            Modifier
-                .size(10.dp)
-                .background(if (d.connected) PepoColors.Ok else PepoColors.TextDim, CircleShape)
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(d.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                when {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 12.dp)) {
+            Box(
+                Modifier
+                    .size(10.dp)
+                    .background(if (d.connected) PepoColors.Ok else PepoColors.TextDim, CircleShape)
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(d.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val state = when {
+                    d.connected && d.cable -> stringResource(R.string.conn_connected_cable)
                     d.connected -> stringResource(R.string.conn_connected)
                     d.current -> stringResource(R.string.conn_in_use)
-                    else -> d.detail
-                },
-                style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                    else -> null
+                }
+                Text(
+                    listOfNotNull(state, d.detail.takeIf { it.isNotBlank() }).joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium.copy(color = PepoColors.TextDim),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
-        androidx.compose.material3.TextButton(onClick = if (d.connected) onDisconnect else onConnect) {
-            Text(
-                stringResource(
-                    when {
-                        d.connected -> R.string.conn_disconnect
-                        d.current -> R.string.conn_connect
-                        else -> R.string.conn_use
-                    }
-                ),
-                color = PepoColors.Blue
-            )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            androidx.compose.material3.TextButton(onClick = { confirmForget = true }) {
+                Text(stringResource(R.string.conn_forget), color = PepoColors.Error)
+            }
+            androidx.compose.material3.TextButton(onClick = if (d.connected) onDisconnect else onConnect) {
+                Text(
+                    stringResource(
+                        when {
+                            d.connected -> R.string.conn_disconnect
+                            d.current -> R.string.conn_connect
+                            else -> R.string.conn_use
+                        }
+                    ),
+                    color = PepoColors.Blue
+                )
+            }
         }
-        androidx.compose.material3.TextButton(onClick = onForget) {
-            Text(stringResource(R.string.conn_forget), color = PepoColors.Error)
+    }
+    if (confirmForget) EditorDialog(onDismiss = { confirmForget = false }) {
+        Text(stringResource(R.string.conn_forget_title, d.name), style = MaterialTheme.typography.titleLarge, color = PepoColors.Text)
+        Text(stringResource(R.string.conn_forget_text), color = PepoColors.TextDim)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            androidx.compose.material3.TextButton(onClick = { confirmForget = false }) {
+                Text(stringResource(R.string.cancel), color = PepoColors.TextDim)
+            }
+            androidx.compose.material3.TextButton(onClick = { confirmForget = false; onForget() }) {
+                Text(stringResource(R.string.conn_forget), color = PepoColors.Error)
+            }
         }
     }
 }
@@ -476,6 +482,7 @@ private fun entryTitle(e: HomeEntry, androidReceiver: Boolean): String = stringR
         HomeEntry.Nunchuk -> R.string.channel_nunchuk
         HomeEntry.Gamepad -> R.string.channel_gamepad
         HomeEntry.Kbm -> R.string.channel_kbm
+        HomeEntry.Microphone -> R.string.microphone_title
         HomeEntry.Pointer -> R.string.channel_controller
     }
 )
@@ -534,6 +541,12 @@ private fun EntryCard(
         HomeEntry.Kbm -> ChannelCard(
             title = title, subtitle = subtitle ?: stringResource(R.string.channel_kbm_sub),
             glyph = ChannelGlyph.Kbm, accent = Color(0xFFF2B705),
+            wide = wide, onLongClick = onLongClick, onClick = onClick
+        )
+        // Micrófono: el móvil como micrófono de Windows (por VB-CABLE)
+        HomeEntry.Microphone -> ChannelCard(
+            title = title, subtitle = subtitle ?: stringResource(R.string.microphone_sub),
+            glyph = ChannelGlyph.Gear, icon = R.drawable.ms_mic, accent = Color(0xFFE5533D),
             wide = wide, onLongClick = onLongClick, onClick = onClick
         )
         HomeEntry.Pointer -> ChannelCard(

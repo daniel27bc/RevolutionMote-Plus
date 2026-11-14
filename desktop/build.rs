@@ -1,4 +1,14 @@
 fn main() {
+    // VB-CABLE (el micrófono del móvil en Windows) viaja dentro del exe si
+    // está en packaging/windows: la CI lo descarga antes de compilar
+    // (packaging/windows/README.md). Sin él, el receptor explica al móvil
+    // dónde conseguirlo en vez de instalarlo.
+    println!("cargo:rustc-check-cfg=cfg(vbcable_pack)");
+    let pack = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packaging/windows/VBCABLE_Driver_Pack.zip");
+    println!("cargo:rerun-if-changed={}", pack.display());
+    if pack.is_file() {
+        println!("cargo:rustc-cfg=vbcable_pack");
+    }
     // Icono y metadatos de versión del exe (solo target Windows)
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let mut res = winresource::WindowsResource::new();

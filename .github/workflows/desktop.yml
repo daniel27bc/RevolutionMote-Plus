@@ -3,7 +3,7 @@ name: desktop
 on:
   push:
     branches: [main, next, "feat/**"]
-    paths: ["desktop/**", "pmp/**", "protocol/**", "packaging/linux/**", "packaging/macos/**", "assets/revolutionmote-icon.png", ".github/workflows/desktop.yml"]
+    paths: ["desktop/**", "pmp/**", "protocol/**", "packaging/linux/**", "packaging/macos/**", "packaging/windows/**", "assets/revolutionmote-icon.png", ".github/workflows/desktop.yml"]
   pull_request:
     paths: ["desktop/**", "pmp/**", "protocol/**", "packaging/linux/**", "packaging/macos/**", ".github/workflows/desktop.yml"]
   workflow_call:
@@ -17,6 +17,18 @@ jobs:
       - name: Test pmp (códec compartido)
         working-directory: pmp
         run: cargo test --release
+      # VB-CABLE (el micrófono del móvil) va dentro del exe: el paquete
+      # oficial de VB-Audio, sin tocar (packaging/windows/README.md). Si su web
+      # no contesta, el receptor sale igual y explica al móvil cómo ponerlo.
+      - name: VB-CABLE dentro del receptor
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $zip = "packaging/windows/VBCABLE_Driver_Pack.zip"
+          Invoke-WebRequest "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack46.zip" -OutFile $zip
+          "SHA-256: " + (Get-FileHash $zip -Algorithm SHA256).Hash
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip)).Entries | Format-Table FullName, Length
       - name: Build (release)
         working-directory: desktop
         run: cargo build --release

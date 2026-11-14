@@ -171,10 +171,23 @@ class ScreenshotTest {
     }
 
     @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
-    fun conexionUsb() = shot("26_conexion_usb") {
-        dev.pepotech.pepomote.ui.screens.PairScreen(
-            onScanQr = {}, onBack = {}, usb = true,
-            discoverReceivers = { kotlinx.coroutines.flow.flowOf(emptyList()) }
+    fun sugerenciaCable() = shot("26_cable_sugerencia") {
+        dev.pepotech.pepomote.ui.screens.CableDialog(onAnswer = { _, _ -> }, onDismiss = {})
+    }
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun microfonoInstalar() = shot("28_microfono_instalar") {
+        dev.pepotech.pepomote.ui.screens.DriverDialog(
+            step = dev.pepotech.pepomote.ui.screens.DriverStep.Offer, canInstall = true,
+            onInstall = {}, onWeb = {}, onDismiss = {}
+        )
+    }
+
+    @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
+    fun microfonoAMano() = shot("29_microfono_a_mano") {
+        dev.pepotech.pepomote.ui.screens.DriverDialog(
+            step = dev.pepotech.pepomote.ui.screens.DriverStep.Manual("C:\\Users\\Daniel\\AppData\\Roaming\\daniel27bc\\RevolutionMote\\config\\VB-CABLE"),
+            canInstall = true, onInstall = {}, onWeb = {}, onDismiss = {}
         )
     }
 
@@ -314,13 +327,13 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "es-rES-w420dp-h860dp-port-xhdpi")
     fun inicioConexion() = shot("23_inicio_conexion") {
         dev.pepotech.pepomote.ui.screens.HomeScreen(
-            status = dev.pepotech.pepomote.ui.screens.HomeStatus(dev.pepotech.pepomote.ui.screens.HomeTone.Off, "Sin conexión"),
+            status = dev.pepotech.pepomote.ui.screens.HomeStatus(dev.pepotech.pepomote.ui.screens.HomeTone.On, "Conectado a TorreDaniel"),
             langLabel = "ES", langSwitchHint = "", onToggleLang = {},
             onConnect = {}, onController = {}, onDolphin = {}, onWiiU = {}, onSwitch = {}, onNunchuk = {}, onNewPairing = {},
             initialTab = dev.pepotech.pepomote.ui.screens.HomeTab.Connection,
             onWake = {},
             devices = listOf(
-                dev.pepotech.pepomote.ui.screens.HomeDevice("a", "TorreDaniel", "192.168.1.40", current = true, connected = false),
+                dev.pepotech.pepomote.ui.screens.HomeDevice("a", "TorreDaniel", "192.168.1.40", current = true, connected = true, cable = true),
                 dev.pepotech.pepomote.ui.screens.HomeDevice("b", "Portátil", "192.168.1.52", current = false, connected = false)
             )
         )
