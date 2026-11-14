@@ -12,11 +12,11 @@ import kotlin.math.sqrt
  * Apuntar con el giroscopio en el propio móvil (mando universal): el giro se
  * convierte aquí en stick derecho, en vez de mandarlo crudo al PC.
  *
- * Giro horizontal "player space" (como Steam Input / JoyShockMapper): se
- * mide alrededor de la VERTICAL real (la gravedad), así que girar la muñeca a
- * izquierda o derecha mueve la cámara en horizontal tanto si sujetas el móvil
- * de pie como tumbado o inclinado. El vertical es inclinar el borde de arriba
- * hacia ti o hacia fuera.
+ * Giro en el marco del mundo («world space», como Steam Input): el horizontal
+ * se mide alrededor de la VERTICAL real (la gravedad) y el vertical alrededor
+ * de la horizontal real, así que da igual si sujetas el móvil de pie, tumbado,
+ * inclinado o con la muñeca girada: como el mando de Wii, mover a izquierda y
+ * derecha es siempre horizontal y subir y bajar, siempre vertical.
  *
  * Velocidad de giro = deflexión del stick (como un ratón): girar despacio,
  * microajustes; girar rápido, giro rápido. Con su zona muerta mínima (el
@@ -28,9 +28,6 @@ object GyroAim {
 
     /** Por debajo de esto (fracción del tope) se considera pulso quieto. */
     const val REST = 0.012f
-
-    /** Cuánto se relaja el giro horizontal combinado (JoyShockMapper). */
-    private const val YAW_RELAX = 1.41f
 
     @Volatile
     var config: GyroConfig = GyroConfig()
@@ -274,10 +271,29 @@ object GyroAim {
      * borde de arriba hacia ti (apuntar arriba).
      */
     internal fun playerSpace(gx: Float, gy: Float, gz: Float, ux: Float, uy: Float, uz: Float): Pair<Float, Float> {
-        val worldYaw = gy * uy + gz * uz
-        val mag = hypot(gy, gz)
-        val yaw = sign(worldYaw) * min(abs(worldYaw) * YAW_RELAX, mag)
-        return yaw to gx
+        // Alrededor de la vertical real entera (también la parte del eje x):
+        // con la muñeca girada, el eje x del móvil apunta en parte hacia
+        // arriba y sin esa parte el giro horizontal salía corto
+        val yaw = gx * ux + gy * uy + gz * uz
+        return yaw to worldPitch(gx, gy, gz, ux, uy, uz)
+    }
+
+    /**
+     * Giro vertical alrededor de la horizontal real (el eje x del móvil sin
+     * su parte vertical), como el mando de Wii: con la muñeca girada, mover a
+     * izquierda y derecha sigue siendo solo horizontal. Antes era el eje x del
+     * móvil tal cual: girada la muñeca, ese eje apunta en parte hacia arriba y
+     * medio giro horizontal se colaba como vertical. Con el eje x casi
+     * vertical (muñeca a 75° o más) la horizontal no se puede sacar de él y se
+     * vuelve al eje del móvil.
+     */
+    internal fun worldPitch(gx: Float, gy: Float, gz: Float, ux: Float, uy: Float, uz: Float): Float {
+        val rx = 1f - ux * ux
+        val ry = -ux * uy
+        val rz = -ux * uz
+        val n = sqrt(rx * rx + ry * ry + rz * rz)
+        if (n < 0.25f) return gx
+        return (gx * rx + gy * ry + gz * rz) / n
     }
 
     /** Fracción del tope (−∞..∞ por eje) → stick −127..127, con reposo y anti-zona muerta. */

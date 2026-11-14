@@ -955,6 +955,9 @@ internal fun IconPadButton(
 ) {
     val view = LocalView.current
     var down by remember { mutableStateOf(false) }
+    // El gesto vive mientras no cambie `enabled`: sin esto se quedaba con la
+    // acción de la primera vez (el botón mando/ratón solo sabía encender el ratón)
+    val press by rememberUpdatedState(onPress)
     val on = down || highlighted
     Box(
         Modifier
@@ -969,8 +972,8 @@ internal fun IconPadButton(
                 contentDescription = label
                 if (!enabled) disabled()
                 onClick {
-                    onPress(true)
-                    onPress(false)
+                    press(true)
+                    press(false)
                     true
                 }
             }
@@ -981,12 +984,12 @@ internal fun IconPadButton(
                     d.consume()
                     down = true
                     Haptics.tap(view, HapticFeedbackConstants.KEYBOARD_TAP)
-                    onPress(true)
+                    press(true)
                     try {
                         waitForUpOrCancellation()
                     } finally {
                         down = false
-                        onPress(false)
+                        press(false)
                         Haptics.release(view)
                     }
                 }

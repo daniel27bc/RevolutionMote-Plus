@@ -531,7 +531,7 @@ private fun GamePadContent(link: UiLink, onDisconnect: () -> Unit) {
         mouseMode = mouseMode,
         mouse = mouseCfg,
         onKeyboard = { if (Route.showsKeyboard(link)) keyboardOpen = true },
-        onToggleMouse = { LinkState.setPadMouse(!padMouse) },
+        onToggleMouse = { LinkState.setPadMouse(!LinkState.padMouse.value) },
         keysAvailable = connected?.supportsKbm == true && operative
     )
     CompositionLocalProvider(LocalPressRegistry provides press, LocalPadActions provides padActions) {
@@ -970,7 +970,7 @@ private fun GamePadContent(link: UiLink, onDisconnect: () -> Unit) {
             if (showMenu) {
                 PadMenuDialog(
                     mouseOn = if (xboxPad) padMouse else null,
-                    onMouseToggle = { LinkState.setPadMouse(!padMouse) },
+                    onMouseToggle = { LinkState.setPadMouse(!LinkState.padMouse.value) },
                     activeName = activeName,
                     locked = orientationLock != AppPrefs.ORIENTATION_FREE,
                     gyroOn = null,

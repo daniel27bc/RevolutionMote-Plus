@@ -26,6 +26,22 @@ class GyroAimTest {
         assertTrue(pitch > 0f)
     }
 
+    @Test fun conLaMunecaGiradaMoverEnHorizontalNoSubeNiBaja() {
+        // Mando de pie, girado 40° como un volante: la vertical (y hacia
+        // arriba) queda inclinada hacia x
+        val t = Math.toRadians(40.0)
+        val ux = kotlin.math.sin(t).toFloat()
+        val uy = kotlin.math.cos(t).toFloat()
+        // Girar a la izquierda alrededor de la vertical real
+        val (yaw, pitch) = GyroAim.playerSpace(ux, uy, 0f, ux, uy, 0f)
+        assertTrue("yaw $yaw", yaw > 0.9f)
+        assertEquals("el giro horizontal no se cuela como vertical", 0f, pitch, 1e-5f)
+        // Y subir (alrededor de la horizontal real) sigue siendo vertical entero
+        val (yaw2, pitch2) = GyroAim.playerSpace(uy, -ux, 0f, ux, uy, 0f)
+        assertEquals(0f, yaw2, 1e-5f)
+        assertEquals(1f, pitch2, 1e-5f)
+    }
+
     @Test fun pulsoQuietoNoMueveYRapidoSatura() {
         assertEquals(0 to 0, GyroAim.toStick(0.005f, 0f, 0.2f))
         assertEquals(127, GyroAim.toStick(3f, 0f, 0f).first)

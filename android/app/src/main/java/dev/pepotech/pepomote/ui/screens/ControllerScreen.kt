@@ -2,6 +2,7 @@ package dev.pepotech.pepomote.ui.screens
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -532,7 +533,12 @@ internal fun ModeChips(current: String, supportsCemu: Boolean, supportsSwitch: B
         }
     }
     val gap = if (compact) 6.dp else if (dense) 8.dp else 10.dp
-    if (compact) Row(modifier, horizontalArrangement = Arrangement.spacedBy(gap)) { chips() }
+    // Apaisado: una fila que se desliza hacia la derecha. Antes la fila era
+    // fija y el último chip («Mando universal») se quedaba sin sitio y cortado
+    if (compact) Row(
+        modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(gap)
+    ) { chips() }
     else FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(gap), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         chips()
         if (foldable) {
@@ -596,7 +602,8 @@ internal fun ModeChip(
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium.copy(color = text),
-            maxLines = 1
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

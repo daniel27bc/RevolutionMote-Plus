@@ -32,15 +32,41 @@ pub fn stick(p: &InputPacket, full_scale_deg_s: f32) -> (i16, i16) {
     let full = full_scale_deg_s.max(1.0).to_radians();
 
     // Los mismos ejes y signos que el fallback relativo del puntero: el
-    // horizontal sale de `gyro[2]` y el vertical de `gyro[0]`.
-    let gz = soft_deadzone(p.gyro[2], GYRO_DEADZONE_RADS);
-    let gx = soft_deadzone(p.gyro[0], GYRO_DEADZONE_RADS);
+    // horizontal sale de `gyro[2]` y el vertical de `gyro[0]`. Con la
+    // gravedad del paquete, medidos en el mundo (ver `world`): con la muñeca
+    // girada, mover a izquierda y derecha sigue siendo solo horizontal.
+    let (h, v) = world(p.gyro, p.accel).unwrap_or((p.gyro[2], p.gyro[0]));
+    let gz = soft_deadzone(h, GYRO_DEADZONE_RADS);
+    let gx = soft_deadzone(v, GYRO_DEADZONE_RADS);
 
     // En pantalla la Y crece hacia abajo; en el stick, hacia arriba. De ahí
     // el signo cambiado en el vertical y no en el horizontal.
     let x = SIGN_X * gz / full;
     let y = -SIGN_Y * gx / full;
     (clamp(x), clamp(y))
+}
+
+/// (horizontal, vertical) del giro en el marco del mundo, como el mando de
+/// Wii: horizontal = alrededor de la vertical real (el acelerómetro en reposo
+/// apunta hacia arriba), vertical = alrededor del eje x del móvil sin su parte
+/// vertical. Con el móvil tumbado y recto da lo mismo que los ejes del móvil
+/// (`gyro[2]`, `gyro[0]`). `None` si el acelerómetro no es la gravedad (una
+/// sacudida, un móvil sin él) o si el eje x está casi vertical: ahí se vuelve
+/// a los ejes del móvil.
+fn world(gyro: [f32; 3], accel: [f32; 3]) -> Option<(f32, f32)> {
+    let n = (accel[0] * accel[0] + accel[1] * accel[1] + accel[2] * accel[2]).sqrt();
+    if !n.is_finite() || !(6.0..=14.0).contains(&n) {
+        return None;
+    }
+    let u = [accel[0] / n, accel[1] / n, accel[2] / n];
+    let r = [1.0 - u[0] * u[0], -u[0] * u[1], -u[0] * u[2]];
+    let rn = (r[0] * r[0] + r[1] * r[1] + r[2] * r[2]).sqrt();
+    if rn < 0.25 {
+        return None;
+    }
+    let yaw = gyro[0] * u[0] + gyro[1] * u[1] + gyro[2] * u[2];
+    let pitch = (gyro[0] * r[0] + gyro[1] * r[1] + gyro[2] * r[2]) / rn;
+    Some((yaw, pitch))
 }
 
 fn clamp(v: f32) -> i16 {
@@ -117,6 +143,25 @@ mod tests {
         let mut p = con_gyro(5.0, 5.0);
         p.flags |= pmp::FLAG_TILT;
         assert_eq!(stick(&p, FULL_SCALE_DEG_S), (0, 0));
+    }
+
+    #[test]
+    fn con_la_muneca_girada_mover_en_horizontal_no_sube_ni_baja() {
+        // Tumbado (la gravedad en +z) da lo mismo que los ejes del móvil
+        assert_eq!(world([0.3, 0.0, 0.7], [0.0, 0.0, 9.8]), Some((0.7, 0.3)));
+        // Girado 40° sobre el eje de apuntado (y): la vertical queda entre x y z
+        let (s, c) = 40f32.to_radians().sin_cos();
+        let accel = [9.8 * s, 0.0, 9.8 * c];
+        // Girar alrededor de la vertical real: todo horizontal
+        let (h, v) = world([s, 0.0, c], accel).unwrap();
+        assert!((h - 1.0).abs() < 1e-4 && v.abs() < 1e-4, "({h}, {v})");
+        let mut p = InputPacket::default();
+        p.gyro = [s, 0.0, c];
+        p.accel = accel;
+        let (_, y) = stick(&p, FULL_SCALE_DEG_S);
+        assert_eq!(y, 0, "el giro horizontal no se cuela en el vertical");
+        // Una sacudida (el acelerómetro no es la gravedad): los ejes del móvil
+        assert_eq!(world([1.0, 0.0, 0.0], [0.0, 0.0, 30.0]), None);
     }
 
     #[test]
