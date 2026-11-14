@@ -38,6 +38,23 @@ Cosas del mando Bluetooth que conviene saber:
 - Los gatillos son botones, no ejes analógicos.
 - No se ha probado con ningún equipo real.
 
+## Micrófono, cable y arreglos (14 de noviembre)
+
+- Micrófono como herramienta del inicio (`HomeEntry.Microphone`). Si falta
+  VB-CABLE, el móvil ofrece «Instalar en el PC»: el receptor de Windows lo
+  lleva dentro (`desktop/src/net/vbcable.rs`, la CI lo descarga) y lanza su
+  instalador con la ventana de permiso. Si no se puede, abre la carpeta del
+  instalador en el PC y el móvil explica los pasos.
+- La conexión por cable ya no es una tarjeta: al abrir un mando con la
+  conexión USB compartida activa sale «Conectado por cable» (`CablePrompt`,
+  `CableDialog`); Ajustes › Conexión por cable: preguntar, siempre o nunca.
+  Si el cable no llega al receptor, se sigue por la red.
+- Arreglado: el botón mando/ratón no volvía al mando; los modos en apaisado
+  se deslizan; el apuntado por giro ignora la muñeca girada (móvil y receptor).
+- Conexión: olvidar pide confirmación y la IP ya no se corta.
+- Sin probar en hardware: la instalación de VB-CABLE (el modo silencioso
+  `-i -h` y si Windows enseña el cable sin reiniciar) y el cable USB.
+
 ## Por probar en un móvil (nada está verificado en hardware)
 
 - Inicio nuevo, favoritos, barra de navegación y arranque por Conexión.

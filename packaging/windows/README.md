@@ -36,7 +36,9 @@ donationware: si te sirve, apoya a su autor desde su web.
 - No está en el repositorio: el flujo `desktop` lo descarga en
   `packaging/windows/VBCABLE_Driver_Pack.zip` antes de compilar y el exe lo
   lleva dentro (`desktop/src/net/vbcable.rs`). El log de ese paso enseña su
-  SHA-256 y los archivos que trae.
+  SHA-256 y los archivos que trae. Versión 46, comprobada el 14/11/2026:
+  SHA-256 `BC44E8974191A5A2427D6C979E2DAB08DBB09925F3F435DFA2F0BA3E45B6EB90`,
+  con `VBCABLE_Setup_x64.exe` y `VBCABLE_Setup.exe`.
 - Licencia: VB-Audio permite incluir el paquete sin modificar en programas
   gratuitos siempre que se diga que es de VB-Audio y que es donationware
   (<https://vb-audio.com/Services/licensing.htm>). La app lo dice en el
