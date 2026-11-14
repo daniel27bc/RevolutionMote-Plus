@@ -899,8 +899,8 @@
     <string name="usb_title">Conexión por cable</string>
     <string name="usb_instructions">Conecta un cable de datos al PC y activa «Compartir conexión por USB» en Android. Abre el receptor y elige tu equipo.</string>
     <string name="usb_receiver_missing">El receptor no responde por USB. Comprueba que esté abierto y que el PC acepte conexiones en la red del cable.</string>
-    <string name="microphone_title">Micrófono del móvil</string>
-    <string name="microphone_sub">Usa el móvil como micrófono de Windows</string>
+    <string name="microphone_title">Micrófono</string>
+    <string name="microphone_sub">Habla por el PC</string>
     <string name="microphone_need_link">Conecta primero con el receptor del PC.</string>
     <string name="microphone_need_windows">Necesitas un receptor de Windows compatible con micrófono.</string>
     <string name="microphone_select_input">En el programa de Windows, elige CABLE Output como micrófono. Mantén esta pantalla abierta mientras hablas.</string>
