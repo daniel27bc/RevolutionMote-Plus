@@ -13,7 +13,8 @@ enum class HomeGroup { Controllers, Tools }
 enum class HomeEntry(val id: String, val group: HomeGroup, val pcOnly: Boolean = false) {
     // El mando de Wii (puntero): el modo principal, el primero
     Pointer("pointer", HomeGroup.Controllers, pcOnly = true),
-    Gamepad("gamepad", HomeGroup.Controllers, pcOnly = true),
+    // Con un servidor Android va por Bluetooth (no necesita receptor)
+    Gamepad("gamepad", HomeGroup.Controllers),
     Dolphin("dolphin", HomeGroup.Controllers),
     WiiU("wiiu", HomeGroup.Controllers, pcOnly = true),
     Switch("switch", HomeGroup.Controllers),

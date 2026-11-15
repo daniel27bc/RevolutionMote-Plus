@@ -935,4 +935,6 @@
     <string name="conn_connected_cable">Connected by cable</string>
     <string name="conn_forget_title">Forget %1$s?</string>
     <string name="conn_forget_text">To use it again you will have to pair it again with the receiver QR code.</string>
+    <string name="kbm_app_android">The Android server can’t act as keyboard and mouse: use Bluetooth</string>
+    <string name="kbm_bt_repair">Not connecting? Forget the pairing on both devices and pair them again with this screen open.</string>
 </resources>

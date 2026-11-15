@@ -216,12 +216,13 @@ private fun GamePadContent(link: UiLink, onDisconnect: () -> Unit) {
     val direct = LocalDirectDsuPad.current
     val requestedMouse by LinkState.padMouse.collectAsState()
     val padMouse = direct == null && requestedMouse
-    // Con el receptor de RevolutionMote+ el modo ratón no cambia el modo del PC
-    val mouseMode = padMouse && (connected?.supportsKbm == true || connected?.mode == LinkState.MODE_POINTER)
-    // Modo ratón por el modo puntero del PC (receptor de PepoTech)
-    val pointerMouse = mouseMode && connected?.mode == LinkState.MODE_POINTER
     // Por Bluetooth (sin receptor): siempre el mando universal, y siempre listo
     val btPad = LocalBtPad.current != null
+    // Con el receptor de RevolutionMote+ el modo ratón no cambia el modo del
+    // PC; por Bluetooth, el ratón es el del propio móvil
+    val mouseMode = padMouse && (btPad || connected?.supportsKbm == true || connected?.mode == LinkState.MODE_POINTER)
+    // Modo ratón por el modo puntero del PC (receptor de PepoTech)
+    val pointerMouse = mouseMode && !btPad && connected?.mode == LinkState.MODE_POINTER
     val wantedMode = when {
         direct != null -> LinkState.MODE_SWITCH
         padMouse || btPad -> LinkState.MODE_GAMEPAD
@@ -387,9 +388,13 @@ private fun GamePadContent(link: UiLink, onDisconnect: () -> Unit) {
     // control a la vez que el mando (y las teclas sueltas siempre); con el de
     // PepoTech, el modo ratón pasa el PC a puntero. El cursor siempre en
     // relativo (giro y touchpads calculados aquí): no se descentra
-    val kbmCapable = connected?.supportsKbm == true && operative
-    DisposableEffect(mouseMode, kbmCapable) {
+    // Por Bluetooth el teclado y el ratón van en el mismo dispositivo que el
+    // mando: antes esta pantalla dejaba el ratón sin salida (Kbm.backend = NONE)
+    // y el botón mando/ratón, las teclas y el touchpad no hacían nada
+    val kbmCapable = (btPad || connected?.supportsKbm == true) && operative
+    DisposableEffect(mouseMode, kbmCapable, btPad) {
         Kbm.backend = when {
+            btPad -> Kbm.Backend.BT
             kbmCapable -> Kbm.Backend.APP
             mouseMode -> Kbm.Backend.POINTER
             else -> Kbm.Backend.NONE
@@ -411,10 +416,13 @@ private fun GamePadContent(link: UiLink, onDisconnect: () -> Unit) {
         onDispose {
             ButtonState.intercept = null
             PointerTrackpad.active = false
-            Kbm.backend = Kbm.Backend.NONE
+            // Por Bluetooth lo apaga BtPad al salir
+            if (!btPad) Kbm.backend = Kbm.Backend.NONE
         }
     }
     DisposableEffect(Unit) { onDispose { GyroAim.mouse = false } }
+    // Sin receptor no hay motor de sensores: por Bluetooth, los del móvil
+    PhoneGyroFeed(enabled = engine == null && btPad && gyroLive)
     DisposableEffect(engine, gyroLive) {
         if (engine != null && gyroLive) {
             GyroAim.active = true
@@ -532,7 +540,7 @@ private fun GamePadContent(link: UiLink, onDisconnect: () -> Unit) {
         mouse = mouseCfg,
         onKeyboard = { if (Route.showsKeyboard(link)) keyboardOpen = true },
         onToggleMouse = { LinkState.setPadMouse(!LinkState.padMouse.value) },
-        keysAvailable = connected?.supportsKbm == true && operative
+        keysAvailable = kbmCapable
     )
     CompositionLocalProvider(LocalPressRegistry provides press, LocalPadActions provides padActions) {
         BoxWithConstraints(

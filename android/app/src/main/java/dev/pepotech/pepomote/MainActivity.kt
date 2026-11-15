@@ -783,6 +783,12 @@ private fun Root(activity: MainActivity) {
                     // eligió de serie; y sin elección, se pregunta
                     val saved = AppPrefs.padTransport(context)
                     when {
+                        // El servidor Android no hace de mando de PC: por Bluetooth,
+                        // que el otro Android acepta como mando de serie
+                        androidReceiver && BtHid.supported(context) -> activity.openBtPad()
+                        androidReceiver -> android.widget.Toast.makeText(
+                            context, R.string.btpad_unsupported, android.widget.Toast.LENGTH_LONG
+                        ).show()
                         LinkState.flow.value.alive || saved == "app" || !BtHid.supported(context) ->
                             viaCable { activity.openController(LinkState.MODE_GAMEPAD, dolphinOnly = false) }
                         saved == "bt" -> activity.openBtPad()

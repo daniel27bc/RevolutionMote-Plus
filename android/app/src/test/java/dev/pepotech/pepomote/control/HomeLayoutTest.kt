@@ -10,7 +10,7 @@ class HomeLayoutTest {
     @Test fun conServidorAndroidNoSeOfreceLoQueSoloHaceElPc() {
         val a = HomeLayout.available(androidReceiver = true)
         assertFalse(HomeEntry.WiiU in a)
-        assertFalse(HomeEntry.Gamepad in a)
+        assertTrue("el mando universal va por Bluetooth", HomeEntry.Gamepad in a)
         assertFalse(HomeEntry.Pointer in a)
         assertFalse(HomeEntry.Nunchuk in a)
         assertTrue(HomeEntry.Dolphin in a)
@@ -38,7 +38,7 @@ class HomeLayoutTest {
 
     @Test fun unFavoritoQueAhoraNoSePuedeOfrecerVuelveAlCambiarDeReceptor() {
         val saved = listOf("gamepad", "dolphin")
-        assertEquals(listOf(HomeEntry.Dolphin), HomeLayout.favorites(saved, androidReceiver = true))
+        assertEquals(listOf(HomeEntry.Gamepad, HomeEntry.Dolphin), HomeLayout.favorites(saved, androidReceiver = true))
         assertEquals(listOf(HomeEntry.Gamepad, HomeEntry.Dolphin), HomeLayout.favorites(saved, androidReceiver = false))
     }
 
@@ -70,7 +70,7 @@ class HomeLayoutTest {
 
     @Test fun continuarSoloConLoQueSePuedeAbrirAhora() {
         assertEquals(HomeEntry.Gamepad, HomeLayout.last("gamepad", androidReceiver = false))
-        assertNull(HomeLayout.last("gamepad", androidReceiver = true))
+        assertNull(HomeLayout.last("pointer", androidReceiver = true))
         assertNull(HomeLayout.last(null, false))
         assertNull(HomeLayout.last("ya-no-existe", false))
     }

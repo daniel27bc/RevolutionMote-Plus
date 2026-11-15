@@ -936,4 +936,6 @@
     <string name="conn_connected_cable">Conectado por cable</string>
     <string name="conn_forget_title">¿Olvidar %1$s?</string>
     <string name="conn_forget_text">Para volver a usarlo tendrás que vincularlo otra vez con el QR del receptor.</string>
+    <string name="kbm_app_android">El servidor Android no hace de teclado y ratón: usa Bluetooth</string>
+    <string name="kbm_bt_repair">¿No conecta? Olvida el emparejamiento en los dos equipos y vuelve a emparejarlos con esta pantalla abierta.</string>
 </resources>

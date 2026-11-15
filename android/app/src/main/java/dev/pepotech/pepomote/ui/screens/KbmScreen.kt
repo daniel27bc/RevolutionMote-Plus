@@ -95,7 +95,19 @@ internal object KbmTransport {
 @Composable
 fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit, initialPanel: KbmPanel = KbmPanel.Touchpad) {
     val context = LocalContext.current
-    var transport by remember { mutableStateOf(AppPrefs.kbmTransport(context)) }
+    // Con un servidor Android vinculado no hay teclado ni ratón por la app
+    // (allí solo hace de mando de emuladores): va por Bluetooth, que Android
+    // acepta de serie como teclado y ratón
+    val androidReceiver = remember {
+        PairStore.load(context)?.platform == dev.pepotech.pepomote.net.ReceiverCapabilities.ANDROID
+    }
+    var transport by remember {
+        mutableStateOf(
+            AppPrefs.kbmTransport(context).let { saved ->
+                if (androidReceiver && saved == KbmTransport.APP) "" else saved
+            }
+        )
+    }
     var asking by remember { mutableStateOf(transport.isEmpty()) }
     var isDefault by remember { mutableStateOf(transport.isNotEmpty()) }
     var mouse by remember { mutableStateOf(AppPrefs.globalMouse(context)) }
@@ -245,6 +257,7 @@ fun KbmScreen(onBack: () -> Unit, onPair: () -> Unit, initialPanel: KbmPanel = K
                 current = transport,
                 rememberChoice = isDefault,
                 btSupported = BtHid.supported(context),
+                appUnavailable = if (androidReceiver) R.string.kbm_app_android else null,
                 onPick = { t, def ->
                     transport = t
                     isDefault = def
@@ -303,6 +316,8 @@ private fun KbmStatus(
         when {
             PairStore.load(context) == null -> stringResource(R.string.kbm_app_unpaired) to PepoColors.Warn
             c == null -> stringResource(R.string.kbm_app_connecting) to PepoColors.TextDim
+            c.platform == dev.pepotech.pepomote.net.ReceiverCapabilities.ANDROID ->
+                stringResource(R.string.kbm_app_android) to PepoColors.Warn
             !c.supportsKbm -> stringResource(R.string.kbm_app_old_receiver) to PepoColors.Warn
             else -> stringResource(R.string.kbm_app_ready, c.pcName) to PepoColors.Ok
         }
@@ -329,6 +344,9 @@ private fun KbmStatus(
                     TextButton(onClick = { BtHid.connect(d) }) { Text(name, color = PepoColors.Text, maxLines = 1) }
                 }
             }
+            // Emparejados antes de abrir esto, el otro equipo no sabe que el
+            // móvil es un teclado y ratón (Android, sobre todo) y no conecta
+            Text(stringResource(R.string.kbm_bt_repair), color = PepoColors.TextDim, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -341,6 +359,8 @@ internal fun TransportDialog(
     btSupported: Boolean,
     onPick: (String, Boolean) -> Unit,
     onDismiss: () -> Unit,
+    /** Por qué no se puede ir por la app (null = se puede). */
+    @androidx.annotation.StringRes appUnavailable: Int? = null,
     @androidx.annotation.StringRes appSub: Int = R.string.kbm_app_sub,
     @androidx.annotation.StringRes btSub: Int = R.string.kbm_bt_sub,
     @androidx.annotation.StringRes btUnsupported: Int = R.string.kbm_bt_unsupported
@@ -350,8 +370,9 @@ internal fun TransportDialog(
         Text(stringResource(R.string.kbm_choose_title), style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(10.dp))
         TransportOption(
-            R.drawable.ms_wifi, stringResource(R.string.kbm_app), stringResource(appSub),
-            current == KbmTransport.APP
+            R.drawable.ms_wifi, stringResource(R.string.kbm_app), stringResource(appUnavailable ?: appSub),
+            current == KbmTransport.APP,
+            enabled = appUnavailable == null
         ) { onPick(KbmTransport.APP, def) }
         TransportOption(
             R.drawable.ms_bluetooth, stringResource(R.string.kbm_bt),
@@ -526,6 +547,39 @@ private fun GyroMouseSensors(enabled: Boolean, mouse: MouseConfig) {
     DisposableEffect(mouse) {
         GyroAim.mouseConfig = mouse
         onDispose { }
+    }
+}
+
+/**
+ * El giroscopio del móvil directo a [GyroAim], sin receptor (el mando por
+ * Bluetooth): la cámara o el ratón según [GyroAim.mouse], como con el motor
+ * de sensores del enlace.
+ */
+@Composable
+internal fun PhoneGyroFeed(enabled: Boolean) {
+    val context = LocalContext.current
+    val view = LocalView.current
+    DisposableEffect(enabled) {
+        if (!enabled) return@DisposableEffect onDispose { }
+        val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val accel = FloatArray(3)
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(e: SensorEvent) {
+                when (e.sensor.type) {
+                    Sensor.TYPE_ACCELEROMETER -> System.arraycopy(e.values, 0, accel, 0, 3)
+                    Sensor.TYPE_GYROSCOPE -> GyroAim.onSample(e.values, accel, view.display?.rotation ?: 0)
+                }
+            }
+
+            override fun onAccuracyChanged(s: Sensor?, a: Int) = Unit
+        }
+        GyroAim.active = true
+        sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sm.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME) }
+        sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE)?.let { sm.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME) }
+        onDispose {
+            sm.unregisterListener(listener)
+            GyroAim.active = false
+        }
     }
 }
 

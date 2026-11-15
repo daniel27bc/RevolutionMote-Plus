@@ -75,6 +75,9 @@ fun BtPadScreen(onExit: () -> Unit) {
                         TextButton(onClick = { BtHid.connect(d) }) { Text(name, color = PepoColors.Text, maxLines = 1) }
                     }
                 }
+                // Emparejados antes de abrir esto, el otro equipo no sabe que
+                // el móvil es un mando (Android, sobre todo) y no conecta
+                Text(stringResource(R.string.kbm_bt_repair), color = PepoColors.TextDim, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
