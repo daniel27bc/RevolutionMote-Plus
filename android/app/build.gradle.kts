@@ -24,8 +24,8 @@ android {
         applicationId = "dev.daniel27bc.revolutionmote"
         minSdk = 26
         targetSdk = 36
-        versionCode = 36
-        versionName = "1.4.1"
+        versionCode = 37
+        versionName = "1.4.2"
     }
 
     val releaseSigning = signingValue("storeFile", "KEYSTORE_PATH")?.let { store ->
