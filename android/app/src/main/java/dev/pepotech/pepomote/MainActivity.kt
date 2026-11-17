@@ -337,6 +337,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         hideSystemBars()
         UiSounds.init(this)
+        // Si la app se cerró de golpe haciendo de mando Bluetooth, el móvil
+        // recupera su nombre de siempre
+        BtHid.restoreName(this)
         // Motor de la vibración que piden los juegos (aparte de la de los botones)
         GameRumble.attach(this)
         PressMode.init(this)

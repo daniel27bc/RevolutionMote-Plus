@@ -113,13 +113,34 @@ object BtHid {
             arrayOf(android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_ADVERTISE)
         } else emptyArray()
 
-    /** Se anuncia como teclado y ratón. Idempotente. */
-    fun start(context: Context) {
+    /** Nombres con los que se ve el móvil mientras hace de mando o de teclado. */
+    const val NAME_KBM = "RevolutionMote+ Teclado"
+    const val NAME_PAD = "RevolutionMote+ Mando"
+
+    private const val PREFS = "bt_hid"
+    private const val KEY_ORIGINAL_NAME = "originalName"
+
+    private var appContext: Context? = null
+    private var bondWatcher: android.content.BroadcastReceiver? = null
+
+    /**
+     * Se anuncia como teclado, ratón y mando. Idempotente. Mientras dura, el
+     * móvil se ve en el Bluetooth de los otros equipos como [visibleName] en
+     * vez de con el suyo («POCO F7 Pro»): una app de Android no puede cambiar
+     * el TIPO de aparato (el icono de teléfono lo fija el sistema), pero sí el
+     * nombre. El suyo se guarda y vuelve al salir (o al abrir la app, si se
+     * cerró de golpe).
+     */
+    fun start(context: Context, visibleName: String = NAME_KBM) {
         if (Build.VERSION.SDK_INT < 28) {
             _state.value = State(Status.UNSUPPORTED)
             return
         }
-        if (hid != null) return
+        appContext = context.applicationContext
+        if (hid != null) {
+            rename(visibleName)
+            return
+        }
         val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         val a = manager?.adapter
         if (a == null) {
@@ -151,7 +172,69 @@ object BtHid {
             _state.value = State(Status.NO_PERMISSION)
             return
         }
-        if (!ok) _state.value = State(Status.UNSUPPORTED)
+        if (!ok) {
+            _state.value = State(Status.UNSUPPORTED)
+            return
+        }
+        rename(visibleName)
+        watchBonds(context.applicationContext)
+    }
+
+    /** Pone el nombre visible, guardando antes el del móvil (una sola vez). */
+    private fun rename(visibleName: String) {
+        val a = adapter ?: return
+        val prefs = appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE) ?: return
+        try {
+            val current = a.name
+            if (!prefs.contains(KEY_ORIGINAL_NAME) && current != null && current != NAME_KBM && current != NAME_PAD) {
+                prefs.edit().putString(KEY_ORIGINAL_NAME, current).commit()
+            }
+            if (current != visibleName) a.setName(visibleName)
+        } catch (_: SecurityException) {
+        }
+    }
+
+    /** Devuelve al móvil su nombre de siempre, si se le cambió. */
+    fun restoreName(context: Context) {
+        if (hid != null) return
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val original = prefs.getString(KEY_ORIGINAL_NAME, null) ?: return
+        val a = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter ?: return
+        try {
+            if (a.isEnabled && a.setName(original)) prefs.edit().remove(KEY_ORIGINAL_NAME).apply()
+        } catch (_: SecurityException) {
+        }
+    }
+
+    /**
+     * Al terminar de emparejar, el móvil conecta él mismo como teclado y mando.
+     * Hace falta con otro Android (una tablet): al ver un «teléfono», sus
+     * ajustes no abren la conexión de teclado y ratón por su cuenta y el
+     * emparejamiento se quedaba en eso.
+     */
+    private fun watchBonds(context: Context) {
+        if (bondWatcher != null) return
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, intent: android.content.Intent) {
+                val state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE)
+                if (state != BluetoothDevice.BOND_BONDED) return
+                val device: BluetoothDevice = (if (Build.VERSION.SDK_INT >= 33) {
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                } else {
+                    @Suppress("DEPRECATION") intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                }) ?: return
+                // Un momento: el otro equipo aún está leyendo qué servicios hay
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    if (host == null) connect(device)
+                }, 1500)
+            }
+        }
+        val filter = android.content.IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        // Es del sistema: llega aunque el receptor no se exporte
+        androidx.core.content.ContextCompat.registerReceiver(
+            context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        bondWatcher = receiver
     }
 
     @androidx.annotation.RequiresApi(28)
@@ -225,6 +308,11 @@ object BtHid {
         hid = null
         host = null
         _state.value = State(Status.OFF)
+        appContext?.let { c ->
+            bondWatcher?.let { runCatching { c.unregisterReceiver(it) } }
+            bondWatcher = null
+            restoreName(c)
+        }
     }
 
     // --- Ratón ---

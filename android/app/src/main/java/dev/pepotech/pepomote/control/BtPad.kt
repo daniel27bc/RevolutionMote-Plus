@@ -95,7 +95,7 @@ object BtPad {
     @Synchronized
     fun start(context: Context) {
         if (!_active.value || exec != null) return
-        BtHid.start(context)
+        BtHid.start(context, BtHid.NAME_PAD)
         Kbm.backend = Kbm.Backend.BT
         exec = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "bt-pad").apply { isDaemon = true } }.also {
             it.scheduleAtFixedRate({
