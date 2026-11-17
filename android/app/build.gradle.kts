@@ -24,8 +24,8 @@ android {
         applicationId = "dev.daniel27bc.revolutionmote"
         minSdk = 26
         targetSdk = 36
-        versionCode = 37
-        versionName = "1.4.2"
+        versionCode = 38
+        versionName = "1.4.3"
     }
 
     val releaseSigning = signingValue("storeFile", "KEYSTORE_PATH")?.let { store ->
@@ -39,8 +39,11 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Sin reducir el código: hasta la 1.4.2 se publicaba el APK de
+            // depuración y es lo único probado en móviles. Reducirlo (R8) puede
+            // romper lo que se lee por reflexión; activarlo solo tras probarlo.
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = releaseSigning
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

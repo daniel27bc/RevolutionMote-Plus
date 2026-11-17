@@ -52,15 +52,21 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > release.keystore
-            export KEYSTORE_PATH=release.keystore
-            ./gradlew assembleRelease --no-daemon
-            cp app/build/outputs/apk/release/app-release.apk ../RevolutionMote-Plus-${TAG}.apk
-          else
-            ./gradlew assembleDebug --no-daemon
-            cp app/build/outputs/apk/debug/app-debug.apk ../RevolutionMote-Plus-${TAG}.apk
+          # Siempre con la clave fija: Android solo instala una versión encima
+          # de otra (y el aviso de la app solo actualiza) si las dos llevan la
+          # misma firma. Sin los secretos no se publica nada: un APK firmado con
+          # otra clave obligaría a desinstalar.
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Faltan los secretos de firma (KEYSTORE_B64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD)"
+            exit 1
           fi
+          echo "$KEYSTORE_B64" | base64 -d > release.keystore
+          export KEYSTORE_PATH=release.keystore
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../RevolutionMote-Plus-${TAG}.apk
+          # Que la firma sea la de siempre (la huella va en docs/releases/FIRMA.md)
+          "$ANDROID_HOME"/build-tools/36.0.0/apksigner verify --print-certs ../RevolutionMote-Plus-${TAG}.apk | grep -i "SHA-256 digest" | tee firma.txt
+          grep -qi "2084231ca34dc052e5e528d692668643b0be03a3dedb52f31261d0517ba17744" firma.txt || { echo "::error::El APK no lleva la firma de RevolutionMote+"; exit 1; }
       - uses: actions/download-artifact@v4
         with:
           name: RevolutionMote-Plus-windows
