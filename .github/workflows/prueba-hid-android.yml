@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   bluetooth:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +23,8 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - name: Preparar Android virtual
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libpulse0 libnss3 libxkbcommon0 libx11-6 libxcb1 libgl1 libegl1
           ls -l /dev/kvm
           sudo chmod a+rw /dev/kvm
           "$ANDROID_HOME/emulator/emulator" -version
@@ -34,8 +36,8 @@ jobs:
       - name: Compilar APK de prueba y arrancar dos AVD
         run: |
           adb start-server
-          "$ANDROID_HOME/emulator/emulator" -avd emisor -port 5554 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -memory 1536 > emisor.log 2>&1 &
-          "$ANDROID_HOME/emulator/emulator" -avd receptor -port 5556 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -memory 1536 > receptor.log 2>&1 &
+          "$ANDROID_HOME/emulator/emulator" -avd emisor -port 5554 -no-window -no-audio -no-snapshot -gpu swiftshader -memory 1536 > emisor.log 2>&1 &
+          "$ANDROID_HOME/emulator/emulator" -avd receptor -port 5556 -no-window -no-audio -no-snapshot -gpu swiftshader -memory 1536 > receptor.log 2>&1 &
           cat > android/app/src/main/java/dev/pepotech/pepomote/PruebaHidActivity.kt <<'KOTLIN'
           package dev.pepotech.pepomote
           
