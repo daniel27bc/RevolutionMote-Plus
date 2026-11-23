@@ -25,7 +25,7 @@ jobs:
         run: |
           ls -l /dev/kvm
           sudo chmod a+rw /dev/kvm
-          emulator -version
+          "$ANDROID_HOME/emulator/emulator" -version
           for dispositivo in emisor receptor; do
             echo no | avdmanager create avd --force --name "$dispositivo" --package "system-images;android-36;google_apis;x86_64"
             sed -i '/^hw.bluetooth=/d' "$HOME/.android/avd/$dispositivo.avd/config.ini"
@@ -34,8 +34,8 @@ jobs:
       - name: Compilar APK de prueba y arrancar dos AVD
         run: |
           adb start-server
-          emulator -avd emisor -port 5554 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -memory 1536 > emisor.log 2>&1 &
-          emulator -avd receptor -port 5556 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -memory 1536 > receptor.log 2>&1 &
+          "$ANDROID_HOME/emulator/emulator" -avd emisor -port 5554 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -memory 1536 > emisor.log 2>&1 &
+          "$ANDROID_HOME/emulator/emulator" -avd receptor -port 5556 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -memory 1536 > receptor.log 2>&1 &
           cat > android/app/src/main/java/dev/pepotech/pepomote/PruebaHidActivity.kt <<'KOTLIN'
           package dev.pepotech.pepomote
           
@@ -63,7 +63,7 @@ jobs:
           
           class PruebaHidActivity : Activity() {
               private val reloj = Handler(Looper.getMainLooper())
-              private val adaptador get() = getSystemService(BluetoothManager::class.java).adapter
+              private val adaptador get() = requireNotNull(requireNotNull(getSystemService(BluetoothManager::class.java)).adapter)
               private var observador: BroadcastReceiver? = null
               private var emisor = false
               private var ultimoEstado: BtHid.State? = null
@@ -116,7 +116,8 @@ jobs:
                           val dispositivo = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java) ?: return
                           when (intent.action) {
                               BluetoothDevice.ACTION_FOUND -> {
-                                  if (dispositivo.name?.startsWith("RevolutionMote+") != true) return
+                                  val nombre = intent.getStringExtra(BluetoothDevice.EXTRA_NAME) ?: dispositivo.name
+                                  if (nombre?.startsWith("RevolutionMote+") != true) return
                                   adaptador.cancelDiscovery()
                                   Log.i(TAG, "EMPAREJAR " + dispositivo.createBond())
                               }
