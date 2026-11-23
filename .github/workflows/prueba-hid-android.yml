@@ -1,0 +1,278 @@
+name: Prueba de mando Bluetooth entre Androids
+on:
+  push:
+    branches: [feat/prueba-hid-entre-androids]
+    paths: [.github/workflows/prueba-hid-android.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  bluetooth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 emulator system-images;android-36;google_apis;x86_64'
+          log-accepted-android-sdk-licenses: false
+      - name: Preparar Android virtual
+        run: |
+          ls -l /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          emulator -version
+          for dispositivo in emisor receptor; do
+            echo no | avdmanager create avd --force --name "$dispositivo" --package "system-images;android-36;google_apis;x86_64"
+            sed -i '/^hw.bluetooth=/d' "$HOME/.android/avd/$dispositivo.avd/config.ini"
+            echo 'hw.bluetooth=yes' >> "$HOME/.android/avd/$dispositivo.avd/config.ini"
+          done
+      - name: Compilar APK de prueba y arrancar dos AVD
+        run: |
+          adb start-server
+          emulator -avd emisor -port 5554 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -memory 1536 > emisor.log 2>&1 &
+          emulator -avd receptor -port 5556 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -memory 1536 > receptor.log 2>&1 &
+          cat > android/app/src/main/java/dev/pepotech/pepomote/PruebaHidActivity.kt <<'KOTLIN'
+          package dev.pepotech.pepomote
+          
+          import android.Manifest
+          import android.app.Activity
+          import android.bluetooth.BluetoothAdapter
+          import android.bluetooth.BluetoothDevice
+          import android.bluetooth.BluetoothManager
+          import android.content.BroadcastReceiver
+          import android.content.Context
+          import android.content.Intent
+          import android.content.IntentFilter
+          import android.os.Bundle
+          import android.os.Handler
+          import android.os.Looper
+          import android.util.Log
+          import android.view.InputDevice
+          import android.view.KeyEvent
+          import android.view.MotionEvent
+          import android.widget.TextView
+          import androidx.core.content.ContextCompat
+          import dev.pepotech.pepomote.control.BtHid
+          import dev.pepotech.pepomote.control.BtPad
+          import dev.pepotech.pepomote.control.ButtonState
+          
+          class PruebaHidActivity : Activity() {
+              private val reloj = Handler(Looper.getMainLooper())
+              private val adaptador get() = getSystemService(BluetoothManager::class.java).adapter
+              private var observador: BroadcastReceiver? = null
+              private var emisor = false
+              private var ultimoEstado: BtHid.State? = null
+          
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(TextView(this).apply { text = "Prueba de Bluetooth HID"; isFocusableInTouchMode = true; requestFocus() })
+                  when (intent.getStringExtra("fase")) {
+                      "emisor" -> {
+                          emisor = true
+                          BtPad.enter()
+                          BtPad.start(this)
+                          registrarEstado()
+                      }
+                      "receptor" -> {
+                          adaptador.setName("RM-Receptor-Prueba")
+                          escucharDescubrimiento()
+                      }
+                  }
+              }
+          
+              override fun onNewIntent(intent: Intent) {
+                  super.onNewIntent(intent)
+                  when (intent.getStringExtra("fase")) {
+                      "visible" -> startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
+                          .putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 180))
+                      "buscar" -> Log.i(TAG, "BUSCAR " + adaptador.startDiscovery())
+                      "conectar" -> BtHid.bonded().firstOrNull()?.let { BtHid.connect(it) }
+                      "controles" -> {
+                          ButtonState.setDirect(ButtonState.A, true)
+                          ButtonState.setStick(100, 40)
+                          reloj.postDelayed({
+                              ButtonState.setDirect(ButtonState.A, false)
+                              ButtonState.setStick(0, 0)
+                          }, 500)
+                      }
+                  }
+              }
+          
+              private fun registrarEstado() {
+                  val estado = BtHid.state.value
+                  if (estado != ultimoEstado) Log.i(TAG, "HID " + estado.status)
+                  ultimoEstado = estado
+                  reloj.postDelayed({ registrarEstado() }, 150)
+              }
+          
+              private fun escucharDescubrimiento() {
+                  val receptor = object : BroadcastReceiver() {
+                      override fun onReceive(context: Context, intent: Intent) {
+                          val dispositivo = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java) ?: return
+                          when (intent.action) {
+                              BluetoothDevice.ACTION_FOUND -> {
+                                  if (dispositivo.name?.startsWith("RevolutionMote+") != true) return
+                                  adaptador.cancelDiscovery()
+                                  Log.i(TAG, "EMPAREJAR " + dispositivo.createBond())
+                              }
+                              BluetoothDevice.ACTION_BOND_STATE_CHANGED -> Log.i(TAG,
+                                  "BOND " + intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1))
+                          }
+                      }
+                  }
+                  val filtro = IntentFilter(BluetoothDevice.ACTION_FOUND).apply { addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED) }
+                  ContextCompat.registerReceiver(this, receptor, filtro, ContextCompat.RECEIVER_EXPORTED)
+                  observador = receptor
+              }
+          
+              override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                  if (event.isFromSource(InputDevice.SOURCE_GAMEPAD) && event.keyCode == KeyEvent.KEYCODE_BUTTON_A) {
+                      Log.i(TAG, "BOTON_A " + event.action)
+                      return true
+                  }
+                  return super.dispatchKeyEvent(event)
+              }
+          
+              override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+                  if (event.isFromSource(InputDevice.SOURCE_JOYSTICK)) {
+                      Log.i(TAG, "STICK_X " + event.getAxisValue(MotionEvent.AXIS_X))
+                      return true
+                  }
+                  return super.dispatchGenericMotionEvent(event)
+              }
+          
+              override fun onDestroy() {
+                  reloj.removeCallbacksAndMessages(null)
+                  observador?.let { unregisterReceiver(it) }
+                  if (emisor) BtPad.stop()
+                  super.onDestroy()
+              }
+          
+              companion object { private const val TAG = "PruebaHid" }
+          }
+          KOTLIN
+          python - <<'PY'
+          from pathlib import Path
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          text = text.replace('<application', '<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />\n    <application', 1)
+          text = text.replace('</application>', '<activity android:name=".PruebaHidActivity" android:exported="true" android:launchMode="singleTop" />\n    </application>', 1)
+          manifest.write_text(text)
+          PY
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - name: Emparejar y verificar controles recibidos
+        run: |
+          for puerto in 5554 5556; do
+            timeout 90 adb -s "emulator-$puerto" wait-for-device
+            timeout 120 bash -c 'until [ "$(adb -s "$1" shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 2; done' _ "emulator-$puerto"
+          done
+          python - <<'PY'
+          import pathlib
+          import re
+          import subprocess
+          import time
+          import xml.etree.ElementTree as ET
+          
+          APK = 'android/app/build/outputs/apk/debug/app-debug.apk'
+          APP = 'dev.daniel27bc.revolutionmote'
+          ACTIVITY = APP + '/dev.pepotech.pepomote.PruebaHidActivity'
+          EMISOR, RECEPTOR = 'emulator-5554', 'emulator-5556'
+          
+          def adb(device, *command, check=True):
+              return subprocess.run(['adb', '-s', device, *command], timeout=35, check=check,
+                                    text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout.strip()
+          
+          def iniciar(device, fase):
+              print(device, fase, adb(device, 'shell', 'am', 'start', '-n', ACTIVITY, '--es', 'fase', fase), flush=True)
+          
+          def registros(device):
+              return adb(device, 'logcat', '-d', '-s', 'PruebaHid:I', 'AndroidRuntime:E', '*:S')
+          
+          def confirmar(device):
+              try:
+                  adb(device, 'shell', 'uiautomator', 'dump', '/sdcard/hid-dialogo.xml')
+                  raw = adb(device, 'shell', 'cat', '/sdcard/hid-dialogo.xml')
+                  tree = ET.fromstring(raw)
+                  for node in tree.iter('node'):
+                      label = node.get('text', '').lower().strip()
+                      if label not in {'pair', 'pair and connect', 'allow', 'yes', 'ok', 'continue', 'start'}:
+                          continue
+                      if node.get('package', '') not in {'com.android.settings', 'com.android.systemui', 'android', 'com.google.android.bluetooth', 'com.android.bluetooth', 'com.google.android.permissioncontroller', 'com.android.permissioncontroller'}:
+                          continue
+                      coords = list(map(int, re.findall(r'\d+', node.get('bounds', ''))))
+                      if len(coords) == 4:
+                          x0, y0, x1, y1 = coords
+                          print(device, 'acepta', label, flush=True)
+                          adb(device, 'shell', 'input', 'tap', str((x0+x1)//2), str((y0+y1)//2))
+                          break
+              except (subprocess.SubprocessError, ET.ParseError):
+                  pass
+          
+          try:
+              for device in (EMISOR, RECEPTOR):
+                  print(device, adb(device, 'shell', 'getprop', 'bluetooth.profile.hid.device.enabled'),
+                        adb(device, 'shell', 'getprop', 'bluetooth.profile.hid.host.enabled'), flush=True)
+                  print(adb(device, 'install', '-g', APK), flush=True)
+                  adb(device, 'shell', 'input', 'keyevent', '82')
+                  adb(device, 'shell', 'svc', 'bluetooth', 'enable')
+              time.sleep(10)
+              iniciar(RECEPTOR, 'receptor')
+              iniciar(EMISOR, 'emisor')
+              for _ in range(15):
+                  if 'HID READY' in registros(EMISOR):
+                      break
+                  time.sleep(1)
+              else:
+                  raise AssertionError('Android emisor no registró el dispositivo HID')
+              iniciar(EMISOR, 'visible')
+              confirmar(EMISOR)
+              iniciar(RECEPTOR, 'buscar')
+              for _ in range(16):
+                  confirmar(EMISOR)
+                  confirmar(RECEPTOR)
+                  if 'BOND 12' in registros(RECEPTOR):
+                      break
+              else:
+                  raise AssertionError('No se completó el emparejamiento Bluetooth')
+              time.sleep(8)
+              automatico = 'HID CONNECTED' in registros(EMISOR)
+              print('CONEXION_AUTOMATICA=' + str(automatico), flush=True)
+              if not automatico:
+                  iniciar(EMISOR, 'conectar')
+                  for _ in range(10):
+                      if 'HID CONNECTED' in registros(EMISOR):
+                          break
+                      time.sleep(1)
+                  else:
+                      raise AssertionError('Emparejado, pero no abre la conexión HID ni manualmente')
+              iniciar(RECEPTOR, 'enfocar')
+              iniciar(EMISOR, 'controles')
+              time.sleep(3)
+              entrada = registros(RECEPTOR)
+              boton = 'BOTON_A 0' in entrada and 'BOTON_A 1' in entrada
+              stick = any(abs(float(x)) > 0.3 for x in re.findall(r'STICK_X (-?[\d.]+)', entrada))
+              print(f'RECEPTOR_ANDROID botón={boton}, stick={stick}', flush=True)
+              assert boton and stick, 'El receptor no entregó todos los eventos como mando'
+              assert automatico, 'Controles válidos con conexión manual, falla la conexión automática'
+          finally:
+              for device in (EMISOR, RECEPTOR):
+                  print(device, registros(device), flush=True)
+                  for subsystem in ('bluetooth_manager', 'input'):
+                      report = adb(device, 'shell', 'dumpsys', subsystem, check=False)
+                      pathlib.Path(f'{device}-{subsystem}.txt').write_text(report, encoding='utf-8')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: diagnostico-hid
+          path: |
+            emisor.log
+            receptor.log
+            emulator-*-*.txt
